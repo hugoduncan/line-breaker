@@ -258,3 +258,89 @@ considerations:
   (with-open [parser (Parser. language)]
     (f parser)))
 ```
+
+### Using Tree-sitter for Code Editing
+
+Tree-sitter is a parsing library that produces read-only syntax trees.
+It does not modify source code directly. For tools like line-sitter that
+need to reformat code, the workflow is:
+
+1. **Parse** the source to get node positions (byte offsets, row/column)
+2. **Analyze** the tree to determine where edits are needed
+3. **Edit** the source string using the position information
+4. Optionally **re-parse** incrementally if making multiple passes
+
+**Single-pass editing (recommended for line-sitter):**
+
+For line-sitter, a single parse can identify all needed line breaks.
+Collect edits as a list of insertions, then apply them to the source
+string in reverse order (so earlier positions remain valid):
+
+```clojure
+(defn apply-edits
+  "Apply edits to source. Each edit is {:offset n :insert s}.
+  Edits must be sorted by offset descending."
+  [source edits]
+  (reduce
+    (fn [s {:keys [offset insert]}]
+      (str (subs s 0 offset) insert (subs s offset)))
+    source
+    edits))
+
+;; Example: insert line breaks
+(let [edits [{:offset 45 :insert "\n  "}
+             {:offset 30 :insert "\n  "}
+             {:offset 15 :insert "\n  "}]]
+  (apply-edits source edits))
+```
+
+**Incremental re-parsing (for multi-pass editing):**
+
+If edits require multiple analysis passes, use `InputEdit` to tell
+tree-sitter what changed for efficient re-parsing:
+
+```clojure
+(import '[io.github.treesitter.jtreesitter InputEdit Point])
+
+(defn make-input-edit
+  "Create an InputEdit describing an insertion at offset."
+  [source offset insert-text]
+  (let [;; Calculate positions before edit
+        before-text (subs source 0 offset)
+        start-row   (count (filter #(= % \newline) before-text))
+        start-col   (- offset (or (str/last-index-of before-text "\n") -1) 1)
+        start-point (Point. start-row start-col)
+        ;; Old end = start (insertion, no deletion)
+        old-end-byte  offset
+        old-end-point start-point
+        ;; New end accounts for inserted text
+        new-end-byte  (+ offset (count insert-text))
+        insert-rows   (count (filter #(= % \newline) insert-text))
+        new-end-row   (+ start-row insert-rows)
+        new-end-col   (if (pos? insert-rows)
+                        (- (count insert-text)
+                           (inc (or (str/last-index-of insert-text "\n") -1)))
+                        (+ start-col (count insert-text)))
+        new-end-point (Point. new-end-row new-end-col)]
+    (InputEdit. offset old-end-byte new-end-byte
+                start-point old-end-point new-end-point)))
+
+(defn edit-and-reparse
+  "Apply an edit and incrementally re-parse."
+  [parser tree source offset insert-text]
+  (let [edit     (make-input-edit source offset insert-text)
+        new-src  (str (subs source 0 offset) insert-text (subs source offset))
+        _        (.edit tree edit)
+        new-tree (.orElse (.parse parser new-src tree) nil)]
+    {:source new-src :tree new-tree}))
+```
+
+**When to use each approach:**
+
+| Approach | Use when |
+|----------|----------|
+| Single-pass | All edits can be determined from one parse (line-sitter) |
+| Incremental | Edits depend on results of previous edits |
+
+For line-sitter, single-pass editing is sufficient: parse once, collect
+all line break insertions, apply in reverse offset order.
