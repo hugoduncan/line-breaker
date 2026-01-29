@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Clojure
+        uses: DeLaGuardo/setup-clojure@12.5
+        with:
+          cli: latest
+
+      - name: Cache Clojure deps
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.m2/repository
+            ~/.gitlibs
+          key: ${{ runner.os }}-clojure-${{ hashFiles('deps.edn') }}
+          restore-keys: |
+            ${{ runner.os }}-clojure-
+
+      - name: Run tests
+        run: clojure -M:test
+
+  format-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Babashka
+        uses: DeLaGuardo/setup-clojure@12.5
+        with:
+          bb: latest
+
+      - name: Install cljfmt
+        run: |
+          curl -sLO https://raw.githubusercontent.com/weavejester/cljfmt/master/install.sh
+          chmod +x install.sh
+          sudo ./install.sh
+
+      - name: Check formatting
+        run: bb format-check
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Babashka
+        uses: DeLaGuardo/setup-clojure@12.5
+        with:
+          bb: latest
+
+      - name: Setup clj-kondo
+        uses: DeLaGuardo/setup-clojure@12.5
+        with:
+          clj-kondo: latest
+
+      - name: Run linting
+        run: bb lint
