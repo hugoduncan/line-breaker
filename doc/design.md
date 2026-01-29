@@ -957,3 +957,255 @@ formatting.
 
 **Strings with newlines:** Multi-line strings are single `str_lit` nodes
 and are unbreakable. They may cause lines to exceed limits.
+
+## Ignore Mechanism
+
+line-sitter provides an escape hatch for code that should not be
+reformatted. Use the `#_:line-sitter/ignore` discard form immediately
+before any form to prevent line-sitter from breaking it.
+
+### Syntax
+
+```clojure
+#_:line-sitter/ignore
+(form that should not be broken)
+```
+
+The ignore marker consists of:
+1. `#_` - Clojure's discard reader macro
+2. `:line-sitter/ignore` - a namespaced keyword
+
+This is valid Clojure syntax that the reader discards, so it has no
+runtime effect. The parser sees three nodes: `dis_expr`, `kwd_lit`, and
+the following form.
+
+### Detection
+
+When line-sitter encounters a `dis_expr` node containing the keyword
+`:line-sitter/ignore`, it marks the immediately following sibling form
+as ignored. Ignored forms are:
+
+- **Not broken** even if they exceed the line limit
+- **Not recursively processed** (children are also left unchanged)
+- **Left silently** without warning or error
+
+### Examples
+
+**Ignore a long definition:**
+```clojure
+#_:line-sitter/ignore
+(def api-url "https://api.example.com/v2/very/long/path/to/resource/endpoint")
+```
+
+The long string would normally cause this line to exceed limits.
+With the ignore marker, line-sitter leaves it unchanged.
+
+**Ignore a formatted map:**
+```clojure
+#_:line-sitter/ignore
+{:small 1  :medium 10  :large 100  :xlarge 1000}
+```
+
+If you've intentionally formatted a map with aligned spacing, use
+ignore to preserve it.
+
+**Ignore a complex threading macro:**
+```clojure
+#_:line-sitter/ignore
+(-> data (transform {:opt-a 1 :opt-b 2}) (filter pred?) (map f) (into []))
+```
+
+Some developers prefer keeping threading macros on one line for
+readability. The ignore marker preserves this choice.
+
+**Ignore within a larger form:**
+```clojure
+(defn process-data
+  [input]
+  #_:line-sitter/ignore
+  (let [config {:alpha 1 :beta 2 :gamma 3 :delta 4 :epsilon 5}]
+    (transform input config)))
+```
+
+Only the `let` form is ignored; the outer `defn` can still be
+reformatted if needed.
+
+### When to Use
+
+Use `#_:line-sitter/ignore` for:
+- URL strings or paths that shouldn't be broken
+- Intentionally formatted data (aligned maps, tables)
+- One-liner threading macros kept for readability
+- Generated or templated code
+
+Avoid overusing ignore markers. If you find yourself adding many,
+consider whether the line length limit is appropriate for your project.
+
+## Example Transformations
+
+This section shows complete before/after examples of how line-sitter
+reformats code to fit within a maximum line length.
+
+### Example 1: Long Function Call
+
+A common case: a function call with many arguments.
+
+**Configuration:** `{:line-length 50}`
+
+**Before:**
+```clojure
+(send-notification user-id "Welcome!" {:urgent true :channel "email"})
+```
+
+**After:**
+```clojure
+(send-notification
+  user-id
+  "Welcome!"
+  {:urgent true :channel "email"})
+```
+
+The outermost `list_lit` is broken. The map literal fits on one line
+(under 50 characters) so it remains unbroken.
+
+### Example 2: Nested Let Bindings
+
+A `let` form with multiple bindings that exceed the limit.
+
+**Configuration:** `{:line-length 60}`
+
+**Before:**
+```clojure
+(let [user (fetch-user id) permissions (get-permissions user) role (:role user)]
+  (authorize permissions role))
+```
+
+**After:**
+```clojure
+(let [user (fetch-user id)
+      permissions (get-permissions user)
+      role (:role user)]
+  (authorize permissions role))
+```
+
+The `:binding` indent rule keeps the bindings vector on the first line
+with `let`. The vector's children are broken with 6-space indent
+(aligning with the first binding). The body fits on one line.
+
+### Example 3: Map Literal
+
+A map literal with many key-value pairs.
+
+**Configuration:** `{:line-length 45}`
+
+**Before:**
+```clojure
+{:id 1 :name "Alice" :email "alice@example.com" :active true}
+```
+
+**After:**
+```clojure
+{:id 1
+  :name "Alice"
+  :email "alice@example.com"
+  :active true}
+```
+
+Each element (key or value) gets its own line with 2-space indent from
+the opening brace.
+
+### Example 4: Threading Macro
+
+A threading macro with multiple transformation steps.
+
+**Configuration:** `{:line-length 50}`
+
+**Before:**
+```clojure
+(-> request (validate-input) (transform-payload) (add-metadata {:ts (now)}) (send-to-service))
+```
+
+**After (first pass):**
+```clojure
+(->
+  request
+  (validate-input)
+  (transform-payload)
+  (add-metadata {:ts (now)})
+  (send-to-service))
+```
+
+The outer `->` form is broken. Each step goes on its own line. The
+`(add-metadata {:ts (now)})` form fits under 50 characters, so it
+remains unbroken.
+
+### Example 5: Nested Form Requiring Multiple Breaks
+
+Sometimes breaking the outer form isn't enough.
+
+**Configuration:** `{:line-length 40}`
+
+**Before:**
+```clojure
+(defn calc [x] (+ (* x x) (* 2 x) 1))
+```
+
+**After (first pass - break defn):**
+```clojure
+(defn calc
+  [x]
+  (+ (* x x) (* 2 x) 1))
+```
+
+Line 3 is 22 characters, which fits. But consider a longer variant:
+
+**Before:**
+```clojure
+(defn calculate [x] (+ (multiply x x) (multiply 2 x) (constant 1)))
+```
+
+**After (first pass):**
+```clojure
+(defn calculate
+  [x]
+  (+ (multiply x x) (multiply 2 x) (constant 1)))
+```
+
+Line 3 exceeds 40 characters. Break the inner `+` form:
+
+**After (second pass):**
+```clojure
+(defn calculate
+  [x]
+  (+
+    (multiply x x)
+    (multiply 2 x)
+    (constant 1)))
+```
+
+All lines now fit within 40 characters.
+
+### Example 6: Ignored Form Alongside Regular Formatting
+
+Showing how ignore interacts with normal reformatting.
+
+**Configuration:** `{:line-length 50}`
+
+**Before:**
+```clojure
+(defn process [data] #_:line-sitter/ignore {:a 1 :b 2 :c 3 :d 4 :e 5 :f 6 :g 7} (transform data))
+```
+
+**After:**
+```clojure
+(defn process
+  [data]
+  #_:line-sitter/ignore
+  {:a 1 :b 2 :c 3 :d 4 :e 5 :f 6 :g 7}
+  (transform data))
+```
+
+The outer `defn` is broken normally. The map literal following
+`#_:line-sitter/ignore` exceeds 50 characters but is left unchanged
+because it's ignored. The final `(transform data)` call fits and
+remains on one line.
