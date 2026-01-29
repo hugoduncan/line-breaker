@@ -1,0 +1,30 @@
+{:tasks
+ {lint
+  {:doc "Run clj-kondo linting on src and test"
+   :task (do
+           (println "Linting src and test directories...")
+           (shell "clj-kondo --lint src test"))}
+
+  format
+  {:doc "Format code with cljfmt"
+   :task (do
+           (println "Formatting code...")
+           (shell "cljfmt fix src test"))}
+
+  format-check
+  {:doc "Check code formatting with cljfmt"
+   :task (do
+           (println "Checking code formatting...")
+           (shell "cljfmt check src test"))}
+
+  test
+  {:doc "Run tests with kaocha"
+   :task (do
+           (println "Running tests...")
+           (shell "clojure -M:test"))}
+
+  import-kondo-config
+  {:doc "Import clj-kondo configs from dependencies"
+   :task (do
+           (println "Importing clj-kondo configs from dependencies...")
+           (shell "clj-kondo --copy-configs --dependencies --lint \"$(clojure -Spath)\""))}}}
