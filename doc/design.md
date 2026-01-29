@@ -895,48 +895,6 @@ receive the same 2-space indentation when a form is broken.
 
 Comments remain attached to the preceding element on the same line.
 
-### Implementation Sketch
-
-```clojure
-(defn needs-breaking?
-  "Check if a line exceeds the maximum length."
-  [line max-length]
-  (> (count line) max-length))
-
-(defn find-outermost-breakable
-  "Find the outermost breakable form spanning the given line."
-  [tree line-number]
-  ;; Walk tree, find breakable nodes (list_lit, vec_lit, map_lit, set_lit)
-  ;; that span line-number, return the outermost one
-  ...)
-
-(defn break-form
-  "Break a form by placing each child on its own line.
-  Returns a sequence of edits {:offset n :insert s}."
-  [node source]
-  ;; For each child after the first, insert newline + indent before it
-  ;; Indent = column of opening delimiter + 2
-  ...)
-
-(defn reformat
-  "Reformat source to fit within max-length.
-  Returns the reformatted source string."
-  [source max-length]
-  (let [tree (parse-source source)]
-    (loop [src source
-           tree tree]
-      (let [lines         (str/split-lines src)
-            long-line-idx (find-first-long-line lines max-length)]
-        (if-not long-line-idx
-          src ; all lines fit
-          (if-let [form (find-outermost-breakable tree long-line-idx)]
-            (let [edits   (break-form form src)
-                  new-src (apply-edits src (sort-by :offset > edits))
-                  new-tree (parse-source new-src)] ; or incremental reparse
-              (recur new-src new-tree))
-            src)))))) ; no breakable form found, return as-is
-```
-
 ### Edge Cases
 
 **Empty collections:** No children to break; left unchanged.
