@@ -1,7 +1,8 @@
 {:paths ["src"]
 
  :deps {org.clojure/clojure {:mvn/version "1.12.4"}
-        io.github.tree-sitter/jtreesitter {:mvn/version "0.26.0"}}
+        io.github.tree-sitter/jtreesitter {:mvn/version "0.26.0"}
+        babashka/fs {:mvn/version "0.5.30"}}
 
  :aliases
  {:nrepl
