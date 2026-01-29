@@ -571,6 +571,106 @@ The tool processes all files matching configured extensions in the
 current directory and its subdirectories, reporting any line length
 violations.
 
+## Error Handling
+
+line-sitter handles errors gracefully and provides informative error
+messages to help users diagnose issues.
+
+### Error Categories
+
+| Category | Exit Code | Description |
+|----------|-----------|-------------|
+| Parse error | 2 | Tree-sitter failed to parse a source file |
+| Invalid config | 2 | Configuration file contains invalid EDN or invalid values |
+| File not found | 2 | Specified file or directory does not exist |
+| I/O error | 2 | Permission denied, disk full, or other filesystem errors |
+
+All errors exit with code 2 and output messages to stderr.
+
+### Error Message Format
+
+Error messages follow a consistent format:
+
+```
+line-sitter: <category>: <details>
+```
+
+For file-specific errors, the path is included:
+
+```
+line-sitter: <category>: <path>: <details>
+```
+
+### Parse Errors
+
+When tree-sitter fails to parse a source file (malformed Clojure
+syntax), line-sitter reports the error and continues processing
+remaining files.
+
+**Message format:**
+```
+line-sitter: parse error: path/to/file.clj: failed to parse
+```
+
+Note: tree-sitter is tolerant and produces partial trees for most
+syntax errors. A complete parse failure is rare.
+
+### Configuration Errors
+
+**Invalid EDN syntax:**
+```
+line-sitter: config error: .line-sitter.edn: invalid EDN: <reader error>
+```
+
+**Invalid value types:**
+```
+line-sitter: config error: .line-sitter.edn: :line-length must be a positive integer
+line-sitter: config error: .line-sitter.edn: :extensions must be a vector of strings
+line-sitter: config error: .line-sitter.edn: :indents must be a map
+```
+
+**Unknown keys (warning, not error):**
+```
+line-sitter: warning: .line-sitter.edn: unknown key :foo
+```
+
+Unknown keys produce a warning but do not prevent execution.
+
+### File Not Found
+
+When a specified path does not exist:
+
+```
+line-sitter: file not found: path/to/missing.clj
+line-sitter: directory not found: path/to/missing/
+```
+
+### I/O Errors
+
+Permission and filesystem errors:
+
+```
+line-sitter: read error: path/to/file.clj: permission denied
+line-sitter: write error: path/to/file.clj: disk full
+```
+
+### Batch Processing Behavior
+
+When processing multiple files:
+
+1. Errors are accumulated and reported, not fatal by default
+2. Processing continues with remaining files after an error
+3. Exit code 2 if any errors occurred
+4. Use `--fail-fast` option to stop on first error (future enhancement)
+
+**Example output:**
+```
+line-sitter: parse error: src/broken.clj: failed to parse
+line-sitter: read error: src/locked.clj: permission denied
+src/good.clj:42: line exceeds 80 characters (actual: 95)
+Processed 3 files, 2 errors
+```
+
 ## Line Breaking Algorithm
 
 This section describes the algorithm for reformatting Clojure code to
