@@ -1,0 +1,1 @@
+{:hooks {:analyze-call {line-sitter.test-util/with-temp-dir hooks.with-temp-dir/with-temp-dir}}}
