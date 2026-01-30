@@ -27,4 +27,12 @@
   {:doc "Import clj-kondo configs from dependencies"
    :task (do
            (println "Importing clj-kondo configs from dependencies...")
-           (shell "clj-kondo --copy-configs --dependencies --lint \"$(clojure -Spath)\""))}}}
+           (shell "clj-kondo --copy-configs --dependencies --lint \"$(clojure -Spath)\""))}
+
+  build-native
+  {:doc "Build tree-sitter native libraries for current platform"
+   :task (shell "scripts/build-native.sh")}
+
+  javac
+  {:doc "Compile Java sources (NativeLoader for jtreesitter)"
+   :task (shell "clojure -T:build javac")}}}

@@ -1,4 +1,4 @@
-{:paths ["src"]
+{:paths ["src" "classes" "resources"]
 
  :deps {org.clojure/clojure {:mvn/version "1.12.4"}
         io.github.tree-sitter/jtreesitter {:mvn/version "0.26.0"}

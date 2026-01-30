@@ -6,6 +6,8 @@
 
 # Build artifacts
 target/
+classes/
+.build/
 
 # Task tracking
 .mcp-tasks-current.edn

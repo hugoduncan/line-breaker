@@ -1,1 +1,2 @@
-{:hooks {:analyze-call {line-sitter.test-util/with-temp-dir hooks.with-temp-dir/with-temp-dir}}}
+{:hooks {:analyze-call {line-sitter.test-util/with-temp-dir hooks.with-temp-dir/with-temp-dir
+                        line-sitter.treesitter.parser/with-parser hooks.with-parser/with-parser}}}
