@@ -2,7 +2,8 @@
 
  :deps {org.clojure/clojure {:mvn/version "1.12.4"}
         io.github.tree-sitter/jtreesitter {:mvn/version "0.26.0"}
-        babashka/fs {:mvn/version "0.5.30"}}
+        babashka/fs {:mvn/version "0.5.30"}
+        org.babashka/cli {:mvn/version "0.8.60"}}
 
  :aliases
  {:nrepl
