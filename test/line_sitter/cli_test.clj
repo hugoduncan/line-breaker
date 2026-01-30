@@ -1,5 +1,7 @@
 (ns line-sitter.cli-test
   (:require
+   [babashka.fs :as fs]
+   [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [line-sitter.cli :as cli]))
 
@@ -53,3 +55,76 @@
       ;; babashka.cli default behavior: later flags override earlier ones
       (is (= {:opts {:fix true :stdout true} :args []}
              (cli/parse-args ["--fix" "--stdout"]))))))
+
+;;; File discovery tests
+
+(def ^:private test-fixtures-dir
+  "test-resources/file-discovery-test")
+
+(def ^:private default-extensions
+  [".clj" ".cljs" ".cljc" ".edn"])
+
+;; Tests for resolve-files. Verifies file discovery handles single files,
+;; directories, extension filtering, and error cases correctly.
+
+(deftest resolve-files-test
+  (testing "resolve-files"
+    (testing "given a single file path"
+      (testing "returns it as an absolute path"
+        (let [result (cli/resolve-files ["test-resources/file-discovery-test/single.clj"]
+                                        default-extensions)]
+          (is (= 1 (count result)))
+          (is (str/ends-with? (first result) "single.clj"))
+          (is (fs/absolute? (first result))))))
+
+    (testing "given a directory path"
+      (testing "recursively finds all matching files"
+        (let [result (cli/resolve-files [test-fixtures-dir] default-extensions)]
+          (is (= 3 (count result))
+              (str "Expected 3 files, got: " result))
+          (is (some #(str/ends-with? % "single.clj") result))
+          (is (some #(str/ends-with? % "inner.cljs") result))
+          (is (some #(str/ends-with? % "bottom.edn") result)))))
+
+    (testing "given a directory path"
+      (testing "excludes non-matching extensions"
+        (let [result (cli/resolve-files [test-fixtures-dir] default-extensions)]
+          (is (not (some #(str/ends-with? % "other.txt") result))))))
+
+    (testing "given empty paths"
+      (testing "defaults to current directory"
+        (let [result (cli/resolve-files [] default-extensions)]
+          ;; Should find files in current dir (the project)
+          (is (seq result) "Should find at least some files"))))
+
+    (testing "given non-existent path"
+      (testing "throws ex-info with :type :file-error"
+        (is (thrown-with-msg?
+             clojure.lang.ExceptionInfo
+             #"Path does not exist"
+             (cli/resolve-files ["nonexistent/path.clj"] default-extensions)))))
+
+    (testing "given non-existent path"
+      (testing "includes the path in exception data"
+        (try
+          (cli/resolve-files ["nonexistent/path.clj"] default-extensions)
+          (is false "Should have thrown")
+          (catch clojure.lang.ExceptionInfo e
+            (is (= :file-error (:type (ex-data e))))
+            (is (= "nonexistent/path.clj" (:path (ex-data e))))))))
+
+    (testing "given a file with non-matching extension"
+      (testing "excludes it from results"
+        (let [result (cli/resolve-files ["test-resources/file-discovery-test/other.txt"]
+                                        default-extensions)]
+          (is (empty? result)))))
+
+    (testing "given custom extensions"
+      (testing "filters to only matching files"
+        (let [result (cli/resolve-files [test-fixtures-dir] [".clj"])]
+          (is (= 1 (count result)))
+          (is (str/ends-with? (first result) "single.clj")))))
+
+    (testing "returns sorted paths"
+      (let [result (cli/resolve-files [test-fixtures-dir] default-extensions)]
+        (is (= result (sort result)))))))
