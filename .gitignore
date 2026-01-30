@@ -6,6 +6,7 @@
 
 # Build artifacts
 target/
+classes/
 .build/
 
 # Task tracking
