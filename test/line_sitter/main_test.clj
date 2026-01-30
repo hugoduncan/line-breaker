@@ -130,7 +130,7 @@
                                            (main/run ["--check" (str root)]))]
                 (is (= 1 exit-code))
                 (is (str/includes? err "Checked 2 files"))
-                (is (str/includes? err "1 violations found")))))))
+                (is (str/includes? err "1 violation found")))))))
 
       (testing "given single file"
         (testing "does not print summary"

@@ -42,7 +42,8 @@
   [file-count violation-count]
   (when (> file-count 1)
     (if (pos? violation-count)
-      (str "Checked " file-count " files, " violation-count " violations found")
+      (str "Checked " file-count " files, "
+           violation-count (if (= 1 violation-count) " violation" " violations") " found")
       (str "Checked " file-count " files, all lines within limit"))))
 
 ;;; Ignore directive support

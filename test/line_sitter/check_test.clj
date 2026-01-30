@@ -147,6 +147,8 @@
 
     (testing "returns violation message for multiple files with violations"
       (is (= "Checked 3 files, 5 violations found"
-             (check/format-summary 3 5)))
-      (is (= "Checked 100 files, 1 violations found"
+             (check/format-summary 3 5))))
+
+    (testing "uses singular 'violation' for count of 1"
+      (is (= "Checked 100 files, 1 violation found"
              (check/format-summary 100 1))))))
