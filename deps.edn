@@ -13,7 +13,7 @@
                "--middleware" "[cider.nrepl/cider-middleware]"]}
 
   :run
-  {:exec-fn line-sitter.cli/-main}
+  {:exec-fn line-sitter.main/-main}
 
   :test
   {:extra-paths ["test"]

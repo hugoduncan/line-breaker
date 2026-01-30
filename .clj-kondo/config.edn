@@ -1,1 +1,2 @@
-{:hooks {:analyze-call {line-sitter.config-test/with-temp-dir hooks.with-temp-dir/with-temp-dir}}}
+{:hooks {:analyze-call {line-sitter.config-test/with-temp-dir hooks.with-temp-dir/with-temp-dir
+                        line-sitter.main-test/with-temp-dir hooks.with-temp-dir/with-temp-dir}}}
