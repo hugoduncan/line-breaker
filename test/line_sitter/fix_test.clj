@@ -148,3 +148,54 @@
             result (fix/apply-edits source edits)]
         (is (= "  (a\n    b\n    c)" result)
             "indentation accounts for form's column position")))))
+
+(deftest find-long-lines-test
+  ;; Verify detection of lines exceeding max length.
+  (testing "find-long-lines"
+    (testing "returns empty vector when all lines fit"
+      (is (= [] (fix/find-long-lines "short" 10))))
+
+    (testing "returns line number for single long line"
+      (is (= [1] (fix/find-long-lines "this is too long" 10))))
+
+    (testing "returns multiple line numbers"
+      (is (= [1 3] (fix/find-long-lines "long line here\nok\nlong line here" 10))))
+
+    (testing "handles empty string"
+      (is (= [] (fix/find-long-lines "" 10))))
+
+    (testing "uses 1-indexed line numbers"
+      (is (= [2] (fix/find-long-lines "ok\nthis is too long\nok" 10))))))
+
+(deftest fix-source-test
+  ;; Verify the iterative multi-pass breaking loop.
+  (testing "fix-source"
+    (testing "returns source unchanged when within limit"
+      (is (= "(a b c)" (fix/fix-source "(a b c)" {:line-length 80}))))
+
+    (testing "breaks simple form in one pass"
+      (is (= "(a\n  b\n  c)"
+             (fix/fix-source "(a b c)" {:line-length 5}))))
+
+    (testing "handles nested forms requiring multiple passes"
+      ;; First pass breaks outer, second pass breaks inner
+      (let [source "(a (b c d e) f)"
+            result (fix/fix-source source {:line-length 10})]
+        (is (= "(a\n  (b\n    c\n    d\n    e)\n  f)" result))))
+
+    (testing "leaves unbreakable atoms unchanged"
+      ;; Long string cannot be broken
+      (let [source "(def x \"long-string\")"
+            result (fix/fix-source source {:line-length 10})]
+        ;; Can break the form but not the string
+        (is (= "(def\n  x\n  \"long-string\")" result))))
+
+    (testing "handles already broken source"
+      (let [source "(a\n  b\n  c)"]
+        (is (= source (fix/fix-source source {:line-length 80})))))
+
+    (testing "uses default line-length of 80"
+      (let [short-source "(a b c)"
+            long-source (str "(" (apply str (repeat 40 "a ")) ")")]
+        (is (= short-source (fix/fix-source short-source {})))
+        (is (not= long-source (fix/fix-source long-source {})))))))

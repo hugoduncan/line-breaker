@@ -4,7 +4,9 @@
   Provides functions to identify breakable forms, generate line break edits,
   and apply those edits to source code."
   (:require
-   [line-sitter.treesitter.node :as node]))
+   [clojure.string :as str]
+   [line-sitter.treesitter.node :as node]
+   [line-sitter.treesitter.parser :as parser]))
 
 ;;; Edit application
 
@@ -43,13 +45,32 @@
   (when-let [[start-line end-line] (node/node-line-range node)]
     (<= start-line line end-line)))
 
-(defn- find-breakable-forms-on-line
-  "Find all breakable nodes containing the given line.
+(defn- node-start-line
+  "Get the 1-indexed start line of a node."
+  [node]
+  (first (node/node-line-range node)))
 
-  Returns a vector of nodes from outermost to innermost."
+(defn- form-needs-breaking-on-line?
+  "Returns true if form has consecutive children both on the target line.
+  A form already broken (children on separate lines) returns false."
+  [node line]
+  (let [children (node/named-children node)]
+    (some (fn [[prev-child next-child]]
+            (let [prev-line (node-start-line prev-child)
+                  next-line (node-start-line next-child)]
+              (= prev-line next-line line)))
+          (partition 2 1 children))))
+
+(defn- find-breakable-forms-on-line
+  "Find all breakable nodes containing the given line that need breaking.
+
+  Returns a vector of nodes from outermost to innermost. Only includes
+  forms that have consecutive children on the target line."
   [node line]
   (when (node-contains-line? node line)
-    (let [self (when (breakable-node? node) [node])
+    (let [self (when (and (breakable-node? node)
+                          (form-needs-breaking-on-line? node line))
+                 [node])
           children-results (mapcat #(find-breakable-forms-on-line % line)
                                    (node/named-children node))]
       (into (vec self) children-results))))
@@ -58,8 +79,9 @@
   "Find the outermost breakable form containing the given line.
 
   Takes a parsed tree and a 1-indexed line number. Returns the outermost
-  breakable node (list_lit, vec_lit, map_lit, set_lit) that spans that line,
-  or nil if no breakable form is found."
+  breakable node (list_lit, vec_lit, map_lit, set_lit) that spans that line
+  and has consecutive children on that line, or nil if no breakable form
+  is found."
   [tree line]
   (first (find-breakable-forms-on-line (node/root-node tree) line)))
 
@@ -89,15 +111,68 @@
   - Closing delimiter stays on the same line as last element
 
   Returns a vector of edits replacing whitespace between consecutive
-  elements with newline+indent. Each edit is {:start n :end m :replacement s}."
+  elements with newline+indent. Each edit is {:start n :end m :replacement s}.
+  Returns nil if node is nil or has fewer than 2 children."
   [node]
-  (let [children (node/named-children node)
-        indent-col (+ 2 (form-start-column node))
-        indent-str (str "\n" (apply str (repeat indent-col \space)))]
-    (when (> (count children) 1)
-      (into []
-            (map (fn [[prev-child next-child]]
-                   {:start (element-end-offset prev-child)
-                    :end (element-start-offset next-child)
-                    :replacement indent-str}))
-            (partition 2 1 children)))))
+  (when node
+    (let [children (node/named-children node)
+          indent-col (+ 2 (form-start-column node))
+          indent-str (str "\n" (apply str (repeat indent-col \space)))]
+      (when (> (count children) 1)
+        (into []
+              (map (fn [[prev-child next-child]]
+                     {:start (element-end-offset prev-child)
+                      :end (element-start-offset next-child)
+                      :replacement indent-str}))
+              (partition 2 1 children))))))
+
+;;; Line length checking
+
+(defn find-long-lines
+  "Find 1-indexed line numbers exceeding max-length.
+  Returns a vector of line numbers."
+  [source max-length]
+  (into []
+        (comp
+         (map-indexed (fn [idx line]
+                        (when (> (count line) max-length)
+                          (inc idx))))
+         (filter some?))
+        (str/split-lines source)))
+
+;;; Iterative multi-pass breaking
+
+(def ^:private max-iterations
+  "Maximum number of breaking passes to prevent infinite loops."
+  100)
+
+(defn fix-source
+  "Fix line length violations in source code.
+
+  Takes a source string and config map with :line-length. Iteratively breaks
+  forms until all lines fit or only unbreakable atoms remain. Returns the
+  fixed source string.
+
+  The algorithm:
+  1. Find lines exceeding max-length
+  2. Find outermost breakable form on first violating line
+  3. Break that form
+  4. Re-parse and repeat until no violations or no breakable forms"
+  [source config]
+  (let [max-length (get config :line-length 80)]
+    (loop [src source
+           iteration 0]
+      (if (>= iteration max-iterations)
+        src
+        (let [long-lines (find-long-lines src max-length)]
+          (if (empty? long-lines)
+            src
+            (let [tree (parser/parse-source src)
+                  first-long-line (first long-lines)
+                  breakable-form (find-breakable-form tree first-long-line)]
+              (if-not breakable-form
+                src
+                (let [edits (break-form breakable-form)]
+                  (if (empty? edits)
+                    src
+                    (recur (apply-edits src edits) (inc iteration))))))))))))
