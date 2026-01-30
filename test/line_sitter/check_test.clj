@@ -129,3 +129,24 @@
       (let [violations [{:line 3 :length 85}]]
         (is (= []
                (check/filter-violations violations #{[1 10]})))))))
+
+(deftest format-summary-test
+  ;; Tests formatting of check summary message.
+  ;; Contract: format-summary returns nil for single file, appropriate
+  ;; message for multiple files based on violation count.
+  (testing "format-summary"
+    (testing "returns nil for single file"
+      (is (nil? (check/format-summary 1 0)))
+      (is (nil? (check/format-summary 1 5))))
+
+    (testing "returns success message for multiple files with no violations"
+      (is (= "Checked 2 files, all lines within limit"
+             (check/format-summary 2 0)))
+      (is (= "Checked 10 files, all lines within limit"
+             (check/format-summary 10 0))))
+
+    (testing "returns violation message for multiple files with violations"
+      (is (= "Checked 3 files, 5 violations found"
+             (check/format-summary 3 5)))
+      (is (= "Checked 100 files, 1 violations found"
+             (check/format-summary 100 1))))))

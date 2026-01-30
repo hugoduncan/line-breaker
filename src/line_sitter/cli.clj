@@ -15,6 +15,9 @@
             :desc "Output reformatted content to stdout"}
    :line-length {:coerce :long
                  :desc "Maximum line length"}
+   :quiet {:coerce :boolean
+           :alias :q
+           :desc "Suppress summary output"}
    :help {:coerce :boolean
           :alias :h
           :desc "Show help"}})

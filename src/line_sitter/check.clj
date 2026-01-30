@@ -36,6 +36,15 @@
       (println (format-violation v max-length))))
   (count violations))
 
+(defn format-summary
+  "Format the check summary message.
+  Returns nil for single-file checks (no summary needed)."
+  [file-count violation-count]
+  (when (> file-count 1)
+    (if (pos? violation-count)
+      (str "Checked " file-count " files, " violation-count " violations found")
+      (str "Checked " file-count " files, all lines within limit"))))
+
 ;;; Ignore directive support
 
 (defn- ignore-marker?

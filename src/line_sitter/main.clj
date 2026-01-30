@@ -16,6 +16,7 @@ Options:
   --fix           Fix files by reformatting long lines
   --stdout        Output reformatted content to stdout
   --line-length N Maximum line length (default: 80)
+  -q, --quiet     Suppress summary output
   -h, --help      Show this help
 
 Arguments:
@@ -62,14 +63,18 @@ Exit codes:
   "Process files in check mode.
   Checks each file for line length violations, respecting ignore directives.
   Reports to stderr. Returns exit code: 0 if no violations, 1 if violations."
-  [files max-length]
+  [files max-length quiet?]
   (let [all-violations (into []
                              (mapcat (fn [file]
                                        (map #(assoc % :file file)
                                             (check/check-file-with-ignore
                                              file max-length))))
-                             files)]
-    (check/report-violations all-violations max-length)
+                             files)
+        violation-count (check/report-violations all-violations max-length)]
+    (when-not quiet?
+      (when-let [summary (check/format-summary (count files) violation-count)]
+        (binding [*out* *err*]
+          (println summary))))
     (if (seq all-violations) 1 0)))
 
 (defn- process-files
@@ -83,7 +88,7 @@ Exit codes:
       0)
 
     (:check opts)
-    (process-check files (:line-length config))
+    (process-check files (:line-length config) (:quiet opts))
 
     ;; --fix is a no-op for now
     :else
