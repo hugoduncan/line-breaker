@@ -60,19 +60,19 @@
 (defn children
   "Get all child nodes.
 
-  Returns a seq of all child nodes (both named and anonymous).
+  Returns a vector of all child nodes (both named and anonymous).
   Returns nil if node is nil."
   [^Node node]
   (when node
     (let [cnt (.getChildCount node)]
-      (keep #(optional->node (.getChild node %)) (range cnt)))))
+      (into [] (keep #(optional->node (.getChild node %))) (range cnt)))))
 
 (defn named-children
   "Get named child nodes only.
 
-  Returns a seq of named child nodes (excludes punctuation like parens).
+  Returns a vector of named child nodes (excludes punctuation like parens).
   Returns nil if node is nil."
   [^Node node]
   (when node
     (let [cnt (.getNamedChildCount node)]
-      (keep #(optional->node (.getNamedChild node %)) (range cnt)))))
+      (into [] (keep #(optional->node (.getNamedChild node %))) (range cnt)))))
