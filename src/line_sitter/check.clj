@@ -79,6 +79,28 @@
   [tree]
   (set (collect-ignored-ranges (node/root-node tree))))
 
+(defn- collect-ignored-byte-ranges
+  "Recursively collect ignored byte ranges from tree.
+  Returns a vector of [start-byte end-byte] pairs."
+  [node]
+  (if-not node
+    []
+    (let [children (node/named-children node)]
+      (into []
+            (mapcat (fn [child]
+                      (if (ignore-marker? child)
+                        (when-let [sibling (node/next-named-sibling child)]
+                          [(node/node-range sibling)])
+                        (collect-ignored-byte-ranges child))))
+            children))))
+
+(defn find-ignored-byte-ranges
+  "Find all byte ranges covered by #_:line-sitter/ignore markers.
+  Returns a set of [start-byte end-byte] vectors where start is inclusive
+  and end is exclusive."
+  [tree]
+  (set (collect-ignored-byte-ranges (node/root-node tree))))
+
 (defn filter-violations
   "Remove violations that fall within ignored line ranges."
   [violations ignored-ranges]

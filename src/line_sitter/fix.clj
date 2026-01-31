@@ -5,6 +5,7 @@
   and apply those edits to source code."
   (:require
    [clojure.string :as str]
+   [line-sitter.check :as check]
    [line-sitter.treesitter.node :as node]
    [line-sitter.treesitter.parser :as parser]))
 
@@ -133,29 +134,45 @@
               (= prev-line next-line line)))
           (partition 2 1 children))))
 
+(defn- node-in-ignored-range?
+  "Returns true if node falls within any of the ignored byte ranges.
+  Ignored ranges are [start-byte end-byte] pairs where start is inclusive
+  and end is exclusive."
+  [node ignored-ranges]
+  (when-let [[start-byte end-byte] (node/node-range node)]
+    (some (fn [[ign-start ign-end]]
+            (and (<= ign-start start-byte)
+                 (<= end-byte ign-end)))
+          ignored-ranges)))
+
 (defn- find-breakable-forms-on-line
   "Find all breakable nodes containing the given line that need breaking.
 
   Returns a vector of nodes from outermost to innermost. Only includes
-  forms that have consecutive children on the target line."
-  [node line]
-  (when (node-contains-line? node line)
+  forms that have consecutive children on the target line. Skips forms
+  that fall within ignored ranges."
+  [node line ignored-ranges]
+  (when (and (node-contains-line? node line)
+             (not (node-in-ignored-range? node ignored-ranges)))
     (let [self (when (and (breakable-node? node)
                           (form-needs-breaking-on-line? node line))
                  [node])
-          children-results (mapcat #(find-breakable-forms-on-line % line)
+          children-results (mapcat #(find-breakable-forms-on-line % line ignored-ranges)
                                    (node/named-children node))]
       (into (vec self) children-results))))
 
 (defn find-breakable-form
   "Find the outermost breakable form containing the given line.
 
-  Takes a parsed tree and a 1-indexed line number. Returns the outermost
-  breakable node (list_lit, vec_lit, map_lit, set_lit) that spans that line
-  and has consecutive children on that line, or nil if no breakable form
-  is found."
-  [tree line]
-  (first (find-breakable-forms-on-line (node/root-node tree) line)))
+  Takes a parsed tree, a 1-indexed line number, and optionally a set of
+  ignored ranges. Returns the outermost breakable node (list_lit, vec_lit,
+  map_lit, set_lit) that spans that line and has consecutive children on
+  that line, or nil if no breakable form is found. Forms within ignored
+  ranges are skipped."
+  ([tree line]
+   (find-breakable-form tree line #{}))
+  ([tree line ignored-ranges]
+   (first (find-breakable-forms-on-line (node/root-node tree) line ignored-ranges))))
 
 ;;; Form breaking
 
@@ -236,13 +253,14 @@
 
   Takes a source string and config map with :line-length. Iteratively breaks
   forms until all lines fit or only unbreakable atoms remain. Returns the
-  fixed source string.
+  fixed source string. Forms preceded by #_:line-sitter/ignore are not modified.
 
   The algorithm:
   1. Find lines exceeding max-length
-  2. Find outermost breakable form on first violating line
-  3. Break that form
-  4. Re-parse and repeat until no violations or no breakable forms"
+  2. Collect ignored byte ranges (re-collected each pass since byte positions shift)
+  3. Find outermost breakable form on first violating line (skipping ignored)
+  4. Break that form
+  5. Re-parse and repeat until no violations or no breakable forms"
   [source config]
   (let [max-length (get config :line-length 80)]
     (loop [src source
@@ -253,8 +271,10 @@
           (if (empty? long-lines)
             src
             (let [tree (parser/parse-source src)
+                  ;; Collect ignored ranges each pass since byte positions shift after edits
+                  ignored-ranges (check/find-ignored-byte-ranges tree)
                   first-long-line (first long-lines)
-                  breakable-form (find-breakable-form tree first-long-line)]
+                  breakable-form (find-breakable-form tree first-long-line ignored-ranges)]
               (if-not breakable-form
                 src
                 (let [edits (break-form breakable-form config)]

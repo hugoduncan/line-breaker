@@ -5,8 +5,10 @@
   - Edit application in correct order
   - Breakable node type detection
   - Finding outermost breakable forms on a line
-  - Generating break edits for various collection types"
+  - Generating break edits for various collection types
+  - Ignore mechanism integration"
   (:require
+   [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [line-sitter.fix :as fix]
    [line-sitter.treesitter.node :as node]
@@ -385,3 +387,30 @@
         (let [source "(foo bar baz)"
               result (fix/fix-source source {:line-length 8})]
           (is (= "(foo\n  bar\n  baz)" result)))))))
+
+(deftest ignore-mechanism-test
+  ;; Verify that #_:line-sitter/ignore prevents breaking of marked forms.
+  (testing "ignore mechanism integration"
+    (testing "does not break ignored form"
+      (let [source "#_:line-sitter/ignore (foo bar baz qux)"
+            result (fix/fix-source source {:line-length 10})]
+        (is (= source result)
+            "ignored form stays on single line")))
+
+    (testing "does not break nested form inside ignored"
+      (let [source "#_:line-sitter/ignore (foo (bar baz qux))"
+            result (fix/fix-source source {:line-length 10})]
+        (is (= source result)
+            "nested forms within ignored are also preserved")))
+
+    (testing "breaks non-ignored forms"
+      (let [source "(foo bar baz) #_:line-sitter/ignore (keep this)"
+            result (fix/fix-source source {:line-length 10})]
+        (is (= "(foo\n  bar\n  baz) #_:line-sitter/ignore (keep this)" result)
+            "non-ignored form is broken, ignored form is preserved")))
+
+    (testing "preserves ignore marker in output"
+      (let [source "#_:line-sitter/ignore (long form here)"
+            result (fix/fix-source source {:line-length 10})]
+        (is (str/includes? result "#_:line-sitter/ignore")
+            "ignore marker is preserved")))))
