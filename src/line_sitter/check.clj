@@ -5,21 +5,26 @@
    [line-sitter.treesitter.node :as node]
    [line-sitter.treesitter.parser :as parser]))
 
+(defn find-violations
+  "Check source string for lines exceeding max-length.
+  Returns vector of violations [{:line n :length len}] where :line is 1-indexed
+  and :length is the actual character count of violating lines."
+  [source max-length]
+  (into []
+        (comp
+         (map-indexed (fn [idx line]
+                        {:line (inc idx) :length (count line)}))
+         (filter (fn [{:keys [length]}]
+                   (> length max-length))))
+        (str/split-lines source)))
+
 (defn check-line-lengths
   "Check a file for lines exceeding max-length.
   Returns vector of violations [{:line n :length len}] where :line is 1-indexed
   and :length is the actual character count of violating lines.
   Empty files return empty vector."
   [file-path max-length]
-  (let [content (slurp file-path)
-        lines (str/split-lines content)]
-    (into []
-          (comp
-           (map-indexed (fn [idx line]
-                          {:line (inc idx) :length (count line)}))
-           (filter (fn [{:keys [length]}]
-                     (> length max-length))))
-          lines)))
+  (find-violations (slurp file-path) max-length))
 
 (defn format-violation
   "Format a single violation for display.
@@ -78,6 +83,28 @@
   and both endpoints are inclusive."
   [tree]
   (set (collect-ignored-ranges (node/root-node tree))))
+
+(defn- collect-ignored-byte-ranges
+  "Recursively collect ignored byte ranges from tree.
+  Returns a vector of [start-byte end-byte] pairs."
+  [node]
+  (if-not node
+    []
+    (let [children (node/named-children node)]
+      (into []
+            (mapcat (fn [child]
+                      (if (ignore-marker? child)
+                        (when-let [sibling (node/next-named-sibling child)]
+                          [(node/node-range sibling)])
+                        (collect-ignored-byte-ranges child))))
+            children))))
+
+(defn find-ignored-byte-ranges
+  "Find all byte ranges covered by #_:line-sitter/ignore markers.
+  Returns a set of [start-byte end-byte] vectors where start is inclusive
+  and end is exclusive."
+  [tree]
+  (set (collect-ignored-byte-ranges (node/root-node tree))))
 
 (defn filter-violations
   "Remove violations that fall within ignored line ranges."

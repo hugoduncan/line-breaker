@@ -96,3 +96,11 @@
   (when node
     [(inc (.row (.getStartPoint node)))
      (inc (.row (.getEndPoint node)))]))
+
+(defn node-parent
+  "Get the parent node.
+
+  Returns the parent Node, or nil if node is nil or has no parent."
+  ^Node [^Node node]
+  (when node
+    (optional->node (.getParent node))))

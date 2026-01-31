@@ -1,0 +1,661 @@
+(ns line-sitter.fix-test
+  "Tests for line breaking functions.
+
+  Tests cover:
+  - Edit application in correct order
+  - Breakable node type detection
+  - Finding outermost breakable forms on a line
+  - Generating break edits for various collection types
+  - Ignore mechanism integration"
+  (:require
+   [clojure.string :as str]
+   [clojure.test :refer [deftest is testing]]
+   [line-sitter.fix :as fix]
+   [line-sitter.treesitter.node :as node]
+   [line-sitter.treesitter.parser :as parser]))
+
+(deftest apply-edits-test
+  ;; Verify edits are applied correctly in reverse start order.
+  (testing "apply-edits"
+    (testing "replaces text at the specified range"
+      (is (= "helloXworld"
+             (fix/apply-edits "hello world"
+                              [{:start 5 :end 6 :replacement "X"}]))))
+
+    (testing "applies multiple edits in reverse start order"
+      (is (= "aXcYe"
+             (fix/apply-edits "abcde"
+                              [{:start 1 :end 2 :replacement "X"}
+                               {:start 3 :end 4 :replacement "Y"}]))))
+
+    (testing "handles empty edit list"
+      (is (= "unchanged"
+             (fix/apply-edits "unchanged" []))))
+
+    (testing "handles replacement at start"
+      (is (= "Xello"
+             (fix/apply-edits "hello"
+                              [{:start 0 :end 1 :replacement "X"}]))))
+
+    (testing "handles insertion when start equals end"
+      (is (= "helloX"
+             (fix/apply-edits "hello"
+                              [{:start 5 :end 5 :replacement "X"}]))))))
+
+(deftest breakable-node?-test
+  ;; Verify breakable node detection for collection types.
+  (testing "breakable-node?"
+    (testing "returns true for list_lit"
+      (let [tree (parser/parse-source "(a b)")
+            root (node/root-node tree)
+            list-node (first (node/named-children root))]
+        (is (fix/breakable-node? list-node))))
+
+    (testing "returns true for vec_lit"
+      (let [tree (parser/parse-source "[a b]")
+            root (node/root-node tree)
+            vec-node (first (node/named-children root))]
+        (is (fix/breakable-node? vec-node))))
+
+    (testing "returns true for map_lit"
+      (let [tree (parser/parse-source "{:a 1}")
+            root (node/root-node tree)
+            map-node (first (node/named-children root))]
+        (is (fix/breakable-node? map-node))))
+
+    (testing "returns true for set_lit"
+      (let [tree (parser/parse-source "#{a b}")
+            root (node/root-node tree)
+            set-node (first (node/named-children root))]
+        (is (fix/breakable-node? set-node))))
+
+    (testing "returns false for sym_lit"
+      (let [tree (parser/parse-source "foo")
+            root (node/root-node tree)
+            sym-node (first (node/named-children root))]
+        (is (not (fix/breakable-node? sym-node)))))
+
+    (testing "returns false for str_lit"
+      (let [tree (parser/parse-source "\"hello\"")
+            root (node/root-node tree)
+            str-node (first (node/named-children root))]
+        (is (not (fix/breakable-node? str-node)))))))
+
+(deftest find-breakable-form-test
+  ;; Verify finding the outermost breakable form on a line.
+  (testing "find-breakable-form"
+    (testing "finds simple list on line 1"
+      (let [tree (parser/parse-source "(a b c)")
+            form (fix/find-breakable-form tree 1)]
+        (is (some? form))
+        (is (= :list_lit (node/node-type form)))
+        (is (= "(a b c)" (node/node-text form)))))
+
+    (testing "finds outermost form when nested"
+      (let [tree (parser/parse-source "(a (b c) d)")
+            form (fix/find-breakable-form tree 1)]
+        (is (= "(a (b c) d)" (node/node-text form))
+            "returns outer form, not inner")))
+
+    (testing "returns nil for line without breakable form"
+      (let [tree (parser/parse-source "foo")
+            form (fix/find-breakable-form tree 1)]
+        (is (nil? form))))
+
+    (testing "finds form on correct line in multiline source"
+      (let [tree (parser/parse-source "(a)\n(b c d)")
+            form (fix/find-breakable-form tree 2)]
+        (is (= "(b c d)" (node/node-text form)))))
+
+    (testing "returns nil for empty line"
+      (let [tree (parser/parse-source "(a)\n\n(b)")
+            form (fix/find-breakable-form tree 2)]
+        (is (nil? form))))))
+
+(deftest break-form-test
+  ;; Verify edit generation for breaking forms.
+  (testing "break-form"
+    (testing "generates edits for simple list"
+      (let [tree (parser/parse-source "(a b c)")
+            form (fix/find-breakable-form tree 1)
+            edits (fix/break-form form)
+            result (fix/apply-edits "(a b c)" edits)]
+        (is (= "(a\n  b\n  c)" result))))
+
+    (testing "generates edits for vector"
+      (let [tree (parser/parse-source "[a b c]")
+            form (fix/find-breakable-form tree 1)
+            edits (fix/break-form form)
+            result (fix/apply-edits "[a b c]" edits)]
+        (is (= "[a\n  b\n  c]" result))))
+
+    (testing "generates edits for map with pair grouping"
+      (let [tree (parser/parse-source "{:a 1 :b 2}")
+            form (fix/find-breakable-form tree 1)
+            edits (fix/break-form form)
+            result (fix/apply-edits "{:a 1 :b 2}" edits)]
+        (is (= "{:a 1\n  :b 2}" result))))
+
+    (testing "returns nil for single-element form"
+      (let [tree (parser/parse-source "(a)")
+            form (fix/find-breakable-form tree 1)
+            edits (fix/break-form form)]
+        (is (nil? edits))))
+
+    (testing "preserves indentation based on form position"
+      (let [source "  (a b c)"
+            tree (parser/parse-source source)
+            form (fix/find-breakable-form tree 1)
+            edits (fix/break-form form)
+            result (fix/apply-edits source edits)]
+        (is (= "  (a\n    b\n    c)" result)
+            "indentation accounts for form's column position")))))
+
+(deftest find-long-lines-test
+  ;; Verify detection of lines exceeding max length.
+  (testing "find-long-lines"
+    (testing "returns empty vector when all lines fit"
+      (is (= [] (fix/find-long-lines "short" 10))))
+
+    (testing "returns line number for single long line"
+      (is (= [1] (fix/find-long-lines "this is too long" 10))))
+
+    (testing "returns multiple line numbers"
+      (is (= [1 3] (fix/find-long-lines "long line here\nok\nlong line here" 10))))
+
+    (testing "handles empty string"
+      (is (= [] (fix/find-long-lines "" 10))))
+
+    (testing "uses 1-indexed line numbers"
+      (is (= [2] (fix/find-long-lines "ok\nthis is too long\nok" 10))))))
+
+(deftest fix-source-test
+  ;; Verify the iterative multi-pass breaking loop.
+  (testing "fix-source"
+    (testing "returns source unchanged when within limit"
+      (is (= "(a b c)" (fix/fix-source "(a b c)" {:line-length 80}))))
+
+    (testing "breaks simple form in one pass"
+      (is (= "(a\n  b\n  c)"
+             (fix/fix-source "(a b c)" {:line-length 5}))))
+
+    (testing "handles nested forms requiring multiple passes"
+      ;; First pass breaks outer, second pass breaks inner
+      (let [source "(a (b c d e) f)"
+            result (fix/fix-source source {:line-length 10})]
+        (is (= "(a\n  (b\n    c\n    d\n    e)\n  f)" result))))
+
+    (testing "leaves unbreakable atoms unchanged"
+      ;; Long string cannot be broken - :def rule keeps name on first line
+      (let [source "(def x \"long-string\")"
+            result (fix/fix-source source {:line-length 10})]
+        ;; Can break the form but not the string
+        (is (= "(def x\n  \"long-string\")" result))))
+
+    (testing "handles already broken source"
+      (let [source "(a\n  b\n  c)"]
+        (is (= source (fix/fix-source source {:line-length 80})))))
+
+    (testing "uses default line-length of 80"
+      (let [short-source "(a b c)"
+            long-source (str "(" (apply str (repeat 40 "a ")) ")")]
+        (is (= short-source (fix/fix-source short-source {})))
+        (is (not= long-source (fix/fix-source long-source {})))))))
+
+(deftest indent-rules-test
+  ;; Verify that :defn and :def indent rules keep name on first line.
+  (testing "indent rules"
+    (testing "for defn"
+      (testing "keeps name on first line"
+        (let [source "(defn foo [x] (+ x 1))"
+              result (fix/fix-source source {:line-length 15})]
+          (is (= "(defn foo\n  [x]\n  (+ x 1))" result)))))
+
+    (testing "for defn-"
+      (testing "keeps name on first line"
+        (let [source "(defn- bar [x] x)"
+              result (fix/fix-source source {:line-length 12})]
+          (is (= "(defn- bar\n  [x]\n  x)" result)))))
+
+    (testing "for defmacro"
+      (testing "keeps name on first line"
+        (let [source "(defmacro m [x] `(do ~x))"
+              result (fix/fix-source source {:line-length 15})]
+          (is (= "(defmacro m\n  [x]\n  `(do ~x))" result)))))
+
+    (testing "for def"
+      (testing "keeps name on first line"
+        (let [source "(def myvar 42)"
+              result (fix/fix-source source {:line-length 10})]
+          (is (= "(def myvar\n  42)" result)))))
+
+    (testing "for defonce"
+      (testing "keeps name on first line"
+        (let [source "(defonce state {})"
+              result (fix/fix-source source {:line-length 12})]
+          (is (= "(defonce state\n  {})" result)))))
+
+    (testing "for defmulti"
+      (testing "keeps name on first line"
+        (let [source "(defmulti dispatch type)"
+              result (fix/fix-source source {:line-length 15})]
+          (is (= "(defmulti dispatch\n  type)" result)))))
+
+    (testing "for custom indent rule"
+      (testing "uses config :indents"
+        (let [source "(my-defn foo [x] x)"
+              config {:line-length 12 :indents {'my-defn :defn}}
+              result (fix/fix-source source config)]
+          (is (= "(my-defn foo\n  [x]\n  x)" result)))))
+
+    (testing "for fn"
+      (testing "keeps arg vector on first line"
+        (let [source "(fn [x] (+ x 1))"
+              result (fix/fix-source source {:line-length 12})]
+          (is (= "(fn [x]\n  (+ x 1))" result)))))
+
+    (testing "for bound-fn"
+      (testing "keeps arg vector on first line"
+        (let [source "(bound-fn [x] x)"
+              result (fix/fix-source source {:line-length 12})]
+          (is (= "(bound-fn [x]\n  x)" result)))))
+
+    (testing "for let"
+      (testing "keeps binding vector on first line"
+        (let [source "(let [x 1] (+ x 2))"
+              result (fix/fix-source source {:line-length 12})]
+          (is (= "(let [x 1]\n  (+ x 2))" result)))))
+
+    (testing "for when-let"
+      (testing "keeps binding vector on first line"
+        (let [source "(when-let [x y] body)"
+              result (fix/fix-source source {:line-length 15})]
+          (is (= "(when-let [x y]\n  body)" result)))))
+
+    (testing "for if-let"
+      (testing "keeps binding vector on first line"
+        (let [source "(if-let [x y] a b)"
+              result (fix/fix-source source {:line-length 14})]
+          (is (= "(if-let [x y]\n  a\n  b)" result)))))
+
+    (testing "for doseq"
+      (testing "keeps binding vector on first line"
+        (let [source "(doseq [x xs] (prn x))"
+              result (fix/fix-source source {:line-length 14})]
+          (is (= "(doseq [x xs]\n  (prn x))" result)))))
+
+    (testing "for for"
+      (testing "keeps binding vector on first line"
+        (let [source "(for [x xs] (* x 2))"
+              result (fix/fix-source source {:line-length 12})]
+          (is (= "(for [x xs]\n  (* x 2))" result)))))
+
+    (testing "for loop"
+      (testing "keeps binding vector on first line"
+        (let [source "(loop [i 0] (recur i))"
+              result (fix/fix-source source {:line-length 12})]
+          (is (= "(loop [i 0]\n  (recur i))" result)))))
+
+    (testing "for if"
+      (testing "keeps test on first line"
+        (let [source "(if test then else)"
+              result (fix/fix-source source {:line-length 12})]
+          (is (= "(if test\n  then\n  else)" result)))))
+
+    (testing "for if-not"
+      (testing "keeps test on first line"
+        (let [source "(if-not test a b)"
+              result (fix/fix-source source {:line-length 12})]
+          (is (= "(if-not test\n  a\n  b)" result)))))
+
+    (testing "for when"
+      (testing "keeps test on first line"
+        (let [source "(when test body1 body2)"
+              result (fix/fix-source source {:line-length 12})]
+          (is (= "(when test\n  body1\n  body2)" result)))))
+
+    (testing "for when-not"
+      (testing "keeps test on first line"
+        (let [source "(when-not test body)"
+              result (fix/fix-source source {:line-length 15})]
+          (is (= "(when-not test\n  body)" result)))))
+
+    (testing "for when-first"
+      (testing "keeps binding on first line"
+        (let [source "(when-first [x xs] body)"
+              result (fix/fix-source source {:line-length 18})]
+          (is (= "(when-first [x xs]\n  body)" result)))))
+
+    (testing "for case"
+      (testing "keeps test-expr on first line with pair grouping"
+        (let [source "(case x :a 1 :b 2)"
+              result (fix/fix-source source {:line-length 10})]
+          (is (= "(case x\n  :a 1\n  :b 2)" result)))))
+
+    (testing "for cond"
+      (testing "uses pair grouping for test-result clauses"
+        (let [source "(cond t1 r1 t2 r2)"
+              result (fix/fix-source source {:line-length 10})]
+          (is (= "(cond\n  t1 r1\n  t2 r2)" result)))))
+
+    (testing "for condp"
+      (testing "keeps pred and expr on first line with pair grouping"
+        (let [source "(condp = x :a 1 :b 2)"
+              result (fix/fix-source source {:line-length 12})]
+          (is (= "(condp = x\n  :a 1\n  :b 2)" result)))))
+
+    (testing "for cond->"
+      (testing "keeps initial expr on first line with pair grouping"
+        (let [source "(cond-> x t1 f1 t2 f2)"
+              result (fix/fix-source source {:line-length 12})]
+          (is (= "(cond-> x\n  t1 f1\n  t2 f2)" result)))))
+
+    (testing "for try"
+      (testing "puts body on next line"
+        (let [source "(try expr catch)"
+              result (fix/fix-source source {:line-length 10})]
+          (is (= "(try\n  expr\n  catch)" result))))
+      (testing "handles multiple body expressions"
+        (let [source "(try a b c d)"
+              result (fix/fix-source source {:line-length 8})]
+          (is (= "(try\n  a\n  b\n  c\n  d)" result)))))
+
+    (testing "for do"
+      (testing "puts body on next line"
+        (let [source "(do expr1 expr2)"
+              result (fix/fix-source source {:line-length 10})]
+          (is (= "(do\n  expr1\n  expr2)" result))))
+      (testing "handles single body expression"
+        (let [source "(do expr)"
+              result (fix/fix-source source {:line-length 5})]
+          (is (= "(do\n  expr)" result)))))
+
+    (testing "for custom indent rule via config"
+      (testing "applies :try rule to custom form"
+        (let [source "(my-try a b c)"
+              config {:line-length 8 :indents {'my-try :try}}
+              result (fix/fix-source source config)]
+          (is (= "(my-try\n  a\n  b\n  c)" result))))
+      (testing "applies :do rule to custom form"
+        (let [source "(my-do a b)"
+              config {:line-length 6 :indents {'my-do :do}}
+              result (fix/fix-source source config)]
+          (is (= "(my-do\n  a\n  b)" result)))))
+
+    (testing "for non-special forms"
+      (testing "breaks all elements"
+        (let [source "(foo bar baz)"
+              result (fix/fix-source source {:line-length 8})]
+          (is (= "(foo\n  bar\n  baz)" result)))))))
+
+(deftest ignore-mechanism-test
+  ;; Verify that #_:line-sitter/ignore prevents breaking of marked forms.
+  (testing "ignore mechanism integration"
+    (testing "does not break ignored form"
+      (let [source "#_:line-sitter/ignore (foo bar baz qux)"
+            result (fix/fix-source source {:line-length 10})]
+        (is (= source result)
+            "ignored form stays on single line")))
+
+    (testing "does not break nested form inside ignored"
+      (let [source "#_:line-sitter/ignore (foo (bar baz qux))"
+            result (fix/fix-source source {:line-length 10})]
+        (is (= source result)
+            "nested forms within ignored are also preserved")))
+
+    (testing "breaks non-ignored forms"
+      (let [source "(foo bar baz) #_:line-sitter/ignore (keep this)"
+            result (fix/fix-source source {:line-length 10})]
+        (is (= "(foo\n  bar\n  baz) #_:line-sitter/ignore (keep this)" result)
+            "non-ignored form is broken, ignored form is preserved")))
+
+    (testing "preserves ignore marker in output"
+      (let [source "#_:line-sitter/ignore (long form here)"
+            result (fix/fix-source source {:line-length 10})]
+        (is (str/includes? result "#_:line-sitter/ignore")
+            "ignore marker is preserved")))))
+
+(deftest reader-macro-test
+  ;; Verify reader macros stay attached and breakable forms are handled.
+  (testing "reader macros"
+    (testing "for anonymous functions"
+      (testing "breaks when exceeding limit"
+        (let [source "#(foo a b c d)"
+              result (fix/fix-source source {:line-length 8})]
+          (is (= "#(foo\n  a\n  b\n  c\n  d)" result))))
+      (testing "stays attached when inside list"
+        (let [source "(map #(+ % 1) xs)"
+              result (fix/fix-source source {:line-length 10})]
+          (is (= "(map\n  #(+ % 1)\n  xs)" result)))))
+
+    (testing "for reader conditionals"
+      (testing "breaks when exceeding limit"
+        (let [source "#?(:clj a :cljs b)"
+              result (fix/fix-source source {:line-length 10})]
+          (is (= "#?(:clj\n  a\n  :cljs\n  b)" result))))
+      (testing "splicing variant breaks"
+        (let [source "#?@(:clj [a] :cljs [b])"
+              result (fix/fix-source source {:line-length 12})]
+          (is (= "#?@(:clj\n  [a]\n  :cljs\n  [b])" result)))))
+
+    (testing "for quote"
+      (testing "stays attached to following form"
+        (let [source "(foo 'bar baz qux)"
+              result (fix/fix-source source {:line-length 10})]
+          (is (= "(foo\n  'bar\n  baz\n  qux)" result))))
+      (testing "inner list breaks correctly"
+        (let [source "'(a b c d e)"
+              result (fix/fix-source source {:line-length 6})]
+          (is (= "'(a\n   b\n   c\n   d\n   e)" result)))))
+
+    (testing "for syntax-quote"
+      (testing "stays attached to following form"
+        (let [source "(foo `bar baz qux)"
+              result (fix/fix-source source {:line-length 10})]
+          (is (= "(foo\n  `bar\n  baz\n  qux)" result)))))
+
+    (testing "for unquote"
+      (testing "stays attached to following form"
+        (let [source "`(foo ~bar baz)"
+              result (fix/fix-source source {:line-length 8})]
+          (is (= "`(foo\n   ~bar\n   baz)" result)))))
+
+    (testing "for unquote-splicing"
+      (testing "stays attached to following form"
+        (let [source "`(foo ~@bar baz)"
+              result (fix/fix-source source {:line-length 8})]
+          (is (= "`(foo\n   ~@bar\n   baz)" result)))))
+
+    (testing "for deref"
+      (testing "stays attached to following form"
+        (let [source "(foo @atom bar baz)"
+              result (fix/fix-source source {:line-length 10})]
+          (is (= "(foo\n  @atom\n  bar\n  baz)" result)))))
+
+    (testing "for var-quote"
+      (testing "stays attached to following form"
+        (let [source "(foo #'var bar baz)"
+              result (fix/fix-source source {:line-length 10})]
+          (is (= "(foo\n  #'var\n  bar\n  baz)" result)))))
+
+    (testing "for metadata"
+      (testing "stays attached to following form"
+        (let [source "(foo ^:key bar baz)"
+              result (fix/fix-source source {:line-length 10})]
+          (is (= "(foo\n  ^:key bar\n  baz)" result)))))))
+
+(deftest comment-handling-test
+  ;; Verify inline comments stay attached and don't cause extra blank lines.
+  (testing "comment handling"
+    (testing "keeps end-of-line comment attached to preceding element"
+      (let [source "(foo a ; comment\nb c)"
+            result (fix/fix-source source {:line-length 10})]
+        (is (= "(foo\n  a ; comment\n  b\n  c)" result))))
+
+    (testing "keeps comment attached to head element"
+      (let [source "(foo ; after head\na b c)"
+            result (fix/fix-source source {:line-length 10})]
+        (is (= "(foo ; after head\n  a\n  b\n  c)" result))))
+
+    (testing "handles multiple comments"
+      (let [source "(foo a ; one\nb ; two\nc)"
+            result (fix/fix-source source {:line-length 10})]
+        (is (= "(foo\n  a ; one\n  b ; two\n  c)" result))))
+
+    (testing "does not introduce extra blank lines"
+      (let [source "(foo a ; comment\nb)"
+            result (fix/fix-source source {:line-length 10})]
+        (is (not (str/includes? result "\n\n"))
+            "no double newlines in output")))
+
+    (testing "preserves comment content"
+      (let [source "(foo a ; important note\nb)"
+            result (fix/fix-source source {:line-length 10})]
+        (is (str/includes? result "; important note")
+            "comment text is preserved")))))
+
+(deftest pair-grouping-test
+  ;; Verify pair grouping for maps, cond, case, and related forms.
+  (testing "pair grouping"
+    (testing "for maps"
+      (testing "keeps key-value pairs together"
+        (let [source "{:a 1 :b 2 :c 3}"
+              result (fix/fix-source source {:line-length 10})]
+          (is (= "{:a 1\n  :b 2\n  :c 3}" result))))
+      (testing "handles nested values"
+        (let [source "{:a [1 2] :b [3 4]}"
+              result (fix/fix-source source {:line-length 12})]
+          (is (= "{:a [1 2]\n  :b [3 4]}" result))))
+      (testing "leaves oversized pairs together"
+        ;; Pairs stay together even if they exceed line length.
+        ;; Breaking within pairs (key on one line, value on next) is
+        ;; a potential future enhancement.
+        (let [source "{:a 1 :longkey longval}"
+              result (fix/fix-source source {:line-length 12})]
+          (is (= "{:a 1\n  :longkey longval}" result)))))
+
+    (testing "for case"
+      (testing "handles default clause (odd element count)"
+        (let [source "(case x :a 1 :b 2 :default)"
+              result (fix/fix-source source {:line-length 12})]
+          (is (= "(case x\n  :a 1\n  :b 2\n  :default)" result))))
+      (testing "keeps test-expr on first line"
+        (let [source "(case expr :a 1)"
+              result (fix/fix-source source {:line-length 12})]
+          (is (= "(case expr\n  :a 1)" result)))))
+
+    (testing "for cond"
+      (testing "handles multiple pairs"
+        (let [source "(cond a 1 b 2 c 3)"
+              result (fix/fix-source source {:line-length 10})]
+          (is (= "(cond\n  a 1\n  b 2\n  c 3)" result))))
+      (testing "handles :else clause"
+        (let [source "(cond a 1 :else 2)"
+              result (fix/fix-source source {:line-length 10})]
+          (is (= "(cond\n  a 1\n  :else 2)" result)))))
+
+    (testing "for condp"
+      (testing "keeps predicate and expr on first line"
+        (let [source "(condp = val :a 1 :b 2)"
+              result (fix/fix-source source {:line-length 14})]
+          (is (= "(condp = val\n  :a 1\n  :b 2)" result))))
+      (testing "handles default clause"
+        (let [source "(condp = x :a 1 :default)"
+              result (fix/fix-source source {:line-length 12})]
+          (is (= "(condp = x\n  :a 1\n  :default)" result)))))
+
+    (testing "for cond->"
+      (testing "keeps initial expr on first line"
+        (let [source "(cond-> val t1 f1 t2 f2)"
+              result (fix/fix-source source {:line-length 14})]
+          (is (= "(cond-> val\n  t1 f1\n  t2 f2)" result)))))
+
+    (testing "for cond->>"
+      (testing "keeps initial expr on first line"
+        (let [source "(cond->> val t1 f1 t2 f2)"
+              result (fix/fix-source source {:line-length 14})]
+          (is (= "(cond->> val\n  t1 f1\n  t2 f2)" result)))))))
+
+(deftest binding-vector-pair-grouping-test
+  ;; Verify binding vectors use pair grouping when broken.
+  (testing "binding vector pair grouping"
+    (testing "for let"
+      (testing "keeps symbol-value pairs together"
+        (let [source "(let [x 1 y 2 z 3] body)"
+              result (fix/fix-source source {:line-length 14})]
+          (is (= "(let [x 1\n      y 2\n      z 3]\n  body)" result))))
+      (testing "aligns to bracket position"
+        (let [source "  (let [a 1 b 2] x)"
+              result (fix/fix-source source {:line-length 14})]
+          (is (= "  (let [a 1\n        b 2]\n    x)" result)))))
+
+    (testing "for loop"
+      (testing "keeps symbol-value pairs together"
+        (let [source "(loop [i 0 n 10] (recur i n))"
+              result (fix/fix-source source {:line-length 14})]
+          (is (= "(loop [i 0\n       n 10]\n  (recur i n))" result)))))
+
+    (testing "for doseq"
+      (testing "keeps binding pairs together"
+        (let [source "(doseq [x xs y ys] (prn x y))"
+              result (fix/fix-source source {:line-length 16})]
+          (is (= "(doseq [x xs\n        y ys]\n  (prn x y))" result)))))
+
+    (testing "for for"
+      (testing "keeps binding pairs together"
+        (let [source "(for [x xs y ys] [x y])"
+              result (fix/fix-source source {:line-length 14})]
+          (is (= "(for [x xs\n      y ys]\n  [x y])" result)))))
+
+    (testing "standalone vectors"
+      (testing "do not use pair grouping"
+        (let [source "[a 1 b 2 c 3]"
+              result (fix/fix-source source {:line-length 8})]
+          (is (= "[a\n  1\n  b\n  2\n  c\n  3]" result)
+              "standalone vectors break each element"))))
+
+    (testing "nested bindings"
+      (testing "each binding vector grouped independently"
+        (let [source "(let [x (let [a 1 b 2] a)] x)"
+              result (fix/fix-source source {:line-length 18})]
+          (is (str/includes? result "[a 1\n")
+              "inner binding vector uses pair grouping"))))
+
+    (testing "destructuring"
+      (testing "keeps pattern-value pairs together"
+        (let [source "(let [{:keys [a]} m x 1] body)"
+              result (fix/fix-source source {:line-length 18})]
+          (is (= "(let [{:keys [a]} m\n      x 1]\n  body)" result)))))))
+
+(deftest edge-cases-test
+  ;; Verify edge cases: empty, single-element, already-formatted.
+  (testing "edge cases"
+    (testing "for empty collections"
+      (testing "leaves empty list unchanged"
+        (is (= "()" (fix/fix-source "()" {:line-length 1}))))
+      (testing "leaves empty vector unchanged"
+        (is (= "[]" (fix/fix-source "[]" {:line-length 1}))))
+      (testing "leaves empty map unchanged"
+        (is (= "{}" (fix/fix-source "{}" {:line-length 1}))))
+      (testing "leaves empty set unchanged"
+        (is (= "#{}" (fix/fix-source "#{}" {:line-length 1})))))
+
+    (testing "for single-element collections"
+      (testing "leaves single-element list unchanged"
+        (is (= "(a)" (fix/fix-source "(a)" {:line-length 2}))))
+      (testing "leaves single-element vector unchanged"
+        (is (= "[x]" (fix/fix-source "[x]" {:line-length 2}))))
+      (testing "leaves map with one pair unchanged when within limit"
+        ;; Map with k v has 2 children, stays unchanged if within limit
+        (is (= "{k v}" (fix/fix-source "{k v}" {:line-length 10})))))
+
+    (testing "for already-formatted code"
+      (testing "leaves properly broken list unchanged"
+        (let [source "(a\n  b\n  c)"]
+          (is (= source (fix/fix-source source {:line-length 80})))))
+      (testing "leaves properly broken vector unchanged"
+        (let [source "[a\n b\n c]"]
+          (is (= source (fix/fix-source source {:line-length 80})))))
+      (testing "leaves properly broken defn unchanged"
+        (let [source "(defn foo\n  [x]\n  (+ x 1))"]
+          (is (= source (fix/fix-source source {:line-length 80}))))))))
