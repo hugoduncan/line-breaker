@@ -1,10 +1,18 @@
-name: Release Build
+name: Build
 
 on:
   workflow_dispatch:
+  workflow_call:
+    outputs:
+      darwin-artifact:
+        description: "Name of the darwin universal binary artifact"
+        value: ${{ jobs.aggregate.outputs.darwin-artifact }}
+      linux-artifact:
+        description: "Name of the linux x86_64 binary artifact"
+        value: ${{ jobs.aggregate.outputs.linux-artifact }}
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
@@ -113,4 +121,22 @@ jobs:
           path: |
             ${{ env.BINARY_NAME }}
             ${{ env.BINARY_NAME }}.sha256
+
+  aggregate:
+    needs: build
+    runs-on: ubuntu-latest
+    outputs:
+      darwin-artifact: ${{ steps.names.outputs.darwin-artifact }}
+      linux-artifact: ${{ steps.names.outputs.linux-artifact }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compute artifact names
+        id: names
+        run: |
+          VERSION=$(git rev-list --count HEAD)
+          echo "darwin-artifact=line-breaker-0.1.${VERSION}-darwin-universal" >> $GITHUB_OUTPUT
+          echo "linux-artifact=line-breaker-0.1.${VERSION}-linux-x86_64" >> $GITHUB_OUTPUT
 
