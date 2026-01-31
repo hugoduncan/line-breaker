@@ -8,6 +8,18 @@ than naive text wrapping.
 
 ## Development
 
+### Setup
+
+After cloning, compile the Java sources (required for tree-sitter native library loading):
+```bash
+clojure -T:build javac
+```
+
+Or via babashka:
+```bash
+bb javac
+```
+
 ### REPL
 
 Start an nREPL server:
