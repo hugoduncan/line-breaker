@@ -68,6 +68,11 @@ public class NativeLoader implements NativeLibraryLookup {
 
     // Extract clojure grammar library
     clojureGrammarLib = extractResource(resourceDir + grammarLibName, extractedDir, grammarLibName);
+
+    // Schedule cleanup on JVM exit (LIFO order: directory last)
+    extractedDir.toFile().deleteOnExit();
+    treeSitterLib.toFile().deleteOnExit();
+    clojureGrammarLib.toFile().deleteOnExit();
   }
 
   private Path extractResource(String resourcePath, Path targetDir, String fileName)
