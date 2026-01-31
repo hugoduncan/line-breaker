@@ -48,8 +48,32 @@ jobs:
       - name: Test --help
         run: ./${{ matrix.artifact }} --help
 
-      - name: Test file processing
-        run: ./${{ matrix.artifact }} test-resources/smoke-test.clj
+      - name: Test line-breaking
+        run: |
+          # Copy input file to .clj for processing
+          cp test-resources/smoke-test-input.txt smoke-test.clj
+
+          # Verify input has long lines (>80 chars)
+          MAX_LINE_LENGTH=$(awk '{ print length }' smoke-test.clj | sort -rn | head -1)
+          echo "Max input line length: $MAX_LINE_LENGTH"
+          if [ "$MAX_LINE_LENGTH" -le 80 ]; then
+            echo "ERROR: Input file should have lines > 80 chars"
+            exit 1
+          fi
+
+          # Run line-breaker
+          ./${{ matrix.artifact }} smoke-test.clj > smoke-test-output.clj
+
+          # Verify output has no long lines
+          MAX_OUTPUT_LENGTH=$(awk '{ print length }' smoke-test-output.clj | sort -rn | head -1)
+          echo "Max output line length: $MAX_OUTPUT_LENGTH"
+          if [ "$MAX_OUTPUT_LENGTH" -gt 80 ]; then
+            echo "ERROR: Output still has lines > 80 chars"
+            cat smoke-test-output.clj
+            exit 1
+          fi
+
+          echo "Line-breaking verified successfully"
 
   release:
     needs: [build, smoke-test]

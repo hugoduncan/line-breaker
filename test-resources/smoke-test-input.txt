@@ -1,0 +1,12 @@
+;; Smoke test input with long lines to exercise line-breaking functionality.
+;; Lines below intentionally exceed 80 characters to verify the binary works.
+(ns smoke-test)
+
+;; Long function call with many arguments that exceeds the line limit
+(defn process-data [input-map] (merge input-map {:processed true :timestamp (System/currentTimeMillis) :metadata {:source "test" :version "1.0"}}))
+
+;; Long let binding with multiple bindings on one line
+(defn transform [data] (let [first-value (:first data) second-value (:second data) third-value (:third data)] (+ first-value second-value third-value)))
+
+;; Long vector literal
+(def sample-data ["alpha" "beta" "gamma" "delta" "epsilon" "zeta" "eta" "theta" "iota" "kappa" "lambda" "mu"])
