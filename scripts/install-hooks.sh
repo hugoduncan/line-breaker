@@ -21,8 +21,8 @@ echo "Installing git hooks..."
 # Create pre-commit hook
 cat > "${HOOKS_DIR}/pre-commit" << 'EOF'
 #!/usr/bin/env bash
-# Pre-commit hook: formats code, restages, and runs lint
-# Auto-fixes formatting; blocks on lint errors
+# Pre-commit hook: formats code, restages, and runs lint/line-length checks
+# Auto-fixes formatting and line length; blocks on lint errors or unfixable violations
 
 set -euo pipefail
 
@@ -32,11 +32,19 @@ echo "Running pre-commit checks..."
 STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(clj|cljs|cljc|edn)$' || true)
 
 if [ -n "${STAGED_FILES}" ]; then
-    echo "Formatting staged files..."
+    echo "Formatting staged files with cljfmt..."
     # shellcheck disable=SC2086
     cljfmt fix ${STAGED_FILES}
 
     echo "Re-staging formatted files..."
+    # shellcheck disable=SC2086
+    git add ${STAGED_FILES}
+
+    echo "Fixing line length violations..."
+    # shellcheck disable=SC2086
+    bb line-length fix ${STAGED_FILES}
+
+    echo "Re-staging line-length fixed files..."
     # shellcheck disable=SC2086
     git add ${STAGED_FILES}
 fi
@@ -46,6 +54,15 @@ bb lint || {
     echo "Lint check failed. Fix the issues above."
     exit 1
 }
+
+if [ -n "${STAGED_FILES}" ]; then
+    echo "Checking line length..."
+    # shellcheck disable=SC2086
+    bb line-length check ${STAGED_FILES} || {
+        echo "Some lines exceed max length and cannot be auto-fixed"
+        exit 1
+    }
+fi
 
 echo "Pre-commit checks passed."
 EOF

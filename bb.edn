@@ -41,4 +41,43 @@
 
   javac
   {:doc "Compile Java sources (NativeLoader for jtreesitter)"
-   :task (shell "clojure -T:build javac")}}}
+   :task (shell "clojure -T:build javac")}
+
+  line-length
+  {:doc "Check or fix line length violations"
+   :depends [javac]
+   :task
+   (let [args *command-line-args*
+         cmd (first args)
+         files (rest args)]
+     (cond
+       (or (= cmd "--help") (= cmd "-h") (nil? cmd))
+       (do
+         (println "Usage: bb line-length <command> [files...]")
+         (println)
+         (println "Commands:")
+         (println "  check   Check files for line length violations")
+         (println "  fix     Fix files by reformatting long lines")
+         (println)
+         (println "Arguments:")
+         (println "  files   Files or directories to process")
+         (println "          (default: current directory)")
+         (println)
+         (println "Examples:")
+         (println "  bb line-length check")
+         (println "  bb line-length check src")
+         (println "  bb line-length fix src/foo.clj"))
+
+       (= cmd "check")
+       (apply shell "clojure" "-J--enable-native-access=ALL-UNNAMED"
+              "-M" "-m" "line-sitter.main" "--check" files)
+
+       (= cmd "fix")
+       (apply shell "clojure" "-J--enable-native-access=ALL-UNNAMED"
+              "-M" "-m" "line-sitter.main" "--fix" files)
+
+       :else
+       (do
+         (println (str "Unknown command: " cmd))
+         (println "Run 'bb line-length --help' for usage")
+         (System/exit 2))))}}}
