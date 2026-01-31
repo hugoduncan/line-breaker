@@ -627,6 +627,33 @@
               result (fix/fix-source source {:line-length 18})]
           (is (= "(let [{:keys [a]} m\n      x 1]\n  body)" result)))))))
 
+(deftest nested-binding-value-test
+  ;; Verify forms nested inside binding pair values are properly broken.
+  ;; Bug 79: Deeply nested forms in binding values were not automatically broken.
+  (testing "nested binding value forms"
+    (testing "breaks function call in let binding value"
+      ;; The inner (mapcat ...) call should be broken when it exceeds line length
+      (let [source "(let [result (mapcat f (get-items))] result)"
+            result (fix/fix-source source {:line-length 35})]
+        (is (< (apply max (map count (str/split-lines result))) 36)
+            "all lines should be within limit")
+        (is (str/includes? result "(mapcat")
+            "mapcat call should be present")))
+
+    (testing "breaks deeply nested form in catch"
+      ;; The (throw (ex-info ...)) pattern from bug report
+      (let [source "(try x (catch Exception e (throw (ex-info \"error\" {:k v}))))"
+            result (fix/fix-source source {:line-length 40})]
+        (is (< (apply max (map count (str/split-lines result))) 41)
+            "all lines should be within limit")))
+
+    (testing "breaks form inside binding value with multiple bindings"
+      ;; When there are multiple bindings, form in later binding should still break
+      (let [source "(let [x 1 y (some-long-function a b c d)] body)"
+            result (fix/fix-source source {:line-length 30})]
+        (is (< (apply max (map count (str/split-lines result))) 31)
+            "all lines should be within limit")))))
+
 (deftest edge-cases-test
   ;; Verify edge cases: empty, single-element, already-formatted.
   (testing "edge cases"
