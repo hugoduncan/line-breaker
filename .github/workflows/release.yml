@@ -14,15 +14,21 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: macos-13
+          - os: macos-latest
             platform: darwin-x86_64
-            graalvm: '25.0.1'
-          - os: macos-14
+            graalvm: '25'
+            arch: x64
+            arch_cmd: 'arch -x86_64'
+          - os: macos-latest
             platform: darwin-aarch64
             graalvm: '25'
+            arch: aarch64
+            arch_cmd: ''
           - os: ubuntu-latest
             platform: linux-x86_64
             graalvm: '25'
+            arch: x64
+            arch_cmd: ''
     steps:
       - uses: actions/checkout@v4
         with:
@@ -34,6 +40,7 @@ jobs:
           java-version: '23'
           distribution: 'graalvm'
           version: ${{ matrix.graalvm }}
+          architecture: ${{ matrix.arch }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Clojure
@@ -53,13 +60,13 @@ jobs:
             ${{ runner.os }}-maven-
 
       - name: Build native tree-sitter libraries
-        run: bb build-native
+        run: ${{ matrix.arch_cmd }} bb build-native
 
       - name: Build native image
-        run: clojure -T:build native-image
+        run: ${{ matrix.arch_cmd }} clojure -T:build native-image
 
       - name: Test binary
-        run: ./target/line-breaker --help
+        run: ${{ matrix.arch_cmd }} ./target/line-breaker --help
 
       - name: Prepare release artifact
         id: artifact
