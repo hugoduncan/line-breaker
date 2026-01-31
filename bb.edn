@@ -74,11 +74,11 @@
 
        (= cmd "check")
        (apply shell "clojure" "-J--enable-native-access=ALL-UNNAMED"
-              "-M" "-m" "line-sitter.main" "--check" files)
+              "-M" "-m" "line-breaker.main" "--check" files)
 
        (= cmd "fix")
        (apply shell "clojure" "-J--enable-native-access=ALL-UNNAMED"
-              "-M" "-m" "line-sitter.main" "--fix" files)
+              "-M" "-m" "line-breaker.main" "--fix" files)
 
        :else
        (do
