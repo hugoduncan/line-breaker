@@ -5,21 +5,26 @@
    [line-sitter.treesitter.node :as node]
    [line-sitter.treesitter.parser :as parser]))
 
+(defn find-violations
+  "Check source string for lines exceeding max-length.
+  Returns vector of violations [{:line n :length len}] where :line is 1-indexed
+  and :length is the actual character count of violating lines."
+  [source max-length]
+  (into []
+        (comp
+         (map-indexed (fn [idx line]
+                        {:line (inc idx) :length (count line)}))
+         (filter (fn [{:keys [length]}]
+                   (> length max-length))))
+        (str/split-lines source)))
+
 (defn check-line-lengths
   "Check a file for lines exceeding max-length.
   Returns vector of violations [{:line n :length len}] where :line is 1-indexed
   and :length is the actual character count of violating lines.
   Empty files return empty vector."
   [file-path max-length]
-  (let [content (slurp file-path)
-        lines (str/split-lines content)]
-    (into []
-          (comp
-           (map-indexed (fn [idx line]
-                          {:line (inc idx) :length (count line)}))
-           (filter (fn [{:keys [length]}]
-                     (> length max-length))))
-          lines)))
+  (find-violations (slurp file-path) max-length))
 
 (defn format-violation
   "Format a single violation for display.

@@ -4,7 +4,6 @@
   Provides functions to identify breakable forms, generate line break edits,
   and apply those edits to source code."
   (:require
-   [clojure.string :as str]
    [line-sitter.check :as check]
    [line-sitter.treesitter.node :as node]
    [line-sitter.treesitter.parser :as parser]))
@@ -360,13 +359,7 @@
   "Find 1-indexed line numbers exceeding max-length.
   Returns a vector of line numbers."
   [source max-length]
-  (into []
-        (comp
-         (map-indexed (fn [idx line]
-                        (when (> (count line) max-length)
-                          (inc idx))))
-         (filter some?))
-        (str/split-lines source)))
+  (mapv :line (check/find-violations source max-length)))
 
 ;;; Iterative multi-pass breaking
 
