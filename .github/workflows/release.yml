@@ -9,39 +9,36 @@ permissions:
 jobs:
   build:
     runs-on: ${{ matrix.os }}
-    outputs:
-      version: ${{ steps.artifact.outputs.version }}
     strategy:
       matrix:
         include:
           - os: macos-latest
-            platform: darwin-x86_64
-            graalvm: '25'
-            arch: x64
-            arch_cmd: 'arch -x86_64'
-          - os: macos-latest
-            platform: darwin-aarch64
-            graalvm: '25'
-            arch: aarch64
-            arch_cmd: ''
+            platform: darwin-universal
           - os: ubuntu-latest
             platform: linux-x86_64
-            graalvm: '25'
-            arch: x64
-            arch_cmd: ''
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Setup GraalVM
+      - name: Setup GraalVM (ARM64)
         uses: graalvm/setup-graalvm@v1
         with:
           java-version: '23'
           distribution: 'graalvm'
-          version: ${{ matrix.graalvm }}
-          architecture: ${{ matrix.arch }}
+          version: '25'
           github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup GraalVM x86_64 for universal build
+        if: matrix.platform == 'darwin-universal'
+        run: |
+          set -e
+          echo "Installing x86_64 GraalVM for universal binary build..."
+          GRAALVM_VERSION="23.0.2"
+          GRAALVM_URL="https://download.oracle.com/graalvm/23/archive/graalvm-jdk-${GRAALVM_VERSION}_macos-x64_bin.tar.gz"
+          mkdir -p /tmp/graalvm-x86_64
+          curl -sL "$GRAALVM_URL" | tar -xz -C /tmp/graalvm-x86_64 --strip-components=1
+          echo "GRAALVM_HOME_X86_64=/tmp/graalvm-x86_64/Contents/Home" >> $GITHUB_ENV
 
       - name: Setup Clojure
         uses: DeLaGuardo/setup-clojure@12.5
@@ -60,16 +57,43 @@ jobs:
             ${{ runner.os }}-maven-
 
       - name: Build native tree-sitter libraries
-        run: ${{ matrix.arch_cmd }} bb build-native
+        run: |
+          set -e
+          if [ "${{ matrix.platform }}" = "darwin-universal" ]; then
+            bb build-native --universal
+          else
+            bb build-native
+          fi
 
       - name: Build native image
-        run: ${{ matrix.arch_cmd }} clojure -T:build native-image
+        run: |
+          set -e
+          if [ "${{ matrix.platform }}" = "darwin-universal" ]; then
+            clojure -T:build native-image :universal true
+          else
+            clojure -T:build native-image
+          fi
 
       - name: Test binary
-        run: ${{ matrix.arch_cmd }} ./target/line-breaker --help
+        run: ./target/line-breaker --help
+
+      - name: Verify universal binary (macOS only)
+        if: matrix.platform == 'darwin-universal'
+        run: |
+          set -e
+          echo "Verifying universal binary architectures..."
+          file target/line-breaker
+          if ! file target/line-breaker | grep -q "x86_64"; then
+            echo "Error: Binary missing x86_64 architecture"
+            exit 1
+          fi
+          if ! file target/line-breaker | grep -q "arm64"; then
+            echo "Error: Binary missing arm64 architecture"
+            exit 1
+          fi
+          echo "Universal binary verified: contains both x86_64 and arm64"
 
       - name: Prepare release artifact
-        id: artifact
         run: |
           set -e
           VERSION=$(git rev-list --count HEAD)
@@ -81,7 +105,6 @@ jobs:
             shasum -a 256 "${BINARY_NAME}" > "${BINARY_NAME}.sha256"
           fi
           echo "BINARY_NAME=${BINARY_NAME}" >> $GITHUB_ENV
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -91,30 +114,3 @@ jobs:
             ${{ env.BINARY_NAME }}
             ${{ env.BINARY_NAME }}.sha256
 
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-
-      - name: Prepare release files
-        run: |
-          set -e
-          VERSION="${{ needs.build.outputs.version }}"
-          echo "VERSION=${VERSION}" >> $GITHUB_ENV
-          echo "TAG=v0.1.${VERSION}" >> $GITHUB_ENV
-          mkdir -p release
-          find artifacts -type f -exec mv {} release/ \;
-
-      - name: Create release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release create "${{ env.TAG }}" \
-            --draft \
-            --title "${{ env.TAG }}" \
-            --generate-notes \
-            release/*

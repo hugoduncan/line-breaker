@@ -7,14 +7,17 @@
 ;; - libtree-sitter (core library required by jtreesitter)
 ;; - libtree-sitter-clojure (Clojure grammar)
 ;;
-;; Usage: bb build-native
+;; Usage: bb build-native [--universal]
+;;
+;; Options:
+;;   --universal  Build universal binary for macOS (arm64 + x86_64)
 ;;
 ;; Requirements:
 ;; - C compiler (cc)
 ;; - git
 ;;
 ;; For CI: Run this script on each target platform (macOS, Linux).
-;; Cross-compilation is possible but not implemented here.
+;; On macOS, use --universal to build fat binaries for both architectures.
 
 (require '[babashka.fs :as fs]
          '[babashka.process :refer [shell]])
@@ -60,43 +63,63 @@
                         (str (fs/file-name build-dir)))))
 
 (defn compile-clojure-grammar
-  "Compile tree-sitter-clojure grammar for the current platform."
-  [os arch output-dir]
+  "Compile tree-sitter-clojure grammar for the current platform.
+  When universal? is true on macOS, builds a fat binary for both architectures."
+  [os arch output-dir universal?]
   (let [lib-name (library-name os "tree-sitter-clojure")
-        output-path (fs/path output-dir lib-name)]
-    (println (str "Compiling " lib-name " for " os "-" arch "..."))
-    (shell-with-context "compiling Clojure grammar"
-                        {:dir (str clojure-build-dir)}
-                        "cc" "-shared" "-fPIC"
-                        "-I" "src"
-                        "src/parser.c"
-                        "-o" (str output-path))
+        output-path (fs/path output-dir lib-name)
+        arch-flags (when (and universal? (= os "darwin"))
+                     ["-arch" "x86_64" "-arch" "arm64"])
+        base-args ["cc" "-shared" "-fPIC" "-I" "src" "src/parser.c"
+                   "-o" (str output-path)]
+        all-args (if arch-flags
+                   (into (vec (take 4 base-args)) (concat arch-flags (drop 4 base-args)))
+                   base-args)]
+    (println (str "Compiling " lib-name " for " os "-" arch
+                  (when universal? " (universal)")
+                  "..."))
+    (apply shell-with-context "compiling Clojure grammar"
+           {:dir (str clojure-build-dir)}
+           all-args)
     (println (str "Built: " output-path))
     output-path))
 
 (defn compile-core-library
-  "Compile tree-sitter core library for the current platform."
-  [os arch output-dir]
+  "Compile tree-sitter core library for the current platform.
+  When universal? is true on macOS, builds a fat binary for both architectures."
+  [os arch output-dir universal?]
   (let [lib-name (library-name os "tree-sitter")
         output-path (fs/path output-dir lib-name)
-        lib-dir (fs/path core-build-dir "lib")]
-    (println (str "Compiling " lib-name " for " os "-" arch "..."))
+        lib-dir (fs/path core-build-dir "lib")
+        arch-flags (when (and universal? (= os "darwin"))
+                     ["-arch" "x86_64" "-arch" "arm64"])
+        base-args ["cc" "-shared" "-fPIC"
+                   "-I" (str lib-dir "/include")
+                   "-I" (str lib-dir "/src")
+                   (str lib-dir "/src/lib.c")
+                   "-o" (str output-path)]
+        all-args (if arch-flags
+                   (into (vec (take 3 base-args)) (concat arch-flags (drop 3 base-args)))
+                   base-args)]
+    (println (str "Compiling " lib-name " for " os "-" arch
+                  (when universal? " (universal)")
+                  "..."))
     ;; tree-sitter core has its source in lib/src/
-    (shell-with-context "compiling tree-sitter core library"
-                        {:dir (str core-build-dir)}
-                        "cc" "-shared" "-fPIC"
-                        "-I" (str lib-dir "/include")
-                        "-I" (str lib-dir "/src")
-                        (str lib-dir "/src/lib.c")
-                        "-o" (str output-path))
+    (apply shell-with-context "compiling tree-sitter core library"
+           {:dir (str core-build-dir)}
+           all-args)
     (println (str "Built: " output-path))
     output-path))
 
 (defn -main
-  []
-  (let [os (platform/detect-os)
-        arch (platform/detect-arch)
+  [& args]
+  (let [universal? (some #{"--universal"} args)
+        os (platform/detect-os)
+        arch (if universal? "universal" (platform/detect-arch))
         output-dir (fs/path resources-dir "native" (str os "-" arch))]
+    (when (and universal? (not= os "darwin"))
+      (println "Error: --universal is only supported on macOS")
+      (System/exit 1))
     (println (str "Building for " os "-" arch))
     (fs/create-dirs output-dir)
     ;; Clone repositories
@@ -104,8 +127,8 @@
     (clone-repo "https://github.com/sogaiu/tree-sitter-clojure"
                 clojure-build-dir)
     ;; Compile libraries
-    (compile-core-library os arch output-dir)
-    (compile-clojure-grammar os arch output-dir)
+    (compile-core-library os arch output-dir universal?)
+    (compile-clojure-grammar os arch output-dir universal?)
     (println "Done.")))
 
-(-main)
+(apply -main *command-line-args*)

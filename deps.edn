@@ -28,7 +28,8 @@
 
   :build
   {:deps       {io.github.clojure/tools.build {:mvn/version "0.10.5"}
-                babashka/process {:mvn/version "0.5.22"}}
+                babashka/process {:mvn/version "0.5.22"}
+                babashka/fs {:mvn/version "0.5.30"}}
    :jvm-opts   ["--enable-native-access=ALL-UNNAMED"]
    :ns-default build}
 
