@@ -57,6 +57,16 @@ Lint with clj-kondo:
 bb lint
 ```
 
+Check line length (max 80 characters):
+```bash
+bb line-length check
+```
+
+Fix line length violations:
+```bash
+bb line-length fix
+```
+
 Import clj-kondo configs from dependencies:
 ```bash
 bb import-kondo-config
@@ -73,4 +83,4 @@ Install pre-commit hooks (auto-formats and lints):
 
 - Use semantic commit messages
 - Tests use kaocha; place tests in `test/` directory
-- Pre-commit hook auto-formats staged files and blocks on lint errors
+- Pre-commit hook auto-formats staged files, enforces line length, and blocks on lint errors
