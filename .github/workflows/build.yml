@@ -4,18 +4,41 @@ on:
   workflow_dispatch:
   workflow_call:
     outputs:
+      version:
+        description: "Version number (git rev-list count)"
+        value: ${{ jobs.version.outputs.version }}
       darwin-artifact:
         description: "Name of the darwin universal binary artifact"
-        value: ${{ jobs.aggregate.outputs.darwin-artifact }}
+        value: ${{ jobs.version.outputs.darwin-artifact }}
       linux-artifact:
         description: "Name of the linux x86_64 binary artifact"
-        value: ${{ jobs.aggregate.outputs.linux-artifact }}
+        value: ${{ jobs.version.outputs.linux-artifact }}
 
 permissions:
   contents: read
 
 jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      darwin-artifact: ${{ steps.version.outputs.darwin-artifact }}
+      linux-artifact: ${{ steps.version.outputs.linux-artifact }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compute version and artifact names
+        id: version
+        run: |
+          VERSION=$(git rev-list --count HEAD)
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "darwin-artifact=line-breaker-0.1.${VERSION}-darwin-universal" >> $GITHUB_OUTPUT
+          echo "linux-artifact=line-breaker-0.1.${VERSION}-linux-x86_64" >> $GITHUB_OUTPUT
+
   build:
+    needs: version
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -102,9 +125,10 @@ jobs:
           echo "Universal binary verified: contains both x86_64 and arm64"
 
       - name: Prepare release artifact
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
         run: |
           set -e
-          VERSION=$(git rev-list --count HEAD)
           BINARY_NAME="line-breaker-0.1.${VERSION}-${{ matrix.platform }}"
           mv target/line-breaker "${BINARY_NAME}"
           if command -v sha256sum &> /dev/null; then
@@ -121,22 +145,3 @@ jobs:
           path: |
             ${{ env.BINARY_NAME }}
             ${{ env.BINARY_NAME }}.sha256
-
-  aggregate:
-    needs: build
-    runs-on: ubuntu-latest
-    outputs:
-      darwin-artifact: ${{ steps.names.outputs.darwin-artifact }}
-      linux-artifact: ${{ steps.names.outputs.linux-artifact }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Compute artifact names
-        id: names
-        run: |
-          VERSION=$(git rev-list --count HEAD)
-          echo "darwin-artifact=line-breaker-0.1.${VERSION}-darwin-universal" >> $GITHUB_OUTPUT
-          echo "linux-artifact=line-breaker-0.1.${VERSION}-linux-x86_64" >> $GITHUB_OUTPUT
-

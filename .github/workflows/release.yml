@@ -95,8 +95,9 @@ jobs:
           name: ${{ needs.build.outputs.linux-artifact }}
 
       - name: Create tag
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
         run: |
-          VERSION=$(git rev-list --count HEAD)
           TAG="v0.1.${VERSION}"
           git tag "$TAG"
           git push origin "$TAG"
