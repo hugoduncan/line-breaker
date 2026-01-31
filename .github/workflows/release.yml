@@ -9,8 +9,6 @@ permissions:
 jobs:
   build:
     runs-on: ${{ matrix.os }}
-    outputs:
-      version: ${{ steps.artifact.outputs.version }}
     strategy:
       matrix:
         include:
@@ -96,7 +94,6 @@ jobs:
           echo "Universal binary verified: contains both x86_64 and arm64"
 
       - name: Prepare release artifact
-        id: artifact
         run: |
           set -e
           VERSION=$(git rev-list --count HEAD)
@@ -108,7 +105,6 @@ jobs:
             shasum -a 256 "${BINARY_NAME}" > "${BINARY_NAME}.sha256"
           fi
           echo "BINARY_NAME=${BINARY_NAME}" >> $GITHUB_ENV
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -118,30 +114,3 @@ jobs:
             ${{ env.BINARY_NAME }}
             ${{ env.BINARY_NAME }}.sha256
 
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-
-      - name: Prepare release files
-        run: |
-          set -e
-          VERSION="${{ needs.build.outputs.version }}"
-          echo "VERSION=${VERSION}" >> $GITHUB_ENV
-          echo "TAG=v0.1.${VERSION}" >> $GITHUB_ENV
-          mkdir -p release
-          find artifacts -type f -exec mv {} release/ \;
-
-      - name: Create release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release create "${{ env.TAG }}" \
-            --draft \
-            --title "${{ env.TAG }}" \
-            --generate-notes \
-            release/*
