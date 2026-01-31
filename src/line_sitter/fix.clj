@@ -37,15 +37,28 @@
 (def ^:private default-indent-rules
   "Default mappings from form head symbols to indent rules.
   :defn - keep name on first line
-  :def - keep name on first line"
-  {'defn      :defn
-   'defn-     :defn
-   'defmacro  :defn
-   'defmethod :defn
-   'deftest   :defn
-   'def       :def
-   'defonce   :def
-   'defmulti  :def})
+  :def - keep name on first line
+  :fn - keep arg vector on first line
+  :binding - keep binding vector on first line"
+  {'defn            :defn
+   'defn-           :defn
+   'defmacro        :defn
+   'defmethod       :defn
+   'deftest         :defn
+   'def             :def
+   'defonce         :def
+   'defmulti        :def
+   'fn              :fn
+   'bound-fn        :fn
+   'let             :binding
+   'when-let        :binding
+   'if-let          :binding
+   'binding         :binding
+   'doseq           :binding
+   'for             :binding
+   'loop            :binding
+   'with-open       :binding
+   'with-local-vars :binding})
 
 (defn- get-head-symbol
   "Get the head symbol of a list_lit node as a symbol.
@@ -67,10 +80,13 @@
 
 (defn- elements-to-keep-on-first-line
   "Number of elements to keep on the first line based on indent rule.
-  :defn and :def keep 2 (head + name), default keeps 1 (head only)."
+  :defn/:def keep 2 (head + name)
+  :fn keeps 2 (head + arg vector)
+  :binding keeps 2 (head + binding vector)
+  Default keeps 1 (head only)."
   [rule]
   (case rule
-    (:defn :def) 2
+    (:defn :def :fn :binding) 2
     1))
 
 (defn breakable-node?

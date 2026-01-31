@@ -246,6 +246,54 @@
               result (fix/fix-source source config)]
           (is (= "(my-defn foo\n  [x]\n  x)" result)))))
 
+    (testing "for fn"
+      (testing "keeps arg vector on first line"
+        (let [source "(fn [x] (+ x 1))"
+              result (fix/fix-source source {:line-length 12})]
+          (is (= "(fn [x]\n  (+ x 1))" result)))))
+
+    (testing "for bound-fn"
+      (testing "keeps arg vector on first line"
+        (let [source "(bound-fn [x] x)"
+              result (fix/fix-source source {:line-length 12})]
+          (is (= "(bound-fn [x]\n  x)" result)))))
+
+    (testing "for let"
+      (testing "keeps binding vector on first line"
+        (let [source "(let [x 1] (+ x 2))"
+              result (fix/fix-source source {:line-length 12})]
+          (is (= "(let [x 1]\n  (+ x 2))" result)))))
+
+    (testing "for when-let"
+      (testing "keeps binding vector on first line"
+        (let [source "(when-let [x y] body)"
+              result (fix/fix-source source {:line-length 15})]
+          (is (= "(when-let [x y]\n  body)" result)))))
+
+    (testing "for if-let"
+      (testing "keeps binding vector on first line"
+        (let [source "(if-let [x y] a b)"
+              result (fix/fix-source source {:line-length 14})]
+          (is (= "(if-let [x y]\n  a\n  b)" result)))))
+
+    (testing "for doseq"
+      (testing "keeps binding vector on first line"
+        (let [source "(doseq [x xs] (prn x))"
+              result (fix/fix-source source {:line-length 14})]
+          (is (= "(doseq [x xs]\n  (prn x))" result)))))
+
+    (testing "for for"
+      (testing "keeps binding vector on first line"
+        (let [source "(for [x xs] (* x 2))"
+              result (fix/fix-source source {:line-length 12})]
+          (is (= "(for [x xs]\n  (* x 2))" result)))))
+
+    (testing "for loop"
+      (testing "keeps binding vector on first line"
+        (let [source "(loop [i 0] (recur i))"
+              result (fix/fix-source source {:line-length 12})]
+          (is (= "(loop [i 0]\n  (recur i))" result)))))
+
     (testing "for non-special forms"
       (testing "breaks all elements"
         (let [source "(foo bar baz)"
