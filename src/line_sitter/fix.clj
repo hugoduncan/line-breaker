@@ -46,6 +46,7 @@
   :binding - keep binding vector on first line
   :if - keep test on first line
   :case - keep test-expr on first line
+  :cond - each clause on own line (same as default)
   :try - body on next line
   :do - body on next line"
   {'defn            :defn
@@ -73,6 +74,10 @@
    'when-not        :if
    'when-first      :if
    'case            :case
+   'cond            :cond
+   'condp           :cond
+   'cond->          :cond
+   'cond->>         :cond
    'try             :try
    'do              :do})
 
@@ -101,11 +106,13 @@
   :binding keeps 2 (head + binding vector)
   :if keeps 2 (head + test)
   :case keeps 2 (head + test-expr)
+  :cond keeps 1 (each clause on own line)
   :try/:do keep 1 (body on next line)
   Default keeps 1 (head only)."
   [rule]
   (case rule
     (:defn :def :fn :binding :if :case) 2
+    (:cond :try :do) 1
     1))
 
 (defn breakable-node?
