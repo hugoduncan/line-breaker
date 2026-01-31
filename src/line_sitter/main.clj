@@ -5,7 +5,8 @@
    [line-sitter.check :as check]
    [line-sitter.cli :as cli]
    [line-sitter.config :as config]
-   [line-sitter.fix :as fix]))
+   [line-sitter.fix :as fix])
+  (:gen-class))
 
 (def usage-text
   "Usage: line-sitter [options] [files/dirs...]

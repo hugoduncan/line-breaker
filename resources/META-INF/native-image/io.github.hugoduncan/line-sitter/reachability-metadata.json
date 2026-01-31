@@ -1,0 +1,4093 @@
+{
+  "reflection": [
+    {
+      "type": "babashka.cli$add_val",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.cli$args__GT_opts",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.cli$auto_coerce",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.cli$coerce",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.cli$coerce_STAR_",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.cli$coerce__GT_collect",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.cli$coerce_coerce_fn",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.cli$coerce_collect_fn",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.cli$deep_merge",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.cli$dispatch",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.cli$dispatch_tree",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.cli$dispatch_tree_SINGLEQUOTE_",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.cli$eval666",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.cli$eval670",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.cli$eval688",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.cli$eval692",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.cli$first_char",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.cli$format_opts",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.cli$format_table",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.cli$has_parse_opts_QMARK_",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.cli$is_option_QMARK_",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.cli$kw__GT_str",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.cli$merge_opts",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.cli$number_char_QMARK_",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.cli$opts__GT_table",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.cli$pad",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.cli$pad_cells",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.cli$parse_args",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.cli$parse_boolean",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.cli$parse_cmds",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.cli$parse_double",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.cli$parse_key",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.cli$parse_keyword",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.cli$parse_long",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.cli$parse_number",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.cli$parse_opts",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.cli$process_previous",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.cli$second_char",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.cli$spec__GT_opts",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.cli$split",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.cli$table__GT_tree",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.cli$throw_coerce",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.cli$throw_unexpected",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.cli.internal$eval672",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.cli.internal$eval674",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.cli.internal$eval678",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.cli.internal$into_able_QMARK_",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.cli.internal$merge_STAR_",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.cli.internal__init"
+    },
+    {
+      "type": "babashka.cli__init"
+    },
+    {
+      "type": "babashka.fs$__GT_charset",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$__GT_copy_opts",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$__GT_file_time",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$__GT_link_opts",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$__GT_open_option",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$__GT_open_options",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$__GT_posix_file_permissions",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$absolute_QMARK_",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$absolutize",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$add_zip_entry",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$as_file",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$as_path",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$canonicalize",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$components",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$copy",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$copy_to_zip",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$copy_tree",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$create_dir",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$create_dirs",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$create_file",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$create_link",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$create_sym_link",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$create_temp_dir",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$create_temp_file",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$creation_time",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$cwd",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$delete",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$delete_if_exists",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$delete_on_exit",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$delete_tree",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$directory_QMARK_",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$directory_simple_QMARK_",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$directory_stream",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$ends_with_QMARK_",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$escape_glob_chars",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$escape_regex_chars",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$eval144",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$eval148",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$eval152",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$eval444",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$eval446",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$exec_paths",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$executable_QMARK_",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$exists_QMARK_",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$expand_file_set",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$expand_home",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$extension",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$file",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$file_name",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$file_time__GT_instant",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$file_time__GT_millis",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$file_visit_result",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$filename_only_QMARK_",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$fn__448",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$fn__450",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$fn__478",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$get_attribute",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$get_env",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$glob",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$gunzip",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$gzip",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$hidden_QMARK_",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$home",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$instant__GT_file_time",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$keyize",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$last_modified",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$last_modified_1",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$last_modified_time",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$list_dir",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$list_dirs",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$match",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$max_filetime",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$millis__GT_file_time",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$modified_since",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$move",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$normalize",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$owner",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$parent",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$path",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$path_seq",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$posix__GT_attrs",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$posix__GT_file_attribute",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$posix__GT_str",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$posix_file_permissions",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$read_all_bytes",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$read_all_lines",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$read_attributes",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$read_attributes_STAR_",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$read_link",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$readable_QMARK_",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$real_path",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$regular_file_QMARK_",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$relative_QMARK_",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$relativize",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$root",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$same_file_QMARK_",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$set_attribute",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$set_creation_time",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$set_last_modified_time",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$set_posix_file_permissions",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$size",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$split_ext",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$split_paths",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$starts_with_QMARK_",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$str__GT_posix",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$strip_ext",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$sym_link_QMARK_",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$temp_dir",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$u_PLUS_wx",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$unixify",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$unzip",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$update_file",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$walk_file_tree",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$which",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$which_all",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$windows_QMARK_",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$with_temp_dir",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$writable_QMARK_",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$write_bytes",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$write_lines",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$xdg_cache_home",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$xdg_config_home",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$xdg_data_home",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$xdg_home_for",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$xdg_path_from_env_var",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$xdg_state_home",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs$zip",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "babashka.fs__init"
+    },
+    {
+      "type": "boolean[]"
+    },
+    {
+      "type": "byte[]"
+    },
+    {
+      "type": "char[]"
+    },
+    {
+      "type": "clojure.asm.ClassVisitor"
+    },
+    {
+      "type": "clojure.asm.ClassWriter"
+    },
+    {
+      "type": "clojure.asm.Opcodes"
+    },
+    {
+      "type": "clojure.asm.Type"
+    },
+    {
+      "type": "clojure.asm.commons.GeneratorAdapter"
+    },
+    {
+      "type": "clojure.asm.commons.Method"
+    },
+    {
+      "type": "clojure.core.ArrayChunk"
+    },
+    {
+      "type": "clojure.core.ArrayManager"
+    },
+    {
+      "type": "clojure.core.Eduction"
+    },
+    {
+      "type": "clojure.core.IVecImpl"
+    },
+    {
+      "type": "clojure.core.Inst"
+    },
+    {
+      "type": "clojure.core.Vec"
+    },
+    {
+      "type": "clojure.core.VecNode"
+    },
+    {
+      "type": "clojure.core.VecSeq"
+    },
+    {
+      "type": "clojure.core.protocols.CollReduce"
+    },
+    {
+      "type": "clojure.core.protocols.Datafiable"
+    },
+    {
+      "type": "clojure.core.protocols.IKVReduce"
+    },
+    {
+      "type": "clojure.core.protocols.InternalReduce"
+    },
+    {
+      "type": "clojure.core.protocols.Navigable"
+    },
+    {
+      "type": "clojure.core.protocols__init"
+    },
+    {
+      "type": "clojure.core.server__init"
+    },
+    {
+      "type": "clojure.core.specs.alpha$eval130",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "clojure.core.specs.alpha$eval132",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "clojure.core.specs.alpha$eval3",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "clojure.core.specs.alpha$eval7",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "clojure.core.specs.alpha$even_number_of_forms_QMARK_",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "clojure.core.specs.alpha$fn__100",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "clojure.core.specs.alpha$fn__102",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "clojure.core.specs.alpha$fn__105",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "clojure.core.specs.alpha$fn__108",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "clojure.core.specs.alpha$fn__110",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "clojure.core.specs.alpha$fn__113",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "clojure.core.specs.alpha$fn__115",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "clojure.core.specs.alpha$fn__117",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "clojure.core.specs.alpha$fn__12",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "clojure.core.specs.alpha$fn__15",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "clojure.core.specs.alpha$fn__18",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "clojure.core.specs.alpha$fn__21",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "clojure.core.specs.alpha$fn__24",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "clojure.core.specs.alpha$fn__26",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "clojure.core.specs.alpha$fn__29",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "clojure.core.specs.alpha$fn__31",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "clojure.core.specs.alpha$fn__34",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "clojure.core.specs.alpha$fn__37",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "clojure.core.specs.alpha$fn__40",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "clojure.core.specs.alpha$fn__44",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "clojure.core.specs.alpha$fn__47",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "clojure.core.specs.alpha$fn__50",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "clojure.core.specs.alpha$fn__52",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "clojure.core.specs.alpha$fn__54",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "clojure.core.specs.alpha$fn__67",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "clojure.core.specs.alpha$fn__69",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "clojure.core.specs.alpha$fn__81",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "clojure.core.specs.alpha$fn__94",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "clojure.core.specs.alpha$fn__97",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "clojure.core.specs.alpha$quotable",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "clojure.core.specs.alpha__init"
+    },
+    {
+      "type": "clojure.core__init"
+    },
+    {
+      "type": "clojure.core_deftype__init"
+    },
+    {
+      "type": "clojure.core_print__init"
+    },
+    {
+      "type": "clojure.core_proxy__init"
+    },
+    {
+      "type": "clojure.edn__init"
+    },
+    {
+      "type": "clojure.genclass__init"
+    },
+    {
+      "type": "clojure.gvec__init"
+    },
+    {
+      "type": "clojure.instant__init"
+    },
+    {
+      "type": "clojure.java.io.Coercions"
+    },
+    {
+      "type": "clojure.java.io.IOFactory"
+    },
+    {
+      "type": "clojure.java.io__init"
+    },
+    {
+      "type": "clojure.lang.APersistentMap$KeySeq"
+    },
+    {
+      "type": "clojure.lang.APersistentMap$ValSeq"
+    },
+    {
+      "type": "clojure.lang.ASeq"
+    },
+    {
+      "type": "clojure.lang.BigInt"
+    },
+    {
+      "type": "clojure.lang.ChunkBuffer"
+    },
+    {
+      "type": "clojure.lang.Compiler"
+    },
+    {
+      "type": "clojure.lang.Compiler$CompilerException"
+    },
+    {
+      "type": "clojure.lang.Delay",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": [
+            "clojure.lang.IFn"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "clojure.lang.DynamicClassLoader"
+    },
+    {
+      "type": "clojure.lang.ExceptionInfo"
+    },
+    {
+      "type": "clojure.lang.Fn"
+    },
+    {
+      "type": "clojure.lang.FnInvokers"
+    },
+    {
+      "type": "clojure.lang.IChunk"
+    },
+    {
+      "type": "clojure.lang.IChunkedSeq"
+    },
+    {
+      "type": "clojure.lang.IDeref"
+    },
+    {
+      "type": "clojure.lang.IExceptionInfo"
+    },
+    {
+      "type": "clojure.lang.IFn"
+    },
+    {
+      "type": "clojure.lang.IHashEq"
+    },
+    {
+      "type": "clojure.lang.IKVReduce"
+    },
+    {
+      "type": "clojure.lang.IObj"
+    },
+    {
+      "type": "clojure.lang.IPersistentCollection"
+    },
+    {
+      "type": "clojure.lang.IPersistentList"
+    },
+    {
+      "type": "clojure.lang.IPersistentMap"
+    },
+    {
+      "type": "clojure.lang.IPersistentSet"
+    },
+    {
+      "type": "clojure.lang.IPersistentVector"
+    },
+    {
+      "type": "clojure.lang.IProxy"
+    },
+    {
+      "type": "clojure.lang.IRecord"
+    },
+    {
+      "type": "clojure.lang.IReduceInit"
+    },
+    {
+      "type": "clojure.lang.ISeq"
+    },
+    {
+      "type": "clojure.lang.Keyword"
+    },
+    {
+      "type": "clojure.lang.LazilyPersistentVector"
+    },
+    {
+      "type": "clojure.lang.LazySeq"
+    },
+    {
+      "type": "clojure.lang.LineNumberingPushbackReader"
+    },
+    {
+      "type": "clojure.lang.LispReader$ReaderException"
+    },
+    {
+      "type": "clojure.lang.LockingTransaction"
+    },
+    {
+      "type": "clojure.lang.Murmur3"
+    },
+    {
+      "type": "clojure.lang.Namespace"
+    },
+    {
+      "type": "clojure.lang.Numbers"
+    },
+    {
+      "type": "clojure.lang.PersistentArrayMap"
+    },
+    {
+      "type": "clojure.lang.PersistentHashMap"
+    },
+    {
+      "type": "clojure.lang.PersistentHashSet"
+    },
+    {
+      "type": "clojure.lang.PersistentVector"
+    },
+    {
+      "type": "clojure.lang.RT"
+    },
+    {
+      "type": "clojure.lang.Ratio"
+    },
+    {
+      "type": "clojure.lang.ReaderConditional"
+    },
+    {
+      "type": "clojure.lang.Reflector"
+    },
+    {
+      "type": "clojure.lang.SeqIterator"
+    },
+    {
+      "type": "clojure.lang.Sequential"
+    },
+    {
+      "type": "clojure.lang.StringSeq"
+    },
+    {
+      "type": "clojure.lang.Symbol"
+    },
+    {
+      "type": "clojure.lang.TaggedLiteral"
+    },
+    {
+      "type": "clojure.lang.Util"
+    },
+    {
+      "type": "clojure.lang.Var"
+    },
+    {
+      "type": "clojure.lang.Volatile"
+    },
+    {
+      "type": "clojure.main__init"
+    },
+    {
+      "type": "clojure.spec.alpha.Spec"
+    },
+    {
+      "type": "clojure.spec.alpha.Specize"
+    },
+    {
+      "type": "clojure.spec.alpha__init"
+    },
+    {
+      "type": "clojure.spec.gen.alpha__init"
+    },
+    {
+      "type": "clojure.string__init"
+    },
+    {
+      "type": "clojure.uuid__init"
+    },
+    {
+      "type": "clojure.walk__init"
+    },
+    {
+      "type": "double[]"
+    },
+    {
+      "type": "float[]"
+    },
+    {
+      "type": "int[]"
+    },
+    {
+      "type": "io.github.treesitter.jtreesitter.Language"
+    },
+    {
+      "type": "io.github.treesitter.jtreesitter.Node"
+    },
+    {
+      "type": "io.github.treesitter.jtreesitter.Parser"
+    },
+    {
+      "type": "io.github.treesitter.jtreesitter.Point"
+    },
+    {
+      "type": "io.github.treesitter.jtreesitter.Tree"
+    },
+    {
+      "type": "java.io.BufferedInputStream"
+    },
+    {
+      "type": "java.io.BufferedOutputStream"
+    },
+    {
+      "type": "java.io.BufferedReader"
+    },
+    {
+      "type": "java.io.BufferedWriter"
+    },
+    {
+      "type": "java.io.ByteArrayInputStream"
+    },
+    {
+      "type": "java.io.ByteArrayOutputStream"
+    },
+    {
+      "type": "java.io.CharArrayReader"
+    },
+    {
+      "type": "java.io.Closeable"
+    },
+    {
+      "type": "java.io.File",
+      "fields": [
+        {
+          "name": "pathSeparator"
+        },
+        {
+          "name": "separator"
+        }
+      ]
+    },
+    {
+      "type": "java.io.FileInputStream"
+    },
+    {
+      "type": "java.io.FileOutputStream"
+    },
+    {
+      "type": "java.io.FileWriter"
+    },
+    {
+      "type": "java.io.InputStream"
+    },
+    {
+      "type": "java.io.InputStreamReader"
+    },
+    {
+      "type": "java.io.NotSerializableException"
+    },
+    {
+      "type": "java.io.OutputStream"
+    },
+    {
+      "type": "java.io.OutputStreamWriter"
+    },
+    {
+      "type": "java.io.PrintWriter"
+    },
+    {
+      "type": "java.io.PushbackReader"
+    },
+    {
+      "type": "java.io.Reader"
+    },
+    {
+      "type": "java.io.Serializable"
+    },
+    {
+      "type": "java.io.StringReader"
+    },
+    {
+      "type": "java.io.Writer"
+    },
+    {
+      "type": "java.lang.AssertionError"
+    },
+    {
+      "type": "java.lang.Boolean",
+      "jniAccessible": true,
+      "methods": [
+        {
+          "name": "getBoolean",
+          "parameterTypes": [
+            "java.lang.String"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "java.lang.Character"
+    },
+    {
+      "type": "java.lang.Class"
+    },
+    {
+      "type": "java.lang.Double"
+    },
+    {
+      "type": "java.lang.Exception"
+    },
+    {
+      "type": "java.lang.Float"
+    },
+    {
+      "type": "java.lang.IllegalArgumentException"
+    },
+    {
+      "type": "java.lang.Integer"
+    },
+    {
+      "type": "java.lang.Iterable"
+    },
+    {
+      "type": "java.lang.Long"
+    },
+    {
+      "type": "java.lang.Number"
+    },
+    {
+      "type": "java.lang.Object"
+    },
+    {
+      "type": "java.lang.Object[]"
+    },
+    {
+      "type": "java.lang.StackTraceElement"
+    },
+    {
+      "type": "java.lang.StackTraceElement[]"
+    },
+    {
+      "type": "java.lang.String"
+    },
+    {
+      "type": "java.lang.System",
+      "methods": [
+        {
+          "name": "getProperty",
+          "parameterTypes": [
+            "java.lang.String"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "java.lang.ThreadLocal"
+    },
+    {
+      "type": "java.lang.Throwable"
+    },
+    {
+      "type": "java.lang.UnsupportedOperationException"
+    },
+    {
+      "type": "java.lang.annotation.Annotation"
+    },
+    {
+      "type": "java.lang.annotation.Retention"
+    },
+    {
+      "type": "java.lang.foreign.Arena"
+    },
+    {
+      "type": "java.lang.foreign.SymbolLookup"
+    },
+    {
+      "type": "java.lang.reflect.Array"
+    },
+    {
+      "type": "java.lang.reflect.Constructor"
+    },
+    {
+      "type": "java.lang.reflect.Field"
+    },
+    {
+      "type": "java.lang.reflect.Method",
+      "methods": [
+        {
+          "name": "canAccess",
+          "parameterTypes": [
+            "java.lang.Object"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "java.lang.reflect.Modifier"
+    },
+    {
+      "type": "java.math.BigDecimal"
+    },
+    {
+      "type": "java.math.BigInteger"
+    },
+    {
+      "type": "java.net.InetAddress"
+    },
+    {
+      "type": "java.net.MalformedURLException"
+    },
+    {
+      "type": "java.net.ServerSocket"
+    },
+    {
+      "type": "java.net.Socket"
+    },
+    {
+      "type": "java.net.SocketException"
+    },
+    {
+      "type": "java.net.URI"
+    },
+    {
+      "type": "java.net.URL"
+    },
+    {
+      "type": "java.net.URLDecoder"
+    },
+    {
+      "type": "java.net.URLEncoder"
+    },
+    {
+      "type": "java.nio.charset.Charset"
+    },
+    {
+      "type": "java.nio.file.CopyOption"
+    },
+    {
+      "type": "java.nio.file.CopyOption[]"
+    },
+    {
+      "type": "java.nio.file.DirectoryStream"
+    },
+    {
+      "type": "java.nio.file.DirectoryStream$Filter"
+    },
+    {
+      "type": "java.nio.file.FileSystem"
+    },
+    {
+      "type": "java.nio.file.FileSystems"
+    },
+    {
+      "type": "java.nio.file.FileVisitOption"
+    },
+    {
+      "type": "java.nio.file.FileVisitResult",
+      "fields": [
+        {
+          "name": "CONTINUE"
+        },
+        {
+          "name": "SKIP_SIBLINGS"
+        },
+        {
+          "name": "SKIP_SUBTREE"
+        },
+        {
+          "name": "TERMINATE"
+        }
+      ]
+    },
+    {
+      "type": "java.nio.file.FileVisitor"
+    },
+    {
+      "type": "java.nio.file.Files"
+    },
+    {
+      "type": "java.nio.file.LinkOption"
+    },
+    {
+      "type": "java.nio.file.LinkOption[]"
+    },
+    {
+      "type": "java.nio.file.OpenOption"
+    },
+    {
+      "type": "java.nio.file.OpenOption[]"
+    },
+    {
+      "type": "java.nio.file.Path"
+    },
+    {
+      "type": "java.nio.file.PathMatcher"
+    },
+    {
+      "type": "java.nio.file.Paths"
+    },
+    {
+      "type": "java.nio.file.StandardCopyOption"
+    },
+    {
+      "type": "java.nio.file.StandardOpenOption"
+    },
+    {
+      "type": "java.nio.file.attribute.BasicFileAttributes"
+    },
+    {
+      "type": "java.nio.file.attribute.FileAttribute"
+    },
+    {
+      "type": "java.nio.file.attribute.FileAttribute[]"
+    },
+    {
+      "type": "java.nio.file.attribute.FileTime"
+    },
+    {
+      "type": "java.nio.file.attribute.PosixFilePermission"
+    },
+    {
+      "type": "java.nio.file.attribute.PosixFilePermissions"
+    },
+    {
+      "type": "java.sql.Timestamp"
+    },
+    {
+      "type": "java.time.Instant"
+    },
+    {
+      "type": "java.util.Calendar"
+    },
+    {
+      "type": "java.util.Collection"
+    },
+    {
+      "type": "java.util.Date"
+    },
+    {
+      "type": "java.util.GregorianCalendar"
+    },
+    {
+      "type": "java.util.List"
+    },
+    {
+      "type": "java.util.Map"
+    },
+    {
+      "type": "java.util.Optional"
+    },
+    {
+      "type": "java.util.Properties"
+    },
+    {
+      "type": "java.util.RandomAccess"
+    },
+    {
+      "type": "java.util.Set"
+    },
+    {
+      "type": "java.util.TimeZone"
+    },
+    {
+      "type": "java.util.UUID"
+    },
+    {
+      "type": "java.util.concurrent.ArrayBlockingQueue"
+    },
+    {
+      "type": "java.util.concurrent.BlockingQueue"
+    },
+    {
+      "type": "java.util.concurrent.LinkedBlockingQueue"
+    },
+    {
+      "type": "java.util.concurrent.locks.ReentrantLock"
+    },
+    {
+      "type": "java.util.regex.Matcher"
+    },
+    {
+      "type": "java.util.regex.Pattern"
+    },
+    {
+      "type": "java.util.zip.GZIPInputStream"
+    },
+    {
+      "type": "java.util.zip.GZIPOutputStream"
+    },
+    {
+      "type": "java.util.zip.ZipEntry"
+    },
+    {
+      "type": "java.util.zip.ZipInputStream"
+    },
+    {
+      "type": "java.util.zip.ZipOutputStream"
+    },
+    {
+      "type": "line_sitter.check$check_file_with_ignore",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.check$check_line_lengths",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.check$collect_ignored_byte_ranges",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.check$collect_ignored_ranges",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.check$eval495",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.check$eval497",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.check$eval501",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.check$eval530",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.check$eval604",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.check$filter_violations",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.check$find_ignored_byte_ranges",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.check$find_ignored_ranges",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.check$find_violations",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.check$format_summary",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.check$format_violation",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.check$ignore_marker_QMARK_",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.check$report_violations",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.check__init"
+    },
+    {
+      "type": "line_sitter.cli$eval658",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.cli$eval660",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.cli$eval664",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.cli$eval948",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.cli$glob_pattern_for_extensions",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.cli$matches_extension_QMARK_",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.cli$parse_args",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.cli$resolve_files",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.cli__init"
+    },
+    {
+      "type": "line_sitter.config$deep_merge",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.config$eval968",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.config$eval970",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.config$eval974",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.config$find_config_file",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.config$load_config",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.config$validate_config",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.config__init"
+    },
+    {
+      "type": "line_sitter.fix$apply_edits",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.fix$binding_vector_QMARK_",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.fix$break_form",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.fix$breakable_node_QMARK_",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.fix$comment_node_QMARK_",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.fix$element_end_offset",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.fix$element_start_offset",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.fix$elements_to_keep_on_first_line",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.fix$eval993",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.fix$eval995",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.fix$eval999",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.fix$find_breakable_form",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.fix$find_breakable_forms",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.fix$find_breakable_forms_on_line",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.fix$find_long_lines",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.fix$fix_source",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.fix$form_needs_breaking_on_line_QMARK_",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.fix$form_start_column",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.fix$generate_paired_edits",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.fix$generate_sequential_edits",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.fix$get_effective_rule",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.fix$get_head_symbol",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.fix$get_indent_rule",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.fix$indent_column",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.fix$make_break_edit",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.fix$node_contains_line_QMARK_",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.fix$node_in_ignored_range_QMARK_",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.fix$node_start_line",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.fix$same_line_QMARK_",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.fix$try_break_forms",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.fix$uses_pair_grouping_QMARK_",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.fix__init"
+    },
+    {
+      "type": "line_sitter.main$_main",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.main$eval1084",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.main$eval136",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.main$eval138",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.main$eval142",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.main$eval493",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.main$eval656",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.main$eval966",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.main$eval991",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.main$format_error",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.main$get_config_dir",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.main$process_check",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.main$process_files",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.main$process_fix",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.main$process_stdout",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.main$run",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.main__init"
+    },
+    {
+      "type": "line_sitter.platform$detect_arch",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.platform$detect_os",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.platform$eval548",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.platform$eval550",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.platform$eval554",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.platform$library_extension",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.platform__init"
+    },
+    {
+      "type": "line_sitter.treesitter.NativeLoader"
+    },
+    {
+      "type": "line_sitter.treesitter.language$eval540",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.treesitter.language$eval542",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.treesitter.language$eval546",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.treesitter.language$eval563",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.treesitter.language$extract_resource_to_temp",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.treesitter.language$find_in_library_path",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.treesitter.language$find_library_path",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.treesitter.language$fn__586",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.treesitter.language$get_env_lib_path",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.treesitter.language$get_native_loader_path",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.treesitter.language$library_name",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.treesitter.language$load_clojure_language",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.treesitter.language$load_clojure_language_STAR_",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.treesitter.language__init"
+    },
+    {
+      "type": "line_sitter.treesitter.node$children",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.treesitter.node$eval503",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.treesitter.node$eval505",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.treesitter.node$eval509",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.treesitter.node$named_children",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.treesitter.node$next_named_sibling",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.treesitter.node$node_line_range",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.treesitter.node$node_parent",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.treesitter.node$node_position",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.treesitter.node$node_range",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.treesitter.node$node_text",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.treesitter.node$node_type",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.treesitter.node$optional__GT_node",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.treesitter.node$root_node",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.treesitter.node__init"
+    },
+    {
+      "type": "line_sitter.treesitter.parser$eval532",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.treesitter.parser$eval534",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.treesitter.parser$eval538",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.treesitter.parser$eval589",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.treesitter.parser$eval598",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.treesitter.parser$eval600",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.treesitter.parser$parse_source",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.treesitter.parser$with_parser",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "line_sitter.treesitter.parser__init"
+    },
+    {
+      "type": "long[]"
+    },
+    {
+      "type": "short[]"
+    },
+    {
+      "type": "sun.security.provider.NativePRNG",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": [
+            "java.security.SecureRandomParameters"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "sun.security.provider.SHA",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "sun.text.resources.cldr.FormatData"
+    },
+    {
+      "type": "sun.text.resources.cldr.FormatData_en"
+    },
+    {
+      "type": "user$eval1",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "user$eval134",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    }
+  ],
+  "resources": [
+    {
+      "glob": "META-INF/services/io.github.treesitter.jtreesitter.NativeLibraryLookup"
+    },
+    {
+      "glob": "META-INF/services/java.time.zone.ZoneRulesProvider"
+    },
+    {
+      "glob": "babashka/cli.clj"
+    },
+    {
+      "glob": "babashka/cli.cljc"
+    },
+    {
+      "glob": "babashka/cli/internal.clj"
+    },
+    {
+      "glob": "babashka/cli/internal.cljc"
+    },
+    {
+      "glob": "babashka/cli/internal__init.class"
+    },
+    {
+      "glob": "babashka/cli__init.class"
+    },
+    {
+      "glob": "babashka/fs.clj"
+    },
+    {
+      "glob": "babashka/fs.cljc"
+    },
+    {
+      "glob": "babashka/fs__init.class"
+    },
+    {
+      "glob": "clojure/core.clj"
+    },
+    {
+      "glob": "clojure/core/protocols.clj"
+    },
+    {
+      "glob": "clojure/core/protocols__init.class"
+    },
+    {
+      "glob": "clojure/core/server.clj"
+    },
+    {
+      "glob": "clojure/core/server__init.class"
+    },
+    {
+      "glob": "clojure/core/specs/alpha.clj"
+    },
+    {
+      "glob": "clojure/core/specs/alpha__init.class"
+    },
+    {
+      "glob": "clojure/core__init.class"
+    },
+    {
+      "glob": "clojure/core_deftype.clj"
+    },
+    {
+      "glob": "clojure/core_deftype__init.class"
+    },
+    {
+      "glob": "clojure/core_print.clj"
+    },
+    {
+      "glob": "clojure/core_print__init.class"
+    },
+    {
+      "glob": "clojure/core_proxy.clj"
+    },
+    {
+      "glob": "clojure/core_proxy__init.class"
+    },
+    {
+      "glob": "clojure/edn.clj"
+    },
+    {
+      "glob": "clojure/edn__init.class"
+    },
+    {
+      "glob": "clojure/genclass.clj"
+    },
+    {
+      "glob": "clojure/genclass__init.class"
+    },
+    {
+      "glob": "clojure/gvec.clj"
+    },
+    {
+      "glob": "clojure/gvec__init.class"
+    },
+    {
+      "glob": "clojure/instant.clj"
+    },
+    {
+      "glob": "clojure/instant__init.class"
+    },
+    {
+      "glob": "clojure/java/io.clj"
+    },
+    {
+      "glob": "clojure/java/io__init.class"
+    },
+    {
+      "glob": "clojure/main.clj"
+    },
+    {
+      "glob": "clojure/main__init.class"
+    },
+    {
+      "glob": "clojure/spec/alpha.clj"
+    },
+    {
+      "glob": "clojure/spec/alpha__init.class"
+    },
+    {
+      "glob": "clojure/spec/gen/alpha.clj"
+    },
+    {
+      "glob": "clojure/spec/gen/alpha__init.class"
+    },
+    {
+      "glob": "clojure/string.clj"
+    },
+    {
+      "glob": "clojure/string__init.class"
+    },
+    {
+      "glob": "clojure/uuid.clj"
+    },
+    {
+      "glob": "clojure/uuid__init.class"
+    },
+    {
+      "glob": "clojure/version.properties"
+    },
+    {
+      "glob": "clojure/walk.clj"
+    },
+    {
+      "glob": "clojure/walk__init.class"
+    },
+    {
+      "glob": "data_readers.clj"
+    },
+    {
+      "glob": "data_readers.cljc"
+    },
+    {
+      "glob": "line_sitter/check.clj"
+    },
+    {
+      "glob": "line_sitter/check__init.class"
+    },
+    {
+      "glob": "line_sitter/cli.clj"
+    },
+    {
+      "glob": "line_sitter/cli__init.class"
+    },
+    {
+      "glob": "line_sitter/config.clj"
+    },
+    {
+      "glob": "line_sitter/config__init.class"
+    },
+    {
+      "glob": "line_sitter/fix.clj"
+    },
+    {
+      "glob": "line_sitter/fix__init.class"
+    },
+    {
+      "glob": "line_sitter/main.clj"
+    },
+    {
+      "glob": "line_sitter/main__init.class"
+    },
+    {
+      "glob": "line_sitter/platform.clj"
+    },
+    {
+      "glob": "line_sitter/platform__init.class"
+    },
+    {
+      "glob": "line_sitter/treesitter/language.clj"
+    },
+    {
+      "glob": "line_sitter/treesitter/language__init.class"
+    },
+    {
+      "glob": "line_sitter/treesitter/node.clj"
+    },
+    {
+      "glob": "line_sitter/treesitter/node__init.class"
+    },
+    {
+      "glob": "line_sitter/treesitter/parser.clj"
+    },
+    {
+      "glob": "line_sitter/treesitter/parser__init.class"
+    },
+    {
+      "glob": "native/darwin-x86_64/libtree-sitter-clojure.dylib"
+    },
+    {
+      "glob": "native/darwin-x86_64/libtree-sitter.dylib"
+    },
+    {
+      "glob": "user.clj"
+    }
+  ],
+  "foreign": {
+    "downcalls": [
+      {
+        "returnType": "struct(sequence(4, jint),void*,void*)",
+        "parameterTypes": [
+          "void*"
+        ]
+      },
+      {
+        "returnType": "void*",
+        "parameterTypes": [
+          "jlong",
+          "jlong"
+        ]
+      },
+      {
+        "returnType": "void*",
+        "parameterTypes": [
+          "void*",
+          "jlong"
+        ]
+      },
+      {
+        "returnType": "void",
+        "parameterTypes": [
+          "void*",
+          "void*",
+          "void*",
+          "void*"
+        ]
+      },
+      {
+        "returnType": "jboolean",
+        "parameterTypes": [
+          "struct(sequence(4, jint),void*,void*)"
+        ]
+      },
+      {
+        "returnType": "void*",
+        "parameterTypes": [
+          "struct(sequence(4, jint),void*,void*)"
+        ]
+      },
+      {
+        "returnType": "void*",
+        "parameterTypes": []
+      },
+      {
+        "returnType": "void",
+        "parameterTypes": [
+          "void*"
+        ]
+      },
+      {
+        "returnType": "void*",
+        "parameterTypes": [
+          "void*",
+          "void*",
+          "void*",
+          "jint",
+          "jint"
+        ]
+      },
+      {
+        "returnType": "jint",
+        "parameterTypes": [
+          "void*"
+        ]
+      },
+      {
+        "returnType": "void*",
+        "parameterTypes": [
+          "jlong"
+        ]
+      },
+      {
+        "returnType": "jint",
+        "parameterTypes": [
+          "struct(sequence(4, jint),void*,void*)"
+        ]
+      },
+      {
+        "returnType": "struct(sequence(4, jint),void*,void*)",
+        "parameterTypes": [
+          "struct(sequence(4, jint),void*,void*)",
+          "jint"
+        ]
+      },
+      {
+        "returnType": "jboolean",
+        "parameterTypes": [
+          "void*",
+          "void*"
+        ]
+      }
+    ]
+  }
+}
