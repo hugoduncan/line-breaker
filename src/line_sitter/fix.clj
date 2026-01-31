@@ -45,8 +45,10 @@
   :fn - keep arg vector on first line
   :binding - keep binding vector on first line
   :if - keep test on first line
-  :case - keep test-expr on first line
-  :cond - each clause on own line (same as default)
+  :case - keep test-expr on first line, pair group remaining
+  :cond - pair group all clauses
+  :condp - keep pred+expr on first line, pair group remaining
+  :cond-> - keep initial expr on first line, pair group remaining
   :try - body on next line
   :do - body on next line"
   {'defn            :defn
@@ -75,9 +77,9 @@
    'when-first      :if
    'case            :case
    'cond            :cond
-   'condp           :cond
-   'cond->          :cond
-   'cond->>         :cond
+   'condp           :condp
+   'cond->          :cond->
+   'cond->>         :cond->
    'try             :try
    'do              :do})
 
@@ -100,23 +102,39 @@
         (get default-indent-rules head-sym))))
 
 (defn- elements-to-keep-on-first-line
-  "Number of elements to keep on the first line based on indent rule.
+  "Number of elements to keep on the first line based on indent rule or node type.
   :defn/:def keep 2 (head + name)
   :fn keeps 2 (head + arg vector)
   :binding keeps 2 (head + binding vector)
   :if keeps 2 (head + test)
   :case keeps 2 (head + test-expr)
-  :cond keeps 1 (each clause on own line)
+  :cond keeps 1 (head only, pair group remaining)
+  :condp keeps 3 (head + pred + expr, pair group remaining)
+  :cond-> keeps 2 (head + initial-expr, pair group remaining)
   :try/:do keep 1 (body on next line)
+  :map keeps 2 (first key-value pair)
   Default keeps 1 (head only)."
   [rule]
-  ;; Note: :cond uses default breaking (one element per line).
-  ;; Pair grouping for cond clauses, map entries, and binding pairs
-  ;; is intentionally deferred to a future enhancement.
   (case rule
-    (:defn :def :fn :binding :if :case) 2
+    (:defn :def :fn :binding :if :case :cond-> :map) 2
+    :condp 3
     (:cond :try :do) 1
     1))
+
+(defn- get-effective-rule
+  "Get the effective indent rule for a node, considering both head symbol
+  and node type. Maps use :map rule for pair grouping."
+  [node config]
+  (or (get-indent-rule node config)
+      (when (= :map_lit (node/node-type node))
+        :map)))
+
+(defn- uses-pair-grouping?
+  "Returns true if the node should use pair grouping when breaking.
+  Pair grouping keeps related pairs together (key-value, test-result, etc.)."
+  [node config]
+  (let [rule (get-effective-rule node config)]
+    (#{:cond :condp :case :cond-> :map} rule)))
 
 (defn breakable-node?
   "Returns true if node is a breakable collection type."
@@ -238,6 +256,33 @@
        :end (element-start-offset next-child)
        :replacement (str "\n" indent-spaces)})))
 
+(defn- generate-paired-edits
+  "Generate edits for pair-grouped breaking.
+  Groups elements in pairs and breaks only between pairs."
+  [last-kept breakable-children indent-col]
+  (let [pairs (partition-all 2 breakable-children)
+        ;; For each pair, we need to break before the first element of the pair
+        ;; Get the element before each pair (last-kept for first, last of prev pair for rest)
+        prev-elements (cons last-kept (map last (butlast pairs)))
+        first-of-pairs (map first pairs)
+        ;; Generate edits between prev-element and first-of-pair
+        break-points (map vector prev-elements first-of-pairs)]
+    (into []
+          (keep (fn [[prev-child next-child]]
+                  (make-break-edit prev-child next-child indent-col)))
+          break-points)))
+
+(defn- generate-sequential-edits
+  "Generate edits for sequential (non-paired) breaking.
+  Each element gets its own line."
+  [last-kept breakable-children indent-col]
+  (let [all-pairs (cons [last-kept (first breakable-children)]
+                        (partition 2 1 breakable-children))]
+    (into []
+          (keep (fn [[prev-child next-child]]
+                  (make-break-edit prev-child next-child indent-col)))
+          all-pairs)))
+
 (defn break-form
   "Generate edits to break a form across multiple lines.
 
@@ -245,6 +290,9 @@
   form's head symbol:
   - :defn/:def rules keep name on first line (2 elements)
   - Default keeps only first element on first line
+
+  For forms that use pair grouping (maps, cond, case), keeps related pairs
+  together (key-value, test-result, etc.) and breaks only between pairs.
 
   Comments on the same line as the preceding element stay attached.
   Comments include their trailing newline, so no extra newline is added after.
@@ -257,21 +305,17 @@
    (when node
      (let [children (node/named-children node)
            indent-col (+ 2 (form-start-column node))
-           rule (get-indent-rule node config)
+           rule (get-effective-rule node config)
            keep-count (elements-to-keep-on-first-line rule)
            ;; Elements that need breaking: skip the ones kept on first line
            breakable-children (drop keep-count children)]
        (when (seq breakable-children)
          (let [;; Get the last element that stays on first line
                last-kept (nth children (dec keep-count))
-               ;; All pairs to potentially break (including first)
-               all-pairs (cons [last-kept (first breakable-children)]
-                               (partition 2 1 breakable-children))
-               ;; Generate edits, filtering out nils (attached comments)
-               edits (into []
-                           (keep (fn [[prev-child next-child]]
-                                   (make-break-edit prev-child next-child indent-col)))
-                           all-pairs)]
+               ;; Generate edits based on whether pair grouping applies
+               edits (if (uses-pair-grouping? node config)
+                       (generate-paired-edits last-kept breakable-children indent-col)
+                       (generate-sequential-edits last-kept breakable-children indent-col))]
            (when (seq edits)
              edits)))))))
 

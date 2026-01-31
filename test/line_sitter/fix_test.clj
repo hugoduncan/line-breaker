@@ -129,12 +129,12 @@
             result (fix/apply-edits "[a b c]" edits)]
         (is (= "[a\n  b\n  c]" result))))
 
-    (testing "generates edits for map"
+    (testing "generates edits for map with pair grouping"
       (let [tree (parser/parse-source "{:a 1 :b 2}")
             form (fix/find-breakable-form tree 1)
             edits (fix/break-form form)
             result (fix/apply-edits "{:a 1 :b 2}" edits)]
-        (is (= "{:a\n  1\n  :b\n  2}" result))))
+        (is (= "{:a 1\n  :b 2}" result))))
 
     (testing "returns nil for single-element form"
       (let [tree (parser/parse-source "(a)")
@@ -327,28 +327,28 @@
           (is (= "(when-first [x xs]\n  body)" result)))))
 
     (testing "for case"
-      (testing "keeps test-expr on first line"
+      (testing "keeps test-expr on first line with pair grouping"
         (let [source "(case x :a 1 :b 2)"
               result (fix/fix-source source {:line-length 10})]
-          (is (= "(case x\n  :a\n  1\n  :b\n  2)" result)))))
+          (is (= "(case x\n  :a 1\n  :b 2)" result)))))
 
     (testing "for cond"
-      (testing "breaks each element separately (pair grouping deferred)"
+      (testing "uses pair grouping for test-result clauses"
         (let [source "(cond t1 r1 t2 r2)"
               result (fix/fix-source source {:line-length 10})]
-          (is (= "(cond\n  t1\n  r1\n  t2\n  r2)" result)))))
+          (is (= "(cond\n  t1 r1\n  t2 r2)" result)))))
 
     (testing "for condp"
-      (testing "breaks each element separately"
+      (testing "keeps pred and expr on first line with pair grouping"
         (let [source "(condp = x :a 1 :b 2)"
               result (fix/fix-source source {:line-length 12})]
-          (is (= "(condp\n  =\n  x\n  :a\n  1\n  :b\n  2)" result)))))
+          (is (= "(condp = x\n  :a 1\n  :b 2)" result)))))
 
     (testing "for cond->"
-      (testing "breaks each element separately"
+      (testing "keeps initial expr on first line with pair grouping"
         (let [source "(cond-> x t1 f1 t2 f2)"
               result (fix/fix-source source {:line-length 12})]
-          (is (= "(cond->\n  x\n  t1\n  f1\n  t2\n  f2)" result)))))
+          (is (= "(cond-> x\n  t1 f1\n  t2 f2)" result)))))
 
     (testing "for try"
       (testing "puts body on next line"
@@ -513,6 +513,68 @@
             result (fix/fix-source source {:line-length 10})]
         (is (str/includes? result "; important note")
             "comment text is preserved")))))
+
+(deftest pair-grouping-test
+  ;; Verify pair grouping for maps, cond, case, and related forms.
+  (testing "pair grouping"
+    (testing "for maps"
+      (testing "keeps key-value pairs together"
+        (let [source "{:a 1 :b 2 :c 3}"
+              result (fix/fix-source source {:line-length 10})]
+          (is (= "{:a 1\n  :b 2\n  :c 3}" result))))
+      (testing "handles nested values"
+        (let [source "{:a [1 2] :b [3 4]}"
+              result (fix/fix-source source {:line-length 12})]
+          (is (= "{:a [1 2]\n  :b [3 4]}" result))))
+      (testing "leaves oversized pairs together"
+        ;; Pairs stay together even if they exceed line length.
+        ;; Breaking within pairs (key on one line, value on next) is
+        ;; a potential future enhancement.
+        (let [source "{:a 1 :longkey longval}"
+              result (fix/fix-source source {:line-length 12})]
+          (is (= "{:a 1\n  :longkey longval}" result)))))
+
+    (testing "for case"
+      (testing "handles default clause (odd element count)"
+        (let [source "(case x :a 1 :b 2 :default)"
+              result (fix/fix-source source {:line-length 12})]
+          (is (= "(case x\n  :a 1\n  :b 2\n  :default)" result))))
+      (testing "keeps test-expr on first line"
+        (let [source "(case expr :a 1)"
+              result (fix/fix-source source {:line-length 12})]
+          (is (= "(case expr\n  :a 1)" result)))))
+
+    (testing "for cond"
+      (testing "handles multiple pairs"
+        (let [source "(cond a 1 b 2 c 3)"
+              result (fix/fix-source source {:line-length 10})]
+          (is (= "(cond\n  a 1\n  b 2\n  c 3)" result))))
+      (testing "handles :else clause"
+        (let [source "(cond a 1 :else 2)"
+              result (fix/fix-source source {:line-length 10})]
+          (is (= "(cond\n  a 1\n  :else 2)" result)))))
+
+    (testing "for condp"
+      (testing "keeps predicate and expr on first line"
+        (let [source "(condp = val :a 1 :b 2)"
+              result (fix/fix-source source {:line-length 14})]
+          (is (= "(condp = val\n  :a 1\n  :b 2)" result))))
+      (testing "handles default clause"
+        (let [source "(condp = x :a 1 :default)"
+              result (fix/fix-source source {:line-length 12})]
+          (is (= "(condp = x\n  :a 1\n  :default)" result)))))
+
+    (testing "for cond->"
+      (testing "keeps initial expr on first line"
+        (let [source "(cond-> val t1 f1 t2 f2)"
+              result (fix/fix-source source {:line-length 14})]
+          (is (= "(cond-> val\n  t1 f1\n  t2 f2)" result)))))
+
+    (testing "for cond->>"
+      (testing "keeps initial expr on first line"
+        (let [source "(cond->> val t1 f1 t2 f2)"
+              result (fix/fix-source source {:line-length 14})]
+          (is (= "(cond->> val\n  t1 f1\n  t2 f2)" result)))))))
 
 (deftest edge-cases-test
   ;; Verify edge cases: empty, single-element, already-formatted.
