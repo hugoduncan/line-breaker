@@ -2,16 +2,18 @@
   "Load the tree-sitter Clojure grammar from native libraries.
 
   Discovery order:
-  1. LINE_SITTER_NATIVE_LIB environment variable (explicit path)
-  2. native/<os>-<arch>/ on classpath resources
-  3. java.library.path"
+  1. NativeLoader extracted path (when available, e.g., native-image)
+  2. LINE_SITTER_NATIVE_LIB environment variable (explicit path)
+  3. native/<os>-<arch>/ on classpath resources
+  4. java.library.path"
   (:require [babashka.fs :as fs]
             [clojure.java.io :as io]
             [clojure.string :as str]
             [line-sitter.platform :as platform])
   (:import [java.lang.foreign Arena SymbolLookup]
-           [java.nio.file Path]
-           [io.github.treesitter.jtreesitter Language]))
+           [java.nio.file Files Path]
+           [io.github.treesitter.jtreesitter Language]
+           [line_sitter.treesitter NativeLoader]))
 
 (defn- library-name
   "Get platform-specific library filename."
@@ -53,26 +55,39 @@
   []
   (System/getenv "LINE_SITTER_NATIVE_LIB"))
 
+(defn- get-native-loader-path
+  "Get the grammar library path from NativeLoader if available.
+  Returns the Path if already extracted by NativeLoader, nil otherwise."
+  []
+  (when-let [path (NativeLoader/getClojureGrammarPath)]
+    (when (Files/exists path (into-array java.nio.file.LinkOption []))
+      path)))
+
 (defn- find-library-path
   "Find the native library path using discovery order.
-  Returns [Path source] where source is :env-var, :classpath, or :library-path.
+  Returns [Path source] where source is :native-loader, :env-var, :classpath, or :library-path.
   Throws ex-info if not found."
   []
   (let [os (platform/detect-os)
         arch (platform/detect-arch)
         lib-name (library-name os)
         env-path (get-env-lib-path)
-        resource-path (str "native/" os "-" arch "/" lib-name)]
+        resource-path (str "native/" os "-" arch "/" lib-name)
+        loader-path (get-native-loader-path)]
     (cond
-      ;; 1. Explicit path via environment variable
+      ;; 1. NativeLoader extracted path (used by native-image)
+      loader-path
+      [loader-path :native-loader]
+
+      ;; 2. Explicit path via environment variable
       (and env-path (fs/exists? env-path))
       [(fs/path env-path) :env-var]
 
-      ;; 2. Classpath resource (extract to temp)
+      ;; 3. Classpath resource (extract to temp)
       :else
       (if-let [extracted (extract-resource-to-temp resource-path)]
         [extracted :classpath]
-        ;; 3. java.library.path
+        ;; 4. java.library.path
         (if-let [lib-path-result (find-in-library-path lib-name)]
           [lib-path-result :library-path]
           ;; Not found
@@ -101,9 +116,10 @@
   "Load the Clojure language grammar from a native library.
 
   Searches for the library in order:
-  1. LINE_SITTER_NATIVE_LIB environment variable
-  2. native/<os>-<arch>/ on classpath
-  3. java.library.path
+  1. NativeLoader extracted path (when available)
+  2. LINE_SITTER_NATIVE_LIB environment variable
+  3. native/<os>-<arch>/ on classpath
+  4. java.library.path
 
   Returns a jtreesitter Language instance (memoized after first load).
   Throws ex-info if the library cannot be found or loaded."

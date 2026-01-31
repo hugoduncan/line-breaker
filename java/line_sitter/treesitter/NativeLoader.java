@@ -11,45 +11,87 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 
 /**
- * ServiceLoader implementation for loading tree-sitter native library.
- * Loads from classpath resources (native/os-arch/libtree-sitter.dylib|so).
+ * ServiceLoader implementation for loading tree-sitter native libraries.
+ * Loads both libtree-sitter (core) and libtree-sitter-clojure (grammar)
+ * from classpath resources (native/os-arch/).
+ *
+ * The libraries are extracted to a shared temp directory and loaded in
+ * dependency order: core library first, then language grammar.
  */
 public class NativeLoader implements NativeLibraryLookup {
 
-  private static Path extractedLibrary = null;
+  private static Path extractedDir = null;
+  private static Path treeSitterLib = null;
+  private static Path clojureGrammarLib = null;
 
   @Override
   public SymbolLookup get(Arena arena) {
     try {
-      Path libPath = findLibrary();
-      return SymbolLookup.libraryLookup(libPath, arena);
+      extractLibraries();
+      // Load core tree-sitter first
+      SymbolLookup coreLookup = SymbolLookup.libraryLookup(treeSitterLib, arena);
+      // Load clojure grammar second
+      SymbolLookup grammarLookup = SymbolLookup.libraryLookup(clojureGrammarLib, arena);
+      // Return combined lookup: grammar first (for tree_sitter_clojure symbol),
+      // falling back to core for other symbols
+      return name -> grammarLookup.find(name).or(() -> coreLookup.find(name));
     } catch (IOException e) {
-      throw new RuntimeException("Failed to load tree-sitter library", e);
+      throw new RuntimeException("Failed to load tree-sitter libraries", e);
     }
   }
 
-  private synchronized Path findLibrary() throws IOException {
-    if (extractedLibrary != null && Files.exists(extractedLibrary)) {
-      return extractedLibrary;
+  /**
+   * Get the path to the extracted clojure grammar library.
+   * Must be called after get() has been invoked at least once.
+   * Returns null if libraries have not been extracted yet.
+   */
+  public static Path getClojureGrammarPath() {
+    return clojureGrammarLib;
+  }
+
+  private synchronized void extractLibraries() throws IOException {
+    if (extractedDir != null && Files.exists(extractedDir)) {
+      return;
     }
 
     String os = detectOs();
     String arch = detectArch();
-    String libName = libraryName(os);
-    String resourcePath = "native/" + os + "-" + arch + "/" + libName;
+    String coreLibName = coreLibraryName(os);
+    String grammarLibName = grammarLibraryName(os);
+    String resourceDir = "native/" + os + "-" + arch + "/";
 
-    // Try classpath resource first
+    // Create shared temp directory
+    extractedDir = Files.createTempDirectory("line-sitter-ts-");
+
+    // Extract core tree-sitter library
+    treeSitterLib = extractResource(resourceDir + coreLibName, extractedDir, coreLibName);
+
+    // Extract clojure grammar library
+    clojureGrammarLib = extractResource(resourceDir + grammarLibName, extractedDir, grammarLibName);
+  }
+
+  private Path extractResource(String resourcePath, Path targetDir, String fileName)
+      throws IOException {
     InputStream is = getClass().getClassLoader().getResourceAsStream(resourcePath);
-    if (is != null) {
-      try (is) {
-        Path tempDir = Files.createTempDirectory("line-sitter-ts-");
-        extractedLibrary = tempDir.resolve(libName);
-        Files.copy(is, extractedLibrary, StandardCopyOption.REPLACE_EXISTING);
-        return extractedLibrary;
+    if (is == null) {
+      // Try java.library.path as fallback
+      Path libPathResult = findInLibraryPath(fileName);
+      if (libPathResult != null) {
+        return libPathResult;
       }
+      throw new IOException(
+          "Could not find native library: " + fileName +
+              " (searched: classpath:" + resourcePath + ", java.library.path)");
     }
 
-    // Fall back to java.library.path
+    try (is) {
+      Path target = targetDir.resolve(fileName);
+      Files.copy(is, target, StandardCopyOption.REPLACE_EXISTING);
+      return target;
+    }
+  }
+
+  private Path findInLibraryPath(String libName) {
     String libPath = System.getProperty("java.library.path");
     if (libPath != null) {
       for (String dir : libPath.split(System.getProperty("path.separator"))) {
@@ -59,10 +101,7 @@ public class NativeLoader implements NativeLibraryLookup {
         }
       }
     }
-
-    throw new IOException(
-      "Could not find tree-sitter library: " + libName +
-        " (searched: classpath:" + resourcePath + ", java.library.path)");
+    return null;
   }
 
   private String detectOs() {
@@ -81,16 +120,25 @@ public class NativeLoader implements NativeLibraryLookup {
       case "aarch64", "arm64" -> "aarch64";
       case "amd64", "x86_64" -> "x86_64";
       default -> throw new UnsupportedOperationException(
-        "Unsupported architecture: " + arch);
+          "Unsupported architecture: " + arch);
     };
   }
 
-  private String libraryName(String os) {
+  private String coreLibraryName(String os) {
     return switch (os) {
       case "darwin" -> "libtree-sitter.dylib";
       case "linux" -> "libtree-sitter.so";
       default -> throw new UnsupportedOperationException(
-        "Unsupported OS: " + os);
+          "Unsupported OS: " + os);
+    };
+  }
+
+  private String grammarLibraryName(String os) {
+    return switch (os) {
+      case "darwin" -> "libtree-sitter-clojure.dylib";
+      case "linux" -> "libtree-sitter-clojure.so";
+      default -> throw new UnsupportedOperationException(
+          "Unsupported OS: " + os);
     };
   }
 }
