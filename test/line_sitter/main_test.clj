@@ -168,16 +168,53 @@
                 (is (not (str/includes? err "Checked")))))))))))
 
 (deftest fix-mode-test
+  ;; Tests that --fix mode writes fixed content back to files.
+  ;; Verifies file modification, output messages, and quiet mode.
   (testing "run in fix mode"
-    (testing "exits 0 with valid files"
-      (with-temp-dir [root]
-        (let [file (fs/path root "test.clj")]
-          (spit (str file) "(ns test)")
-          (let [[_out _err exit-code] (with-captured-output
-                                        (main/run ["--fix" (str file)]))]
-            (is (= 0 exit-code))))))))
+    (testing "given file with no violations"
+      (testing "exits 0 and does not modify file"
+        (with-temp-dir [root]
+          (let [file (fs/path root "test.clj")
+                content "(ns test)"]
+            (spit (str file) content)
+            (let [[_out _err exit-code] (with-captured-output
+                                          (main/run ["--fix" (str file)]))]
+              (is (= 0 exit-code))
+              (is (= content (slurp (str file)))))))))
+
+    (testing "given file with long line"
+      (testing "rewrites file with breaking applied"
+        (with-temp-dir [root]
+          (let [file (fs/path root "long.clj")
+                ;; Construct 90-char list (exceeds 80)
+                long-form (str "(foo " (str/join " " (repeat 20 "arg")) ")")]
+            (spit (str file) long-form)
+            (let [[_out err exit-code] (with-captured-output
+                                         (main/run ["--fix" (str file)]))]
+              (is (= 0 exit-code))
+              (is (str/includes? err "Fixed:"))
+              (let [result (slurp (str file))]
+                ;; Verify breaking happened
+                (is (str/includes? result "\n"))
+                ;; Verify elements present
+                (is (str/includes? result "foo"))
+                (is (str/includes? result "arg"))))))))
+
+    (testing "with --quiet flag"
+      (testing "suppresses Fixed: output"
+        (with-temp-dir [root]
+          (let [file (fs/path root "long.clj")
+                long-form (str "(foo " (str/join " " (repeat 20 "arg")) ")")]
+            (spit (str file) long-form)
+            (let [[_out err exit-code] (with-captured-output
+                                         (main/run ["--fix" "--quiet"
+                                                    (str file)]))]
+              (is (= 0 exit-code))
+              (is (not (str/includes? err "Fixed:"))))))))))
 
 (deftest stdout-mode-test
+  ;; Tests that --stdout mode outputs fixed content without modifying files.
+  ;; Verifies stdout output and multi-file headers.
   (testing "run in stdout mode"
     (testing "with single file"
       (testing "echoes file content without header"
@@ -189,6 +226,20 @@
                                          (main/run ["--stdout" (str file)]))]
               (is (= content out))
               (is (= 0 exit-code)))))))
+
+    (testing "with long line"
+      (testing "outputs fixed content without modifying file"
+        (with-temp-dir [root]
+          (let [file (fs/path root "long.clj")
+                long-form (str "(foo " (str/join " " (repeat 20 "arg")) ")")]
+            (spit (str file) long-form)
+            (let [[out _err exit-code] (with-captured-output
+                                         (main/run ["--stdout" (str file)]))]
+              (is (= 0 exit-code))
+              ;; Output should have breaking
+              (is (str/includes? out "\n"))
+              ;; File should be unchanged
+              (is (= long-form (slurp (str file)))))))))
 
     (testing "with multiple files"
       (testing "prefixes each with ;;; path header"

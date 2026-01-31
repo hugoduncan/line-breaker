@@ -4,7 +4,8 @@
    [babashka.fs :as fs]
    [line-sitter.check :as check]
    [line-sitter.cli :as cli]
-   [line-sitter.config :as config]))
+   [line-sitter.config :as config]
+   [line-sitter.fix :as fix]))
 
 (def usage-text
   "Usage: line-sitter [options] [files/dirs...]
@@ -50,14 +51,16 @@ Exit codes:
     "."))
 
 (defn- process-stdout
-  "Process files in stdout mode. Prints file contents.
-  If multiple files, prefixes each with ;;; path header."
-  [files]
+  "Process files in stdout mode with fix applied.
+  Outputs reformatted content. If multiple files, prefixes each with ;;; path header."
+  [files config]
   (let [multiple? (> (count files) 1)]
     (doseq [file files]
       (when multiple?
         (println (str ";;; " file)))
-      (print (slurp file)))))
+      (let [source (slurp file)
+            fixed (fix/fix-source source config)]
+        (print fixed)))))
 
 (defn- process-check
   "Process files in check mode.
@@ -77,6 +80,21 @@ Exit codes:
           (println summary))))
     (if (seq all-violations) 1 0)))
 
+(defn- process-fix
+  "Process files in fix mode.
+  Reads each file, applies fix algorithm, writes back in place.
+  Reports fixed files to stderr unless quiet. Returns 0 on success."
+  [files config quiet?]
+  (doseq [file files]
+    (let [source (slurp file)
+          fixed (fix/fix-source source config)]
+      (when (not= source fixed)
+        (spit file fixed)
+        (when-not quiet?
+          (binding [*out* *err*]
+            (println (str "Fixed: " file)))))))
+  0)
+
 (defn- process-files
   "Process files according to mode.
   Returns exit code."
@@ -84,13 +102,15 @@ Exit codes:
   (cond
     (:stdout opts)
     (do
-      (process-stdout files)
+      (process-stdout files config)
       0)
+
+    (:fix opts)
+    (process-fix files config (:quiet opts))
 
     (:check opts)
     (process-check files (:line-length config) (:quiet opts))
 
-    ;; --fix is a no-op for now
     :else
     0))
 
