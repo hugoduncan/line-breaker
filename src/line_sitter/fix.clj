@@ -307,21 +307,21 @@
   5. Re-parse and repeat until no violations or no breakable forms"
   [source config]
   (let [max-length (get config :line-length 80)]
-    (loop [src source
+    (loop [source source
            iteration 0]
       (if (>= iteration max-iterations)
-        src
-        (let [long-lines (find-long-lines src max-length)]
+        source
+        (let [long-lines (find-long-lines source max-length)]
           (if (empty? long-lines)
-            src
-            (let [tree (parser/parse-source src)
+            source
+            (let [tree (parser/parse-source source)
                   ;; Collect ignored ranges each pass since byte positions shift after edits
                   ignored-ranges (check/find-ignored-byte-ranges tree)
                   first-long-line (first long-lines)
                   breakable-form (find-breakable-form tree first-long-line ignored-ranges)]
               (if-not breakable-form
-                src
+                source
                 (let [edits (break-form breakable-form config)]
                   (if (empty? edits)
-                    src
-                    (recur (apply-edits src edits) (inc iteration))))))))))))
+                    source
+                    (recur (apply-edits source edits) (inc iteration))))))))))))
