@@ -1,0 +1,113 @@
+name: Release Build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    outputs:
+      version: ${{ steps.artifact.outputs.version }}
+    strategy:
+      matrix:
+        include:
+          - os: macos-13
+            platform: darwin-x86_64
+            graalvm: '25.0.1'
+          - os: macos-14
+            platform: darwin-aarch64
+            graalvm: '25'
+          - os: ubuntu-latest
+            platform: linux-x86_64
+            graalvm: '25'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup GraalVM
+        uses: graalvm/setup-graalvm@v1
+        with:
+          java-version: '23'
+          distribution: 'graalvm'
+          version: ${{ matrix.graalvm }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Clojure
+        uses: DeLaGuardo/setup-clojure@12.5
+        with:
+          cli: latest
+          bb: latest
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.m2/repository
+            ~/.gitlibs
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/deps.edn') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+
+      - name: Build native tree-sitter libraries
+        run: bb build-native
+
+      - name: Build native image
+        run: clojure -T:build native-image
+
+      - name: Test binary
+        run: ./target/line-breaker --help
+
+      - name: Prepare release artifact
+        id: artifact
+        run: |
+          set -e
+          VERSION=$(git rev-list --count HEAD)
+          BINARY_NAME="line-breaker-0.1.${VERSION}-${{ matrix.platform }}"
+          mv target/line-breaker "${BINARY_NAME}"
+          if command -v sha256sum &> /dev/null; then
+            sha256sum "${BINARY_NAME}" > "${BINARY_NAME}.sha256"
+          else
+            shasum -a 256 "${BINARY_NAME}" > "${BINARY_NAME}.sha256"
+          fi
+          echo "BINARY_NAME=${BINARY_NAME}" >> $GITHUB_ENV
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.BINARY_NAME }}
+          path: |
+            ${{ env.BINARY_NAME }}
+            ${{ env.BINARY_NAME }}.sha256
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release files
+        run: |
+          set -e
+          VERSION="${{ needs.build.outputs.version }}"
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          echo "TAG=v0.1.${VERSION}" >> $GITHUB_ENV
+          mkdir -p release
+          find artifacts -type f -exec mv {} release/ \;
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ env.TAG }}" \
+            --draft \
+            --title "${{ env.TAG }}" \
+            --generate-notes \
+            release/*
