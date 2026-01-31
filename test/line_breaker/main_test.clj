@@ -1,10 +1,10 @@
-(ns line-sitter.main-test
+(ns line-breaker.main-test
   (:require
    [babashka.fs :as fs]
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
-   [line-sitter.main :as main]
-   [line-sitter.test-util :refer [with-captured-output with-temp-dir]]))
+   [line-breaker.main :as main]
+   [line-breaker.test-util :refer [with-captured-output with-temp-dir]]))
 
 ;; Integration tests for main entry point. Verifies the full flow:
 ;; parse args → load config → resolve files → process → exit code.
@@ -16,7 +16,7 @@
     (testing "prints usage text to stdout"
       (let [[out _err exit-code] (with-captured-output
                                    (main/run ["--help"]))]
-        (is (str/includes? out "Usage: line-sitter"))
+        (is (str/includes? out "Usage: line-breaker"))
         (is (str/includes? out "--check"))
         (is (str/includes? out "--fix"))
         (is (str/includes? out "--stdout"))
@@ -26,7 +26,7 @@
     (testing "with -h alias prints usage"
       (let [[out _err exit-code] (with-captured-output
                                    (main/run ["-h"]))]
-        (is (str/includes? out "Usage: line-sitter"))
+        (is (str/includes? out "Usage: line-breaker"))
         (is (= 0 exit-code))))))
 
 (deftest check-mode-test
@@ -260,7 +260,7 @@
   (testing "run with config file"
     (testing "loads config from file directory"
       (with-temp-dir [root]
-        (let [config-path (fs/path root ".line-sitter.edn")
+        (let [config-path (fs/path root ".line-breaker.edn")
               file (fs/path root "test.clj")]
           (spit (str config-path) "{:line-length 120}")
           (spit (str file) "(ns test)")
@@ -271,7 +271,7 @@
 
     (testing "CLI --line-length overrides config"
       (with-temp-dir [root]
-        (let [config-path (fs/path root ".line-sitter.edn")
+        (let [config-path (fs/path root ".line-breaker.edn")
               file (fs/path root "test.clj")]
           (spit (str config-path) "{:line-length 80}")
           (spit (str file) "(ns test)")
@@ -288,22 +288,22 @@
         (let [[_out err exit-code] (with-captured-output
                                      (main/run ["nonexistent.clj"]))]
           (is (= 2 exit-code))
-          (is (str/includes? err "line-sitter: file-error:")))))
+          (is (str/includes? err "line-breaker: file-error:")))))
 
     (testing "given invalid config"
       (testing "exits 2 with error message"
         (with-temp-dir [root]
-          (let [config-path (fs/path root ".line-sitter.edn")
+          (let [config-path (fs/path root ".line-breaker.edn")
                 file (fs/path root "test.clj")]
             (spit (str config-path) "{:line-length -1}")
             (spit (str file) "(ns test)")
             (let [[_out err exit-code] (with-captured-output
                                          (main/run [(str file)]))]
               (is (= 2 exit-code))
-              (is (str/includes? err "line-sitter: config-error:")))))))))
+              (is (str/includes? err "line-breaker: config-error:")))))))))
 
 (deftest format-error-test
   (testing "format-error"
     (testing "formats error with type and message"
-      (is (= "line-sitter: config-error: bad value"
+      (is (= "line-breaker: config-error: bad value"
              (main/format-error "config-error" "bad value"))))))

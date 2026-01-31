@@ -1,8 +1,8 @@
-(ns line-sitter.treesitter.parser
+(ns line-breaker.treesitter.parser
   "Clojure interface for parsing source code with tree-sitter.
 
   Provides resource-safe parser usage and idiomatic Tree access."
-  (:require [line-sitter.treesitter.language :as lang])
+  (:require [line-breaker.treesitter.language :as lang])
   (:import [io.github.treesitter.jtreesitter Parser Tree]))
 
 (defmacro with-parser

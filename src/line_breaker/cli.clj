@@ -1,5 +1,5 @@
-(ns line-sitter.cli
-  "Command-line interface for line-sitter."
+(ns line-breaker.cli
+  "Command-line interface for line-breaker."
   (:require
    [babashka.cli :as cli]
    [babashka.fs :as fs]

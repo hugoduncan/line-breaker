@@ -1,4 +1,4 @@
-(ns line-sitter.treesitter.node
+(ns line-breaker.treesitter.node
   "Clojure interface for tree-sitter Node access.
 
   Provides convenient accessors that return Clojure-native data structures,

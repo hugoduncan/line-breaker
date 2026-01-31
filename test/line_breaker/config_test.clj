@@ -1,9 +1,9 @@
-(ns line-sitter.config-test
+(ns line-breaker.config-test
   (:require
    [babashka.fs :as fs]
    [clojure.test :refer [deftest is testing]]
-   [line-sitter.config :as config]
-   [line-sitter.test-util :refer [with-temp-dir]]))
+   [line-breaker.config :as config]
+   [line-breaker.test-util :refer [with-temp-dir]]))
 
 ;; Tests for configuration loading, merging, and validation.
 ;; Contracts tested:
@@ -27,14 +27,14 @@
     (testing "when config exists in start directory"
       (testing "returns the config path"
         (with-temp-dir [root]
-          (let [config-path (fs/path root ".line-sitter.edn")]
+          (let [config-path (fs/path root ".line-breaker.edn")]
             (spit (str config-path) "{}")
             (is (= (str config-path)
                    (config/find-config-file root)))))))
     (testing "when config exists in parent directory"
       (testing "returns the parent config path"
         (with-temp-dir [root]
-          (let [config-path (fs/path root ".line-sitter.edn")
+          (let [config-path (fs/path root ".line-breaker.edn")
                 child-dir (fs/path root "child")]
             (fs/create-dir child-dir)
             (spit (str config-path) "{}")
@@ -43,7 +43,7 @@
     (testing "when config exists in grandparent directory"
       (testing "returns the grandparent config path"
         (with-temp-dir [root]
-          (let [config-path (fs/path root ".line-sitter.edn")
+          (let [config-path (fs/path root ".line-breaker.edn")
                 child-dir (fs/path root "child" "grandchild")]
             (fs/create-dirs child-dir)
             (spit (str config-path) "{}")
@@ -59,21 +59,21 @@
     (testing "when config overrides :line-length"
       (testing "uses the override value"
         (with-temp-dir [root]
-          (let [config-path (fs/path root ".line-sitter.edn")]
+          (let [config-path (fs/path root ".line-breaker.edn")]
             (spit (str config-path) "{:line-length 120}")
             (is
              (= 120 (:line-length (config/load-config (str config-path)))))))))
     (testing "when config does not override :line-length"
       (testing "uses the default value"
         (with-temp-dir [root]
-          (let [config-path (fs/path root ".line-sitter.edn")]
+          (let [config-path (fs/path root ".line-breaker.edn")]
             (spit (str config-path) "{}")
             (is
              (= 80 (:line-length (config/load-config (str config-path)))))))))
     (testing "when config overrides :extensions"
       (testing "replaces the default value"
         (with-temp-dir [root]
-          (let [config-path (fs/path root ".line-sitter.edn")]
+          (let [config-path (fs/path root ".line-breaker.edn")]
             (spit (str config-path) "{:extensions [\".clj\"]}")
             (is
              (=
@@ -82,7 +82,7 @@
     (testing "when config has :indents"
       (testing "merges with default empty map"
         (with-temp-dir [root]
-          (let [config-path (fs/path root ".line-sitter.edn")]
+          (let [config-path (fs/path root ".line-breaker.edn")]
             (spit (str config-path) "{:indents {defn 1}}")
             (is
              (=
@@ -91,7 +91,7 @@
     (testing "when config file is not valid EDN"
       (testing "throws ex-info with :type :config-error"
         (with-temp-dir [root]
-          (let [config-path (fs/path root ".line-sitter.edn")]
+          (let [config-path (fs/path root ".line-breaker.edn")]
             (spit (str config-path) "{:a [}")
             (is (thrown-with-msg?
                  clojure.lang.ExceptionInfo
@@ -100,7 +100,7 @@
     (testing "when config file contains non-map"
       (testing "throws ex-info with :type :config-error"
         (with-temp-dir [root]
-          (let [config-path (fs/path root ".line-sitter.edn")]
+          (let [config-path (fs/path root ".line-breaker.edn")]
             (spit (str config-path) "42")
             (is (thrown-with-msg?
                  clojure.lang.ExceptionInfo

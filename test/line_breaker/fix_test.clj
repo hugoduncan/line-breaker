@@ -1,4 +1,4 @@
-(ns line-sitter.fix-test
+(ns line-breaker.fix-test
   "Tests for line breaking functions.
 
   Tests cover:
@@ -10,9 +10,9 @@
   (:require
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
-   [line-sitter.fix :as fix]
-   [line-sitter.treesitter.node :as node]
-   [line-sitter.treesitter.parser :as parser]))
+   [line-breaker.fix :as fix]
+   [line-breaker.treesitter.node :as node]
+   [line-breaker.treesitter.parser :as parser]))
 
 (deftest apply-edits-test
   ;; Verify edits are applied correctly in reverse start order.
@@ -392,30 +392,30 @@
           (is (= "(foo\n  bar\n  baz)" result)))))))
 
 (deftest ignore-mechanism-test
-  ;; Verify that #_:line-sitter/ignore prevents breaking of marked forms.
+  ;; Verify that #_:line-breaker/ignore prevents breaking of marked forms.
   (testing "ignore mechanism integration"
     (testing "does not break ignored form"
-      (let [source "#_:line-sitter/ignore (foo bar baz qux)"
+      (let [source "#_:line-breaker/ignore (foo bar baz qux)"
             result (fix/fix-source source {:line-length 10})]
         (is (= source result)
             "ignored form stays on single line")))
 
     (testing "does not break nested form inside ignored"
-      (let [source "#_:line-sitter/ignore (foo (bar baz qux))"
+      (let [source "#_:line-breaker/ignore (foo (bar baz qux))"
             result (fix/fix-source source {:line-length 10})]
         (is (= source result)
             "nested forms within ignored are also preserved")))
 
     (testing "breaks non-ignored forms"
-      (let [source "(foo bar baz) #_:line-sitter/ignore (keep this)"
+      (let [source "(foo bar baz) #_:line-breaker/ignore (keep this)"
             result (fix/fix-source source {:line-length 10})]
-        (is (= "(foo\n  bar\n  baz) #_:line-sitter/ignore (keep this)" result)
+        (is (= "(foo\n  bar\n  baz) #_:line-breaker/ignore (keep this)" result)
             "non-ignored form is broken, ignored form is preserved")))
 
     (testing "preserves ignore marker in output"
-      (let [source "#_:line-sitter/ignore (long form here)"
+      (let [source "#_:line-breaker/ignore (long form here)"
             result (fix/fix-source source {:line-length 10})]
-        (is (str/includes? result "#_:line-sitter/ignore")
+        (is (str/includes? result "#_:line-breaker/ignore")
             "ignore marker is preserved")))))
 
 (deftest reader-macro-test

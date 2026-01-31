@@ -1,4 +1,4 @@
-(ns line-sitter.treesitter.node-test
+(ns line-breaker.treesitter.node-test
   "Tests for node access helper functions.
 
   Tests traverse a parsed (defn foo [x] x) form to verify:
@@ -7,8 +7,8 @@
   - Position and range information is accurate
   - Child enumeration works for both all and named-only"
   (:require [clojure.test :refer [deftest is testing]]
-            [line-sitter.treesitter.node :as node]
-            [line-sitter.treesitter.parser :as parser])
+            [line-breaker.treesitter.node :as node]
+            [line-breaker.treesitter.parser :as parser])
   (:import [io.github.treesitter.jtreesitter Node]))
 
 (deftest root-node-test

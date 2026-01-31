@@ -1,4 +1,4 @@
-# line-sitter
+# line-breaker
 
 A tool to reformat Clojure code to enforce a maximum line length.
 

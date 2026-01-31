@@ -1,12 +1,12 @@
-(ns line-sitter.fix
+(ns line-breaker.fix
   "Line breaking functions for reformatting Clojure code.
 
   Provides functions to identify breakable forms, generate line break edits,
   and apply those edits to source code."
   (:require
-   [line-sitter.check :as check]
-   [line-sitter.treesitter.node :as node]
-   [line-sitter.treesitter.parser :as parser]))
+   [line-breaker.check :as check]
+   [line-breaker.treesitter.node :as node]
+   [line-breaker.treesitter.parser :as parser]))
 
 ;;; Edit application
 
@@ -391,7 +391,7 @@
 
   Takes a source string and config map with :line-length. Iteratively breaks
   forms until all lines fit or only unbreakable atoms remain. Returns the
-  fixed source string. Forms preceded by #_:line-sitter/ignore are not modified.
+  fixed source string. Forms preceded by #_:line-breaker/ignore are not modified.
 
   The algorithm:
   1. Find lines exceeding max-length

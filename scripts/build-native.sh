@@ -35,7 +35,7 @@
 ;; Add src to classpath for platform namespace
 (babashka.classpath/add-classpath (str (fs/path (fs/parent (fs/parent *file*)) "src")))
 
-(require '[line-sitter.platform :as platform])
+(require '[line-breaker.platform :as platform])
 
 (def project-root (fs/parent (fs/parent *file*)))
 (def build-base-dir (fs/path project-root ".build"))

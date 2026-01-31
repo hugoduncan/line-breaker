@@ -1,4 +1,4 @@
-package line_sitter.treesitter;
+package line_breaker.treesitter;
 
 import io.github.treesitter.jtreesitter.NativeLibraryLookup;
 
@@ -61,7 +61,7 @@ public class NativeLoader implements NativeLibraryLookup {
     String resourceDir = "native/" + os + "-" + arch + "/";
 
     // Create shared temp directory
-    extractedDir = Files.createTempDirectory("line-sitter-ts-");
+    extractedDir = Files.createTempDirectory("line-breaker-ts-");
 
     // Extract core tree-sitter library
     treeSitterLib = extractResource(resourceDir + coreLibName, extractedDir, coreLibName);

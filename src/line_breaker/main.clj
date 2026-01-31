@@ -1,15 +1,15 @@
-(ns line-sitter.main
-  "Main entry point for line-sitter CLI."
+(ns line-breaker.main
+  "Main entry point for line-breaker CLI."
   (:require
    [babashka.fs :as fs]
-   [line-sitter.check :as check]
-   [line-sitter.cli :as cli]
-   [line-sitter.config :as config]
-   [line-sitter.fix :as fix])
+   [line-breaker.check :as check]
+   [line-breaker.cli :as cli]
+   [line-breaker.config :as config]
+   [line-breaker.fix :as fix])
   (:gen-class))
 
 (def usage-text
-  "Usage: line-sitter [options] [files/dirs...]
+  "Usage: line-breaker [options] [files/dirs...]
 
 Reformat Clojure code to enforce maximum line length.
 
@@ -25,10 +25,10 @@ Arguments:
   files/dirs      Files or directories to process (default: current directory)
 
 Examples:
-  line-sitter                     Check all files in current directory
-  line-sitter src                 Check all files in src directory
-  line-sitter --fix src/foo.clj   Fix a specific file
-  line-sitter --line-length 100   Check with custom line length
+  line-breaker                     Check all files in current directory
+  line-breaker src                 Check all files in src directory
+  line-breaker --fix src/foo.clj   Fix a specific file
+  line-breaker --line-length 100   Check with custom line length
 
 Exit codes:
   0  Success (no violations in check mode, or fix/stdout completed)
@@ -38,7 +38,7 @@ Exit codes:
 (defn format-error
   "Format an error for stderr output."
   [error-type message]
-  (str "line-sitter: " error-type ": " message))
+  (str "line-breaker: " error-type ": " message))
 
 (defn- get-config-dir
   "Determine directory to search for config.
@@ -116,7 +116,7 @@ Exit codes:
     0))
 
 (defn run
-  "Run line-sitter with given args. Returns exit code.
+  "Run line-breaker with given args. Returns exit code.
   Prints to stdout/stderr as appropriate."
   [args]
   (try
@@ -151,6 +151,6 @@ Exit codes:
       2)))
 
 (defn -main
-  "Entry point for line-sitter CLI."
+  "Entry point for line-breaker CLI."
   [& args]
   (System/exit (run args)))

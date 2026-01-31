@@ -1,19 +1,19 @@
-(ns line-sitter.treesitter.language
+(ns line-breaker.treesitter.language
   "Load the tree-sitter Clojure grammar from native libraries.
 
   Discovery order:
   1. NativeLoader extracted path (when available, e.g., native-image)
-  2. LINE_SITTER_NATIVE_LIB environment variable (explicit path)
+  2. LINE_BREAKER_NATIVE_LIB environment variable (explicit path)
   3. native/<os>-<arch>/ on classpath resources
   4. java.library.path"
   (:require [babashka.fs :as fs]
             [clojure.java.io :as io]
             [clojure.string :as str]
-            [line-sitter.platform :as platform])
+            [line-breaker.platform :as platform])
   (:import [java.lang.foreign Arena SymbolLookup]
            [java.nio.file Files Path]
            [io.github.treesitter.jtreesitter Language]
-           [line_sitter.treesitter NativeLoader]))
+           [line_breaker.treesitter NativeLoader]))
 
 (defn- library-name
   "Get platform-specific library filename."
@@ -26,7 +26,7 @@
   Files are marked for deletion when the JVM exits."
   [resource-path]
   (when-let [url (io/resource resource-path)]
-    (let [temp-dir (fs/create-temp-dir {:prefix "line-sitter-"})
+    (let [temp-dir (fs/create-temp-dir {:prefix "line-breaker-"})
           temp-file (fs/path temp-dir (fs/file-name resource-path))]
       (with-open [in (io/input-stream url)]
         (io/copy in (fs/file temp-file)))
@@ -53,7 +53,7 @@
   "Get the native library path from environment variable.
   Returns the path string or nil if not set."
   []
-  (System/getenv "LINE_SITTER_NATIVE_LIB"))
+  (System/getenv "LINE_BREAKER_NATIVE_LIB"))
 
 (defn- get-native-loader-path
   "Get the grammar library path from NativeLoader if available.
@@ -117,7 +117,7 @@
 
   Searches for the library in order:
   1. NativeLoader extracted path (when available)
-  2. LINE_SITTER_NATIVE_LIB environment variable
+  2. LINE_BREAKER_NATIVE_LIB environment variable
   3. native/<os>-<arch>/ on classpath
   4. java.library.path
 

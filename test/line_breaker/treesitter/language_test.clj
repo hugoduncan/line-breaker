@@ -1,4 +1,4 @@
-(ns line-sitter.treesitter.language-test
+(ns line-breaker.treesitter.language-test
   "Tests for native library discovery and language loading.
 
   Tests verify:
@@ -7,7 +7,7 @@
   - Informative error when library not found"
   (:require [babashka.fs :as fs]
             [clojure.test :refer [deftest is testing]]
-            [line-sitter.treesitter.language :as lang])
+            [line-breaker.treesitter.language :as lang])
   (:import [clojure.lang ExceptionInfo]
            [io.github.treesitter.jtreesitter Language]))
 

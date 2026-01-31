@@ -1,9 +1,9 @@
-(ns line-sitter.check
+(ns line-breaker.check
   "Line length checking functions."
   (:require
    [clojure.string :as str]
-   [line-sitter.treesitter.node :as node]
-   [line-sitter.treesitter.parser :as parser]))
+   [line-breaker.treesitter.node :as node]
+   [line-breaker.treesitter.parser :as parser]))
 
 (defn find-violations
   "Check source string for lines exceeding max-length.
@@ -55,12 +55,12 @@
 ;;; Ignore directive support
 
 (defn- ignore-marker?
-  "Check if node is a dis_expr containing :line-sitter/ignore."
+  "Check if node is a dis_expr containing :line-breaker/ignore."
   [node]
   (and (= :dis_expr (node/node-type node))
        (some (fn [child]
                (and (= :kwd_lit (node/node-type child))
-                    (= ":line-sitter/ignore" (node/node-text child))))
+                    (= ":line-breaker/ignore" (node/node-text child))))
              (node/named-children node))))
 
 (defn- collect-ignored-ranges
@@ -79,7 +79,7 @@
             children))))
 
 (defn find-ignored-ranges
-  "Find all line ranges covered by #_:line-sitter/ignore markers.
+  "Find all line ranges covered by #_:line-breaker/ignore markers.
   Returns a set of [start-line end-line] vectors where lines are 1-indexed
   and both endpoints are inclusive."
   [tree]
@@ -101,7 +101,7 @@
             children))))
 
 (defn find-ignored-byte-ranges
-  "Find all byte ranges covered by #_:line-sitter/ignore markers.
+  "Find all byte ranges covered by #_:line-breaker/ignore markers.
   Returns a set of [start-byte end-byte] vectors where start is inclusive
   and end is exclusive."
   [tree]

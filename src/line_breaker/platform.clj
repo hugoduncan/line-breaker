@@ -1,4 +1,4 @@
-(ns line-sitter.platform
+(ns line-breaker.platform
   "Platform detection utilities for native library loading.")
 
 (defn detect-os

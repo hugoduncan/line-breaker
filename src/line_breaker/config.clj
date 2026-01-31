@@ -1,5 +1,5 @@
-(ns line-sitter.config
-  "Configuration loading, merging, and validation for line-sitter."
+(ns line-breaker.config
+  "Configuration loading, merging, and validation for line-breaker."
   (:require
    [babashka.fs :as fs]
    [clojure.edn :as edn]))
@@ -10,10 +10,10 @@
    :extensions [".clj" ".cljs" ".cljc" ".edn"]
    :indents {}})
 
-(def config-filename ".line-sitter.edn")
+(def config-filename ".line-breaker.edn")
 
 (defn find-config-file
-  "Walk up from `dir` looking for `.line-sitter.edn`.
+  "Walk up from `dir` looking for `.line-breaker.edn`.
   Returns the path to the config file if found, nil otherwise."
   [dir]
   (let [start-dir (fs/normalize (fs/absolutize dir))]

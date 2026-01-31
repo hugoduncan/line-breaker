@@ -1,5 +1,5 @@
-(ns line-sitter.test-util
-  "Shared test utilities for line-sitter tests."
+(ns line-breaker.test-util
+  "Shared test utilities for line-breaker tests."
   (:require
    [babashka.fs :as fs]))
 

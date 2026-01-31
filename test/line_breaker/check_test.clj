@@ -1,11 +1,11 @@
-(ns line-sitter.check-test
+(ns line-breaker.check-test
   ;; Tests for check-line-lengths function.
   ;; Contract: returns [{:line n :length len}] for violating lines.
   (:require
    [clojure.test :refer [deftest is testing]]
    [babashka.fs :as fs]
-   [line-sitter.check :as check]
-   [line-sitter.test-util :refer [with-temp-dir]]))
+   [line-breaker.check :as check]
+   [line-breaker.test-util :refer [with-temp-dir]]))
 
 (deftest check-line-lengths-test
   (testing "check-line-lengths"

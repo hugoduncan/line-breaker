@@ -1,9 +1,9 @@
-(ns line-sitter.cli-test
+(ns line-breaker.cli-test
   (:require
    [babashka.fs :as fs]
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
-   [line-sitter.cli :as cli]))
+   [line-breaker.cli :as cli]))
 
 ;; Tests for CLI argument parsing. Verifies that parse-args correctly
 ;; handles mode flags (check/fix/stdout), line-length option, help flag,

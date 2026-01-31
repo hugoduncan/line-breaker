@@ -1,9 +1,9 @@
-(ns line-sitter.e2e-test
+(ns line-breaker.e2e-test
   (:require
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
-   [line-sitter.main :as main]
-   [line-sitter.test-util :refer [with-captured-output]]))
+   [line-breaker.main :as main]
+   [line-breaker.test-util :refer [with-captured-output]]))
 
 ;; End-to-end tests using static fixtures in test-resources/.
 ;; These tests verify the complete flow from CLI args to exit code
@@ -14,7 +14,7 @@
 
 (deftest config-search-from-nested-dir-test
   ;; Tests that config search walks up directory tree to find
-  ;; .line-sitter.edn in parent directories.
+  ;; .line-breaker.edn in parent directories.
   (testing "run with file in nested directory"
     (testing "finds config in parent directory"
       ;; The config in cli-test/ sets extensions to [".clj" ".cljs"]
@@ -28,7 +28,7 @@
 
 (deftest extensions-filtering-test
   ;; Tests that extensions from config filter discovered files.
-  ;; cli-test/.line-sitter.edn has :extensions [".clj" ".cljs"]
+  ;; cli-test/.line-breaker.edn has :extensions [".clj" ".cljs"]
   (testing "run on directory with config"
     (testing "excludes files not matching configured extensions"
       (let [[out _err exit-code]
@@ -45,14 +45,14 @@
 
 (deftest error-format-test
   ;; Tests that errors are printed to stderr in the correct format:
-  ;; "line-sitter: <category>: <details>"
+  ;; "line-breaker: <category>: <details>"
   (testing "run with invalid config"
     (testing "prints error to stderr in correct format"
       (let [[_out err exit-code]
             (with-captured-output
               (main/run ["test-resources/cli-test-invalid"]))]
         (is (= 2 exit-code))
-        (is (str/starts-with? err "line-sitter:"))
+        (is (str/starts-with? err "line-breaker:"))
         (is (str/includes? err "config-error:"))))))
 
 ;;; Full workflow tests

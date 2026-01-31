@@ -1,10 +1,10 @@
-# line-sitter Design
+# line-breaker Design
 
 ## Tree-sitter Integration
 
 ### Overview
 
-line-sitter uses [tree-sitter](https://tree-sitter.github.io/) for
+line-breaker uses [tree-sitter](https://tree-sitter.github.io/) for
 structure-aware parsing of Clojure source code. Tree-sitter provides
 incremental parsing with concrete syntax trees, enabling the tool to
 understand code structure rather than treating source as plain text.
@@ -262,7 +262,7 @@ considerations:
 ### Using Tree-sitter for Code Editing
 
 Tree-sitter is a parsing library that produces read-only syntax trees.
-It does not modify source code directly. For tools like line-sitter that
+It does not modify source code directly. For tools like line-breaker that
 need to reformat code, the workflow is:
 
 1. **Parse** the source to get node positions (byte offsets, row/column)
@@ -270,9 +270,9 @@ need to reformat code, the workflow is:
 3. **Edit** the source string using the position information
 4. Optionally **re-parse** incrementally if making multiple passes
 
-**Single-pass editing (recommended for line-sitter):**
+**Single-pass editing (recommended for line-breaker):**
 
-For line-sitter, a single parse can identify all needed line breaks.
+For line-breaker, a single parse can identify all needed line breaks.
 Collect edits as a list of insertions, then apply them to the source
 string in reverse order (so earlier positions remain valid):
 
@@ -339,15 +339,15 @@ tree-sitter what changed for efficient re-parsing:
 
 | Approach | Use when |
 |----------|----------|
-| Single-pass | All edits can be determined from one parse (line-sitter) |
+| Single-pass | All edits can be determined from one parse (line-breaker) |
 | Incremental | Edits depend on results of previous edits |
 
-For line-sitter, single-pass editing is sufficient: parse once, collect
+For line-breaker, single-pass editing is sufficient: parse once, collect
 all line break insertions, apply in reverse offset order.
 
 ## Configuration
 
-line-sitter reads configuration from a `.line-sitter.edn` file, searched
+line-breaker reads configuration from a `.line-breaker.edn` file, searched
 starting from the file being processed and walking up the directory
 hierarchy.
 
@@ -371,10 +371,10 @@ The configuration file is an EDN map with optional keys:
 
 ### Configuration Search Algorithm
 
-When processing a file, line-sitter searches for `.line-sitter.edn`:
+When processing a file, line-breaker searches for `.line-breaker.edn`:
 
 1. Start from the directory containing the file being processed
-2. Look for `.line-sitter.edn` in the current directory
+2. Look for `.line-breaker.edn` in the current directory
 3. If not found, move to the parent directory
 4. Repeat until a config file is found or filesystem root is reached
 5. If no config file is found, use default values
@@ -387,14 +387,14 @@ directory tree.
 
 ```
 /home/user/projects/
-├── .line-sitter.edn          # Project-wide config
+├── .line-breaker.edn          # Project-wide config
 └── myproject/
     ├── src/
     │   └── myproject/
-    │       └── core.clj      # Uses /home/user/projects/.line-sitter.edn
+    │       └── core.clj      # Uses /home/user/projects/.line-breaker.edn
     └── legacy/
-        ├── .line-sitter.edn  # Override for legacy code
-        └── old_code.clj      # Uses legacy/.line-sitter.edn
+        ├── .line-breaker.edn  # Override for legacy code
+        └── old_code.clj      # Uses legacy/.line-breaker.edn
 ```
 
 ### Example Configurations
@@ -437,19 +437,19 @@ directory tree.
    :extensions [".clj" ".cljs" ".cljc" ".edn"]})
 
 (defn find-config-file
-  "Search for .line-sitter.edn starting from dir, walking up to root.
+  "Search for .line-breaker.edn starting from dir, walking up to root.
   Returns the File if found, nil otherwise."
   [dir]
   (loop [current (io/file dir)]
     (when current
-      (let [config-file (io/file current ".line-sitter.edn")]
+      (let [config-file (io/file current ".line-breaker.edn")]
         (if (.exists config-file)
           config-file
           (recur (.getParentFile current)))))))
 
 (defn load-config
   "Load configuration for the given file path.
-  Searches for .line-sitter.edn starting from the file's directory.
+  Searches for .line-breaker.edn starting from the file's directory.
   Returns merged config with defaults for any missing keys."
   [file-path]
   (let [dir         (.getParent (io/file file-path))
@@ -460,19 +460,19 @@ directory tree.
 
 ## CLI Interface
 
-line-sitter provides a command-line interface for checking and fixing
+line-breaker provides a command-line interface for checking and fixing
 line length violations in Clojure source files.
 
 ### Command Syntax
 
 ```
-line-sitter [options] [paths...]
+line-breaker [options] [paths...]
 ```
 
 **Arguments:**
 - `paths...` - Files or directories to process (default: current directory)
 
-When a directory is given, line-sitter recursively finds files matching
+When a directory is given, line-breaker recursively finds files matching
 the configured extensions.
 
 ### Options
@@ -501,37 +501,37 @@ other options.
 
 **Check current directory for violations:**
 ```bash
-line-sitter --check
+line-breaker --check
 ```
 
 **Check specific files:**
 ```bash
-line-sitter --check src/myproject/core.clj src/myproject/util.clj
+line-breaker --check src/myproject/core.clj src/myproject/util.clj
 ```
 
 **Check a directory recursively:**
 ```bash
-line-sitter --check src/
+line-breaker --check src/
 ```
 
 **Fix all files in place:**
 ```bash
-line-sitter --fix src/
+line-breaker --fix src/
 ```
 
 **Preview fixes without modifying files:**
 ```bash
-line-sitter --stdout src/myproject/core.clj
+line-breaker --stdout src/myproject/core.clj
 ```
 
 **Use a different line length:**
 ```bash
-line-sitter --check --line-length 120 src/
+line-breaker --check --line-length 120 src/
 ```
 
 **CI integration (exits 1 if violations found):**
 ```bash
-line-sitter --check src/ test/ || echo "Line length violations found"
+line-breaker --check src/ test/ || echo "Line length violations found"
 ```
 
 ### Output Format
@@ -559,12 +559,12 @@ comment header:
 
 When invoked without arguments:
 ```bash
-line-sitter
+line-breaker
 ```
 
 This is equivalent to:
 ```bash
-line-sitter --check .
+line-breaker --check .
 ```
 
 The tool processes all files matching configured extensions in the
@@ -573,7 +573,7 @@ violations.
 
 ## Error Handling
 
-line-sitter handles errors gracefully and provides informative error
+line-breaker handles errors gracefully and provides informative error
 messages to help users diagnose issues.
 
 ### Error Categories
@@ -592,24 +592,24 @@ All errors exit with code 2 and output messages to stderr.
 Error messages follow a consistent format:
 
 ```
-line-sitter: <category>: <details>
+line-breaker: <category>: <details>
 ```
 
 For file-specific errors, the path is included:
 
 ```
-line-sitter: <category>: <path>: <details>
+line-breaker: <category>: <path>: <details>
 ```
 
 ### Parse Errors
 
 When tree-sitter fails to parse a source file (malformed Clojure
-syntax), line-sitter reports the error and continues processing
+syntax), line-breaker reports the error and continues processing
 remaining files.
 
 **Message format:**
 ```
-line-sitter: parse error: path/to/file.clj: failed to parse
+line-breaker: parse error: path/to/file.clj: failed to parse
 ```
 
 Note: tree-sitter is tolerant and produces partial trees for most
@@ -619,19 +619,19 @@ syntax errors. A complete parse failure is rare.
 
 **Invalid EDN syntax:**
 ```
-line-sitter: config error: .line-sitter.edn: invalid EDN: <reader error>
+line-breaker: config error: .line-breaker.edn: invalid EDN: <reader error>
 ```
 
 **Invalid value types:**
 ```
-line-sitter: config error: .line-sitter.edn: :line-length must be a positive integer
-line-sitter: config error: .line-sitter.edn: :extensions must be a vector of strings
-line-sitter: config error: .line-sitter.edn: :indents must be a map
+line-breaker: config error: .line-breaker.edn: :line-length must be a positive integer
+line-breaker: config error: .line-breaker.edn: :extensions must be a vector of strings
+line-breaker: config error: .line-breaker.edn: :indents must be a map
 ```
 
 **Unknown keys (warning, not error):**
 ```
-line-sitter: warning: .line-sitter.edn: unknown key :foo
+line-breaker: warning: .line-breaker.edn: unknown key :foo
 ```
 
 Unknown keys produce a warning but do not prevent execution.
@@ -641,8 +641,8 @@ Unknown keys produce a warning but do not prevent execution.
 When a specified path does not exist:
 
 ```
-line-sitter: file not found: path/to/missing.clj
-line-sitter: directory not found: path/to/missing/
+line-breaker: file not found: path/to/missing.clj
+line-breaker: directory not found: path/to/missing/
 ```
 
 ### I/O Errors
@@ -650,8 +650,8 @@ line-sitter: directory not found: path/to/missing/
 Permission and filesystem errors:
 
 ```
-line-sitter: read error: path/to/file.clj: permission denied
-line-sitter: write error: path/to/file.clj: disk full
+line-breaker: read error: path/to/file.clj: permission denied
+line-breaker: write error: path/to/file.clj: disk full
 ```
 
 ### Batch Processing Behavior
@@ -665,8 +665,8 @@ When processing multiple files:
 
 **Example output:**
 ```
-line-sitter: parse error: src/broken.clj: failed to parse
-line-sitter: read error: src/locked.clj: permission denied
+line-breaker: parse error: src/broken.clj: failed to parse
+line-breaker: read error: src/locked.clj: permission denied
 src/good.clj:42: line exceeds 80 characters (actual: 95)
 Processed 3 files, 2 errors
 ```
@@ -708,7 +708,7 @@ When breaking a form, apply these rules:
 #### Indent Rules (cljfmt-compatible)
 
 Certain forms have "special" arguments that should stay on the first
-line with the form name. line-sitter follows cljfmt's indent rules:
+line with the form name. line-breaker follows cljfmt's indent rules:
 
 | Rule | Forms | First line keeps |
 |------|-------|------------------|
@@ -760,7 +760,7 @@ length.
 Indent rules can be extended via configuration:
 
 ```clojure
-;; .line-sitter.edn
+;; .line-breaker.edn
 {:line-length 80
  :indents {my-special-macro :defn
            with-my-resource :binding}}
@@ -1065,20 +1065,20 @@ and are unbreakable. They may cause lines to exceed limits.
 
 ## Ignore Mechanism
 
-line-sitter provides an escape hatch for code that should not be
-reformatted. Use the `#_:line-sitter/ignore` discard form immediately
-before any form to prevent line-sitter from breaking it.
+line-breaker provides an escape hatch for code that should not be
+reformatted. Use the `#_:line-breaker/ignore` discard form immediately
+before any form to prevent line-breaker from breaking it.
 
 ### Syntax
 
 ```clojure
-#_:line-sitter/ignore
+#_:line-breaker/ignore
 (form that should not be broken)
 ```
 
 The ignore marker consists of:
 1. `#_` - Clojure's discard reader macro
-2. `:line-sitter/ignore` - a namespaced keyword
+2. `:line-breaker/ignore` - a namespaced keyword
 
 This is valid Clojure syntax that the reader discards, so it has no
 runtime effect. The parser sees three nodes: `dis_expr`, `kwd_lit`, and
@@ -1086,8 +1086,8 @@ the following form.
 
 ### Detection
 
-When line-sitter encounters a `dis_expr` node containing the keyword
-`:line-sitter/ignore`, it marks the immediately following sibling form
+When line-breaker encounters a `dis_expr` node containing the keyword
+`:line-breaker/ignore`, it marks the immediately following sibling form
 as ignored. Ignored forms are:
 
 - **Not broken** even if they exceed the line limit
@@ -1098,16 +1098,16 @@ as ignored. Ignored forms are:
 
 **Ignore a long definition:**
 ```clojure
-#_:line-sitter/ignore
+#_:line-breaker/ignore
 (def api-url "https://api.example.com/v2/very/long/path/to/resource/endpoint")
 ```
 
 The long string would normally cause this line to exceed limits.
-With the ignore marker, line-sitter leaves it unchanged.
+With the ignore marker, line-breaker leaves it unchanged.
 
 **Ignore a formatted map:**
 ```clojure
-#_:line-sitter/ignore
+#_:line-breaker/ignore
 {:small 1  :medium 10  :large 100  :xlarge 1000}
 ```
 
@@ -1116,7 +1116,7 @@ ignore to preserve it.
 
 **Ignore a complex threading macro:**
 ```clojure
-#_:line-sitter/ignore
+#_:line-breaker/ignore
 (-> data (transform {:opt-a 1 :opt-b 2}) (filter pred?) (map f) (into []))
 ```
 
@@ -1127,7 +1127,7 @@ readability. The ignore marker preserves this choice.
 ```clojure
 (defn process-data
   [input]
-  #_:line-sitter/ignore
+  #_:line-breaker/ignore
   (let [config {:alpha 1 :beta 2 :gamma 3 :delta 4 :epsilon 5}]
     (transform input config)))
 ```
@@ -1137,7 +1137,7 @@ reformatted if needed.
 
 ### When to Use
 
-Use `#_:line-sitter/ignore` for:
+Use `#_:line-breaker/ignore` for:
 - URL strings or paths that shouldn't be broken
 - Intentionally formatted data (aligned maps, tables)
 - One-liner threading macros kept for readability
@@ -1148,7 +1148,7 @@ consider whether the line length limit is appropriate for your project.
 
 ## Example Transformations
 
-This section shows complete before/after examples of how line-sitter
+This section shows complete before/after examples of how line-breaker
 reformats code to fit within a maximum line length.
 
 ### Example 1: Long Function Call
@@ -1299,19 +1299,19 @@ Showing how ignore interacts with normal reformatting.
 
 **Before:**
 ```clojure
-(defn process [data] #_:line-sitter/ignore {:a 1 :b 2 :c 3 :d 4 :e 5 :f 6 :g 7} (transform data))
+(defn process [data] #_:line-breaker/ignore {:a 1 :b 2 :c 3 :d 4 :e 5 :f 6 :g 7} (transform data))
 ```
 
 **After:**
 ```clojure
 (defn process
   [data]
-  #_:line-sitter/ignore
+  #_:line-breaker/ignore
   {:a 1 :b 2 :c 3 :d 4 :e 5 :f 6 :g 7}
   (transform data))
 ```
 
 The outer `defn` is broken normally. The map literal following
-`#_:line-sitter/ignore` exceeds 50 characters but is left unchanged
+`#_:line-breaker/ignore` exceeds 50 characters but is left unchanged
 because it's ignored. The final `(transform data)` call fits and
 remains on one line.

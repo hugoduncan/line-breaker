@@ -1,4 +1,4 @@
-(ns line-sitter.treesitter.parser-test
+(ns line-breaker.treesitter.parser-test
   "Tests for parser wrapper functions.
 
   Tests verify:
@@ -6,7 +6,7 @@
   - Parsing source with syntax errors returns a tree with ERROR nodes
   - Parsing empty string returns a valid tree"
   (:require [clojure.test :refer [deftest is testing]]
-            [line-sitter.treesitter.parser :as parser])
+            [line-breaker.treesitter.parser :as parser])
   (:import [io.github.treesitter.jtreesitter Tree Node]))
 
 (deftest parse-source-test

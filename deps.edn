@@ -17,7 +17,7 @@
                 "--middleware" "[cider.nrepl/cider-middleware]"]}
 
   :run
-  {:main-opts ["-m" "line-sitter.main"]
+  {:main-opts ["-m" "line-breaker.main"]
    :jvm-opts  ["--enable-native-access=ALL-UNNAMED"]}
 
   :test
