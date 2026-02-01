@@ -127,7 +127,7 @@ verify_checksum() {
   local checksum_file="$2"
   local expected actual
 
-  expected=$(cat "$checksum_file" | awk '{print $1}')
+  expected=$(awk '{print $1}' "$checksum_file")
 
   if command -v sha256sum &> /dev/null; then
     actual=$(sha256sum "$file" | awk '{print $1}')
