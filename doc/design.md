@@ -682,7 +682,8 @@ The algorithm uses tree-sitter to understand code structure, enabling
 intelligent line breaking at form boundaries rather than arbitrary text
 positions. When a line exceeds the configured limit, the algorithm
 breaks forms from the outside in, placing each element on its own line
-with consistent 2-space indentation.
+with cljfmt-compatible indentation (1-space for function calls and data
+structures, 2-space for body forms).
 
 ### Algorithm Steps
 
@@ -701,14 +702,35 @@ When breaking a form, apply these rules:
 
 1. **First element** stays on the same line as the opening delimiter
 2. **Special arguments** (based on indent rules) stay on the first line
-3. **Remaining elements** each go on their own line with 2-space indent
-   from the opening delimiter's column
+3. **Remaining elements** each go on their own line with indentation
+   determined by the form type (see Indentation Rules below)
 4. **Closing delimiter** stays on the same line as the last element
 
-#### Indent Rules (cljfmt-compatible)
+#### Indentation Rules (cljfmt-compatible)
 
-Certain forms have "special" arguments that should stay on the first
-line with the form name. line-breaker follows cljfmt's indent rules:
+line-breaker follows cljfmt's indentation conventions:
+
+**2-space indentation** for body forms (forms with an indent rule):
+- `defn`, `defn-`, `defmacro`, `defmethod`, `deftest`
+- `def`, `defonce`, `defmulti`
+- `fn`, `bound-fn`
+- `let`, `when-let`, `if-let`, `binding`, `doseq`, `for`, `loop`,
+  `with-open`, `with-local-vars`
+- `if`, `if-not`, `when`, `when-not`, `when-first`
+- `case`, `cond`, `condp`, `cond->`, `cond->>`
+- `try`, `do`
+- Any form with a custom indent rule via `:indents` config
+
+**1-space indentation** (aligns to first element) for everything else:
+- Plain function calls (no indent rule)
+- Data structures: vectors `[...]`, maps `{...}`, sets `#{...}`
+
+> **Note:** 1-space indentation from the opening delimiter is equivalent
+> to aligning to the first element position. For a form starting at
+> column N, both mean indenting to column N+1.
+
+Certain forms also have "special" arguments that should stay on the
+first line with the form name:
 
 | Rule | Forms | First line keeps |
 |------|-------|------------------|
@@ -739,21 +761,28 @@ line with the form name. line-breaker follows cljfmt's indent rules:
 (let [x 1 y 2 z 3]
   (+ x y z))
 
-;; :if rule - keep test on first line
+;; :if rule - keep test on first line, 2-space indent
 (if (some-condition? x)
   then-expression
   else-expression)
 
-;; default rule - plain function call
+;; default rule - plain function call, 1-space indent
 (some-function
-  arg1
-  arg2
-  arg3)
+ arg1
+ arg2
+ arg3)
+
+;; data structures - 1-space indent
+[item1
+ item2
+ item3]
+
+{:key1 val1
+ :key2 val2}
 ```
 
-The 2-space indent is fixed and does not align with arguments. This
-produces consistent, predictable output regardless of function name
-length.
+Body forms use 2-space indent; plain function calls and data structures
+use 1-space indent (aligning to the first element position).
 
 #### Configuration
 
@@ -879,14 +908,15 @@ list_lit
 **After breaking (limit: 40):**
 ```clojure
 (println
-  "Hello"
-  "World"
-  "from"
-  "Clojure")
+ "Hello"
+ "World"
+ "from"
+ "Clojure")
 ```
 
 The `list_lit` is identified as the outermost breakable form. Each child
-(the symbol and strings) is placed on its own line with 2-space indent.
+(the symbol and strings) is placed on its own line with 1-space indent
+(since `println` has no indent rule).
 
 ### Example 2: Nested Form Breaking with Indent Rules
 
@@ -931,13 +961,14 @@ The `:defn` rule keeps `process` on the first line. Line 3 still exceeds
 (defn process
   [x]
   (->
-    x
-    (transform-alpha)
-    (transform-beta)
-    (transform-gamma)))
+   x
+   (transform-alpha)
+   (transform-beta)
+   (transform-gamma)))
 ```
 
-All lines now fit within the limit.
+All lines now fit within the limit. Note: `defn` uses 2-space indent
+(body form), while `->` uses 1-space indent (no indent rule).
 
 ### Example 3: Unbreakable Content
 
@@ -978,14 +1009,15 @@ Maps break with key-value pairs kept together on the same line when possible.
 **After breaking:**
 ```clojure
 {:name "Alice"
-  :age 30
-  :occupation "Engineer"
-  :city "Boston"}
+ :age 30
+ :occupation "Engineer"
+ :city "Boston"}
 ```
 
 Key-value pairs stay together: each pair (key and its value) remains on
-the same line when the pair fits within the limit. If a pair exceeds the
-limit, only then does the value move to its own line.
+the same line when the pair fits within the limit. Maps use 1-space
+indent (data structure). If a pair exceeds the limit, only then does
+the value move to its own line.
 
 ### Example 5: Metadata Preservation
 
@@ -1023,7 +1055,7 @@ unit, so the entire `meta_lit` node stays on line 1.
 ### Comments
 
 Comments (`;`) within forms are treated as their own elements and
-receive the same 2-space indentation when a form is broken.
+receive the same indentation as other elements when a form is broken.
 
 **Before:**
 ```clojure
@@ -1035,9 +1067,9 @@ receive the same 2-space indentation when a form is broken.
 **After breaking:**
 ```clojure
 (process
-  input ; transform the input
-  intermediate ; apply rules
-  output) ; return result
+ input ; transform the input
+ intermediate ; apply rules
+ output) ; return result
 ```
 
 Comments remain attached to the preceding element on the same line.
@@ -1056,9 +1088,9 @@ Comments remain attached to the preceding element on the same line.
 
 **Already-broken forms:** Lines already within limit are not modified.
 
-**Mixed indentation in input:** The algorithm uses 2-space indent
-regardless of existing indentation. It does not preserve alignment-based
-formatting.
+**Mixed indentation in input:** The algorithm applies consistent
+indentation (1-space or 2-space based on form type) regardless of
+existing indentation. It does not preserve alignment-based formatting.
 
 **Strings with newlines:** Multi-line strings are single `str_lit` nodes
 and are unbreakable. They may cause lines to exceed limits.
@@ -1165,13 +1197,14 @@ A common case: a function call with many arguments.
 **After:**
 ```clojure
 (send-notification
-  user-id
-  "Welcome!"
-  {:urgent true :channel "email"})
+ user-id
+ "Welcome!"
+ {:urgent true :channel "email"})
 ```
 
-The outermost `list_lit` is broken. The map literal fits on one line
-(under 50 characters) so it remains unbroken.
+The outermost `list_lit` is broken with 1-space indent (plain function
+call). The map literal fits on one line (under 50 characters) so it
+remains unbroken.
 
 ### Example 2: Nested Let Bindings
 
@@ -1211,14 +1244,14 @@ A map literal with many key-value pairs.
 **After:**
 ```clojure
 {:id 1
-  :name "Alice"
-  :email "alice@example.com"
-  :active true}
+ :name "Alice"
+ :email "alice@example.com"
+ :active true}
 ```
 
-Key-value pairs stay together on the same line. Each pair gets 2-space
-indent from the opening brace. If a pair itself exceeds the limit, the
-value moves to its own line.
+Key-value pairs stay together on the same line. Each pair gets 1-space
+indent from the opening brace (maps are data structures). If a pair
+itself exceeds the limit, the value moves to its own line.
 
 ### Example 4: Threading Macro
 
@@ -1234,16 +1267,16 @@ A threading macro with multiple transformation steps.
 **After (first pass):**
 ```clojure
 (->
-  request
-  (validate-input)
-  (transform-payload)
-  (add-metadata {:ts (now)})
-  (send-to-service))
+ request
+ (validate-input)
+ (transform-payload)
+ (add-metadata {:ts (now)})
+ (send-to-service))
 ```
 
-The outer `->` form is broken. Each step goes on its own line. The
-`(add-metadata {:ts (now)})` form fits under 50 characters, so it
-remains unbroken.
+The outer `->` form is broken with 1-space indent (no indent rule).
+Each step goes on its own line. The `(add-metadata {:ts (now)})` form
+fits under 50 characters, so it remains unbroken.
 
 ### Example 5: Nested Form Requiring Multiple Breaks
 
@@ -1284,12 +1317,13 @@ Line 3 exceeds 40 characters. Break the inner `+` form:
 (defn calculate
   [x]
   (+
-    (multiply x x)
-    (multiply 2 x)
-    (constant 1)))
+   (multiply x x)
+   (multiply 2 x)
+   (constant 1)))
 ```
 
-All lines now fit within 40 characters.
+All lines now fit within 40 characters. Note: `defn` uses 2-space
+indent (body form), while `+` uses 1-space indent (no indent rule).
 
 ### Example 6: Ignored Form Alongside Regular Formatting
 
