@@ -82,7 +82,8 @@ and `when` use 2-space indentation.
 
 ```clojure
 ;; Function call: 1-space indent
-(some-fn arg1
+(some-fn
+ arg1
  arg2
  arg3)
 
@@ -131,6 +132,16 @@ Create `.line-breaker.edn` in your project root:
 
 - `:line-length` — Maximum line length (default: 80)
 - `:extensions` — File extensions to process (default: `[".clj" ".cljs" ".cljc" ".edn"]`)
-- `:indents` — Custom indent rules mapping symbols to rule types (`:defn`, `:binding`, `:do`, etc.)
+- `:indents` — Custom indent rules mapping symbols to rule types:
+  - `:defn` — Keeps name on first line, 2-space indent (for definitions)
+  - `:fn` — Keeps arg vector on first line (for anonymous functions)
+  - `:binding` — Keeps binding vector on first line, 2-space indent (for `let`, `for`, etc.)
+  - `:if` — 2-space indent (for conditionals)
+  - `:cond` — Body on next line, pair grouping
+  - `:condp` — Pair grouping
+  - `:case` — Pair grouping
+  - `:cond->` — Pair grouping
+  - `:try` — Body on next line
+  - `:do` — Body on next line
 
 CLI options override config file values, which override defaults.
