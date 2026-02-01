@@ -20,7 +20,7 @@ The official Java bindings are provided by
 io.github.tree-sitter/jtreesitter {:mvn/version "0.26.0"}
 ```
 
-**Requirements:** JRE 23+ (uses Java Foreign Function & Memory API)
+**Requirements:** JRE 25+ (uses Java Foreign Function & Memory API)
 
 **API documentation:**
 https://tree-sitter.github.io/java-tree-sitter/

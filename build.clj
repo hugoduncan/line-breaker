@@ -24,7 +24,7 @@
             :class-dir java-class-dir
             :basis (b/create-basis {:project "deps.edn"
                                     :aliases [:native]})
-            :javac-opts ["--release" "23"]}))
+            :javac-opts ["--release" "25"]}))
 
 (defn uber
   "Build an uberjar."
@@ -75,9 +75,7 @@
   (let [native-image-cmd (find-native-image graalvm-home)
         base-args [native-image-cmd
                    "-jar" uber-file
-                   "-o" output-path
-                   "-H:+UnlockExperimentalVMOptions"
-                   "-H:+ForeignAPISupport"]
+                   "-o" output-path]
         all-args (if (= arch :x86_64)
                    (into ["arch" "-x86_64"] base-args)
                    base-args)]
@@ -139,9 +137,7 @@
       (let [native-image-cmd (find-native-image)
             result (p/shell {:out :inherit :err :inherit :continue true}
                             native-image-cmd "-jar" uber-file
-                            "-o" "target/line-breaker"
-                            "-H:+UnlockExperimentalVMOptions"
-                            "-H:+ForeignAPISupport")
+                            "-o" "target/line-breaker")
             exit-code (:exit result)]
         (if (zero? exit-code)
           (println "Native image built: target/line-breaker")
