@@ -61,8 +61,8 @@ jobs:
             exit 1
           fi
 
-          # Run line-breaker
-          ./${{ matrix.artifact }} smoke-test.clj > smoke-test-output.clj
+          # Run line-breaker with --stdout to output reformatted code
+          ./${{ matrix.artifact }} --stdout smoke-test.clj > smoke-test-output.clj
 
           # Verify output has no long lines
           MAX_OUTPUT_LENGTH=$(awk '{ print length }' smoke-test-output.clj | sort -rn | head -1)
