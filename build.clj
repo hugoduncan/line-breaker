@@ -73,7 +73,11 @@
   Returns the path to the built binary."
   [graalvm-home uber-file output-path arch]
   (let [native-image-cmd (find-native-image graalvm-home)
-        base-args [native-image-cmd "-jar" uber-file "-o" output-path]
+        base-args [native-image-cmd
+                   "-jar" uber-file
+                   "-o" output-path
+                   "-H:+UnlockExperimentalVMOptions"
+                   "-H:+ForeignAPISupport"]
         all-args (if (= arch :x86_64)
                    (into ["arch" "-x86_64"] base-args)
                    base-args)]
@@ -135,7 +139,9 @@
       (let [native-image-cmd (find-native-image)
             result (p/shell {:out :inherit :err :inherit :continue true}
                             native-image-cmd "-jar" uber-file
-                            "-o" "target/line-breaker")
+                            "-o" "target/line-breaker"
+                            "-H:+UnlockExperimentalVMOptions"
+                            "-H:+ForeignAPISupport")
             exit-code (:exit result)]
         (if (zero? exit-code)
           (println "Native image built: target/line-breaker")
