@@ -19,6 +19,8 @@ To install to a custom directory:
 curl -sL https://raw.githubusercontent.com/hugoduncan/line-breaker/master/scripts/install.sh | bash -s -- --install-dir ~/.local/bin
 ```
 
+For all available options, run `install.sh --help`.
+
 ### Manual download
 
 Download the latest release for your platform from the
