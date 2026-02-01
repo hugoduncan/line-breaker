@@ -120,14 +120,14 @@
             form (fix/find-breakable-form tree 1)
             edits (fix/break-form form)
             result (fix/apply-edits "(a b c)" edits)]
-        (is (= "(a\n  b\n  c)" result))))
+        (is (= "(a\n b\n c)" result))))
 
     (testing "generates edits for vector"
       (let [tree (parser/parse-source "[a b c]")
             form (fix/find-breakable-form tree 1)
             edits (fix/break-form form)
             result (fix/apply-edits "[a b c]" edits)]
-        (is (= "[a\n  b\n  c]" result))))
+        (is (= "[a\n b\n c]" result))))
 
     (testing "generates edits for map with pair grouping"
       (let [tree (parser/parse-source "{:a 1 :b 2}")
@@ -148,7 +148,7 @@
             form (fix/find-breakable-form tree 1)
             edits (fix/break-form form)
             result (fix/apply-edits source edits)]
-        (is (= "  (a\n    b\n    c)" result)
+        (is (= "  (a\n   b\n   c)" result)
             "indentation accounts for form's column position")))))
 
 (deftest find-long-lines-test
@@ -179,14 +179,14 @@
       (is (= "(a b c)" (fix/fix-source "(a b c)" {:line-length 80}))))
 
     (testing "breaks simple form in one pass"
-      (is (= "(a\n  b\n  c)"
+      (is (= "(a\n b\n c)"
              (fix/fix-source "(a b c)" {:line-length 5}))))
 
     (testing "handles nested forms requiring multiple passes"
-      ;; First pass breaks outer, second pass breaks inner
+      ;; With 1-space indent, inner form fits on line after outer breaks
       (let [source "(a (b c d e) f)"
             result (fix/fix-source source {:line-length 10})]
-        (is (= "(a\n  (b\n    c\n    d\n    e)\n  f)" result))))
+        (is (= "(a\n (b c d e)\n f)" result))))
 
     (testing "leaves unbreakable atoms unchanged"
       ;; Long string cannot be broken - :def rule keeps name on first line
@@ -389,7 +389,7 @@
       (testing "breaks all elements"
         (let [source "(foo bar baz)"
               result (fix/fix-source source {:line-length 8})]
-          (is (= "(foo\n  bar\n  baz)" result)))))))
+          (is (= "(foo\n bar\n baz)" result)))))))
 
 (deftest ignore-mechanism-test
   ;; Verify that #_:line-breaker/ignore prevents breaking of marked forms.
@@ -409,7 +409,7 @@
     (testing "breaks non-ignored forms"
       (let [source "(foo bar baz) #_:line-breaker/ignore (keep this)"
             result (fix/fix-source source {:line-length 10})]
-        (is (= "(foo\n  bar\n  baz) #_:line-breaker/ignore (keep this)" result)
+        (is (= "(foo\n bar\n baz) #_:line-breaker/ignore (keep this)" result)
             "non-ignored form is broken, ignored form is preserved")))
 
     (testing "preserves ignore marker in output"
@@ -425,67 +425,67 @@
       (testing "breaks when exceeding limit"
         (let [source "#(foo a b c d)"
               result (fix/fix-source source {:line-length 8})]
-          (is (= "#(foo\n  a\n  b\n  c\n  d)" result))))
+          (is (= "#(foo\n a\n b\n c\n d)" result))))
       (testing "stays attached when inside list"
         (let [source "(map #(+ % 1) xs)"
               result (fix/fix-source source {:line-length 10})]
-          (is (= "(map\n  #(+ % 1)\n  xs)" result)))))
+          (is (= "(map\n #(+ % 1)\n xs)" result)))))
 
     (testing "for reader conditionals"
       (testing "breaks when exceeding limit"
         (let [source "#?(:clj a :cljs b)"
               result (fix/fix-source source {:line-length 10})]
-          (is (= "#?(:clj\n  a\n  :cljs\n  b)" result))))
+          (is (= "#?(:clj\n a\n :cljs\n b)" result))))
       (testing "splicing variant breaks"
         (let [source "#?@(:clj [a] :cljs [b])"
               result (fix/fix-source source {:line-length 12})]
-          (is (= "#?@(:clj\n  [a]\n  :cljs\n  [b])" result)))))
+          (is (= "#?@(:clj\n [a]\n :cljs\n [b])" result)))))
 
     (testing "for quote"
       (testing "stays attached to following form"
         (let [source "(foo 'bar baz qux)"
               result (fix/fix-source source {:line-length 10})]
-          (is (= "(foo\n  'bar\n  baz\n  qux)" result))))
+          (is (= "(foo\n 'bar\n baz\n qux)" result))))
       (testing "inner list breaks correctly"
         (let [source "'(a b c d e)"
               result (fix/fix-source source {:line-length 6})]
-          (is (= "'(a\n   b\n   c\n   d\n   e)" result)))))
+          (is (= "'(a\n  b\n  c\n  d\n  e)" result)))))
 
     (testing "for syntax-quote"
       (testing "stays attached to following form"
         (let [source "(foo `bar baz qux)"
               result (fix/fix-source source {:line-length 10})]
-          (is (= "(foo\n  `bar\n  baz\n  qux)" result)))))
+          (is (= "(foo\n `bar\n baz\n qux)" result)))))
 
     (testing "for unquote"
       (testing "stays attached to following form"
         (let [source "`(foo ~bar baz)"
               result (fix/fix-source source {:line-length 8})]
-          (is (= "`(foo\n   ~bar\n   baz)" result)))))
+          (is (= "`(foo\n  ~bar\n  baz)" result)))))
 
     (testing "for unquote-splicing"
       (testing "stays attached to following form"
         (let [source "`(foo ~@bar baz)"
               result (fix/fix-source source {:line-length 8})]
-          (is (= "`(foo\n   ~@bar\n   baz)" result)))))
+          (is (= "`(foo\n  ~@bar\n  baz)" result)))))
 
     (testing "for deref"
       (testing "stays attached to following form"
         (let [source "(foo @atom bar baz)"
               result (fix/fix-source source {:line-length 10})]
-          (is (= "(foo\n  @atom\n  bar\n  baz)" result)))))
+          (is (= "(foo\n @atom\n bar\n baz)" result)))))
 
     (testing "for var-quote"
       (testing "stays attached to following form"
         (let [source "(foo #'var bar baz)"
               result (fix/fix-source source {:line-length 10})]
-          (is (= "(foo\n  #'var\n  bar\n  baz)" result)))))
+          (is (= "(foo\n #'var\n bar\n baz)" result)))))
 
     (testing "for metadata"
       (testing "stays attached to following form"
         (let [source "(foo ^:key bar baz)"
               result (fix/fix-source source {:line-length 10})]
-          (is (= "(foo\n  ^:key bar\n  baz)" result)))))))
+          (is (= "(foo\n ^:key bar\n baz)" result)))))))
 
 (deftest comment-handling-test
   ;; Verify inline comments stay attached and don't cause extra blank lines.
@@ -493,17 +493,17 @@
     (testing "keeps end-of-line comment attached to preceding element"
       (let [source "(foo a ; comment\nb c)"
             result (fix/fix-source source {:line-length 10})]
-        (is (= "(foo\n  a ; comment\n  b\n  c)" result))))
+        (is (= "(foo\n a ; comment\n b\n c)" result))))
 
     (testing "keeps comment attached to head element"
       (let [source "(foo ; after head\na b c)"
             result (fix/fix-source source {:line-length 10})]
-        (is (= "(foo ; after head\n  a\n  b\n  c)" result))))
+        (is (= "(foo ; after head\n a\n b\n c)" result))))
 
     (testing "handles multiple comments"
       (let [source "(foo a ; one\nb ; two\nc)"
             result (fix/fix-source source {:line-length 10})]
-        (is (= "(foo\n  a ; one\n  b ; two\n  c)" result))))
+        (is (= "(foo\n a ; one\n b ; two\n c)" result))))
 
     (testing "does not introduce extra blank lines"
       (let [source "(foo a ; comment\nb)"
@@ -614,7 +614,7 @@
       (testing "do not use pair grouping"
         (let [source "[a 1 b 2 c 3]"
               result (fix/fix-source source {:line-length 8})]
-          (is (= "[a\n  1\n  b\n  2\n  c\n  3]" result)
+          (is (= "[a\n 1\n b\n 2\n c\n 3]" result)
               "standalone vectors break each element"))))
 
     (testing "nested bindings"
