@@ -689,3 +689,47 @@
       (testing "leaves properly broken defn unchanged"
         (let [source "(defn foo\n  [x]\n  (+ x 1))"]
           (is (= source (fix/fix-source source {:line-length 80}))))))))
+
+(deftest atomic-literal-integrity-test
+  ;; Verify atomic literals (strings, etc.) are never broken internally.
+  ;; Breaks should occur between form elements, not inside literals.
+  ;; Tests the contract that strings remain intact after line breaking.
+  (testing "multiple short strings exceeding line length"
+    (testing "breaks between strings, not inside them"
+      ;; Four 5-char strings in a vector: each fits, but total exceeds 40 chars
+      (let [source "(vector \"abc\" \"def\" \"ghi\" \"jkl\")"
+            result (fix/fix-source source {:line-length 20})]
+        (is (str/includes? result "\"abc\"")
+            "first string remains intact")
+        (is (str/includes? result "\"def\"")
+            "second string remains intact")
+        (is (str/includes? result "\"ghi\"")
+            "third string remains intact")
+        (is (str/includes? result "\"jkl\"")
+            "fourth string remains intact")))
+
+    (testing "handles strings at beginning position"
+      (let [source "(\"first\" a b c)"
+            result (fix/fix-source source {:line-length 10})]
+        (is (str/includes? result "\"first\"")
+            "string at beginning remains intact")))
+
+    (testing "handles strings at middle position"
+      (let [source "(a \"mid\" b c)"
+            result (fix/fix-source source {:line-length 8})]
+        (is (str/includes? result "\"mid\"")
+            "string in middle remains intact")))
+
+    (testing "handles strings at end position"
+      (let [source "(a b c \"last\")"
+            result (fix/fix-source source {:line-length 8})]
+        (is (str/includes? result "\"last\"")
+            "string at end remains intact")))
+
+    (testing "handles mixed strings and other elements"
+      (let [source "(fn \"s1\" :k1 \"s2\" sym)"
+            result (fix/fix-source source {:line-length 12})]
+        (is (str/includes? result "\"s1\"")
+            "first string remains intact")
+        (is (str/includes? result "\"s2\"")
+            "second string remains intact")))))
