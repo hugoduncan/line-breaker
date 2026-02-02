@@ -379,8 +379,11 @@
     (cond
       (= :binding-vector rule) (+ 1 base-col)
       (= :metadata-wrapped rule)
-      ;; Align to the first content element (second child, after metadata)
-      (form-start-column (second (node/named-children node)))
+      ;; Align to the first content element (second child, after metadata).
+      ;; Fall back to base-col + 1 if no content element exists.
+      (if-let [content-node (second (node/named-children node))]
+        (form-start-column content-node)
+        (+ 1 base-col))
       (some? rule) (+ 2 base-col)
       :else (+ 1 base-col))))
 
