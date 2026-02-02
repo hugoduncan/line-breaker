@@ -74,6 +74,7 @@
   [graalvm-home uber-file output-path arch]
   (let [native-image-cmd (find-native-image graalvm-home)
         base-args [native-image-cmd
+                   "--enable-native-access=ALL-UNNAMED"
                    "-jar" uber-file
                    "-o" output-path]
         all-args (if (= arch :x86_64)
@@ -136,7 +137,9 @@
       (println "Building native image...")
       (let [native-image-cmd (find-native-image)
             result (p/shell {:out :inherit :err :inherit :continue true}
-                            native-image-cmd "-jar" uber-file
+                            native-image-cmd
+                            "--enable-native-access=ALL-UNNAMED"
+                            "-jar" uber-file
                             "-o" "target/line-breaker")
             exit-code (:exit result)]
         (if (zero? exit-code)
