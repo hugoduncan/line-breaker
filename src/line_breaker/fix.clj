@@ -341,16 +341,39 @@
        :end (element-start-offset next-child)
        :replacement (str "\n" indent-spaces)})))
 
+(defn- find-actual-prev-sibling
+  "Find the actual previous sibling of target-node in all-children.
+  Returns the node immediately before target-node, or fallback if target-node
+  is not found or is the first element."
+  [all-children target-node fallback]
+  (let [target-start (element-start-offset target-node)]
+    (or (last (take-while #(< (element-start-offset %) target-start)
+                          all-children))
+        fallback)))
+
 (defn- generate-paired-edits
   "Generate edits for pair-grouped breaking.
-  Groups elements in pairs and breaks only between pairs."
+
+  Groups elements in pairs and breaks only between pairs. Comments are filtered
+  out before pairing to prevent disrupting the grouping logic, but when
+  generating break edits, the actual previous sibling (which may be a comment)
+  is used so comments are preserved correctly."
   [last-kept breakable-children indent-col]
-  (let [pairs (partition-all 2 breakable-children)
+  ;; Filter out comments before pairing to avoid disrupting pair grouping.
+  ;; Comments in binding vectors would otherwise shift the pairing (e.g.,
+  ;; [a 1 ;comment b 2] would incorrectly pair as [[;comment b] [2]]).
+  (let [non-comment-children (remove comment-node? breakable-children)
+        pairs (partition-all 2 non-comment-children)
         ;; For each pair, break before its first element.
-        ;; Prev elem: last-kept for 1st pair, last of prev pair for rest
-        prev-elements (cons last-kept (map last (butlast pairs)))
+        ;; Use the actual previous sibling (may be a comment) for correct edits.
         first-of-pairs (map first pairs)
-        ;; Generate edits between prev-element and first-of-pair
+        prev-of-first-pair (find-actual-prev-sibling
+                            breakable-children (first first-of-pairs) last-kept)
+        prev-elements (cons prev-of-first-pair
+                            (map (fn [pair-first]
+                                   (find-actual-prev-sibling
+                                    breakable-children pair-first last-kept))
+                                 (rest first-of-pairs)))
         break-points (map vector prev-elements first-of-pairs)]
     (into []
           (keep (fn [[prev-child next-child]]
