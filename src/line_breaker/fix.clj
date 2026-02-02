@@ -10,6 +10,35 @@
 
 ;;; Edit application
 
+(defn- byte-offset->char-index
+  "Convert a UTF-8 byte offset to a character index.
+
+  Tree-sitter returns byte positions, but Java String operations use
+  character indices. This function converts byte offsets to character
+  indices by counting how many characters it takes to reach the target
+  byte offset.
+
+  Handles surrogate pairs (4-byte UTF-8 characters like emojis) which
+  are represented as 2 chars in Java strings."
+  [^String s byte-offset]
+  (let [len (count s)]
+    (loop [char-idx 0
+           byte-idx 0]
+      (cond
+        (>= byte-idx byte-offset) char-idx
+        (>= char-idx len) len
+        :else
+        (let [code-point (.codePointAt s char-idx)
+              ;; Number of chars this code point uses (1 or 2 for surrogates)
+              char-count (Character/charCount code-point)
+              ;; Number of UTF-8 bytes this code point uses
+              code-point-bytes (cond
+                                 (<= code-point 0x7F) 1
+                                 (<= code-point 0x7FF) 2
+                                 (<= code-point 0xFFFF) 3
+                                 :else 4)]
+          (recur (+ char-idx char-count) (+ byte-idx code-point-bytes)))))))
+
 (defn apply-edits
   "Apply replacement edits to source string.
 
@@ -22,7 +51,9 @@
   [source edits]
   (reduce
    (fn [s {:keys [start end replacement]}]
-     (str (subs s 0 start) replacement (subs s end)))
+     (let [start-char (byte-offset->char-index s start)
+           end-char (byte-offset->char-index s end)]
+       (str (subs s 0 start-char) replacement (subs s end-char))))
    source
    (sort-by :start > edits)))
 

@@ -881,3 +881,51 @@
             result (fix/fix-source source {:line-length 9})]
         (is (= source result)
             "character literals at exact limit stay on one line")))))
+
+(deftest unicode-handling-test
+  ;; Verify multi-byte UTF-8 characters don't cause corruption.
+  ;; Tree-sitter returns byte offsets, but Clojure strings use char indices.
+  ;; Bug 141: Without byte-to-char conversion, edits corrupt multi-byte chars.
+  (testing "unicode handling"
+    (testing "preserves multi-byte characters when breaking"
+      ;; é is 2 bytes in UTF-8
+      (let [source "(é b c)"
+            result (fix/fix-source source {:line-length 5})]
+        (is (= "(é\n b\n c)" result)
+            "2-byte UTF-8 char preserved")))
+
+    (testing "preserves 3-byte characters"
+      ;; → is 3 bytes in UTF-8
+      (let [source "(→ b c)"
+            result (fix/fix-source source {:line-length 5})]
+        (is (= "(→\n b\n c)" result)
+            "3-byte UTF-8 char preserved")))
+
+    (testing "preserves 4-byte characters"
+      ;; 😀 is 4 bytes in UTF-8
+      (let [source "(😀 b c)"
+            result (fix/fix-source source {:line-length 5})]
+        (is (= "(😀\n b\n c)" result)
+            "4-byte UTF-8 char preserved")))
+
+    (testing "handles mixed ASCII and multi-byte"
+      (let [source "(foo ébar baz)"
+            result (fix/fix-source source {:line-length 8})]
+        (is (str/includes? result "ébar")
+            "symbol with multi-byte char preserved")))
+
+    (testing "handles unicode in string literals"
+      (let [source "(f \"café\" x)"
+            result (fix/fix-source source {:line-length 8})]
+        (is (str/includes? result "\"café\"")
+            "string with multi-byte char preserved")))
+
+    (testing "handles multiple multi-byte chars"
+      (let [source "(é ü ñ)"
+            result (fix/fix-source source {:line-length 5})]
+        (is (str/includes? result "é")
+            "first multi-byte char preserved")
+        (is (str/includes? result "ü")
+            "second multi-byte char preserved")
+        (is (str/includes? result "ñ")
+            "third multi-byte char preserved")))))
