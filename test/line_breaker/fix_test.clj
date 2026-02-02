@@ -702,7 +702,43 @@
       (testing "keeps pattern-value pairs together"
         (let [source "(let [{:keys [a]} m x 1] body)"
               result (fix/fix-source source {:line-length 18})]
-          (is (= "(let [{:keys [a]} m\n      x 1]\n  body)" result)))))))
+          (is (= "(let [{:keys [a]} m\n      x 1]\n  body)" result)))))
+
+    (testing "with comments"
+      (testing "does not let comment disrupt pair grouping"
+        ;; Bug 150: Comments in binding vectors were counted in pair grouping,
+        ;; causing binding pairs to be incorrectly split.
+        (let [source (str "(let [a 1\n"
+                          "      ;; comment\n"
+                          "      b (f x y z)\n"
+                          "      c 3]\n"
+                          "  x)")
+              result (fix/fix-source source {:line-length 80})]
+          (is (str/includes? result "b (f x y z)")
+              "binding pair stays together")
+          (is (str/includes? result "c 3")
+              "subsequent pair unaffected")))
+
+      (testing "breaks value when needed despite preceding comment"
+        ;; The value should be broken, not the pair split
+        (let [source (str "(let [a 1\n"
+                          "      ;; comment\n"
+                          "      b (long-fn arg1 arg2 arg3)]\n"
+                          "  x)")
+              result (fix/fix-source source {:line-length 40})]
+          (is (not (re-find #"b\n\s+\(long" result))
+              "pair not split (name not orphaned)")
+          (is (str/includes? result "(long-fn")
+              "value present")))
+
+      (testing "preserves comment between pairs"
+        (let [source (str "(let [a 1\n"
+                          "      ;; middle comment\n"
+                          "      b 2]\n"
+                          "  x)")
+              result (fix/fix-source source {:line-length 80})]
+          (is (str/includes? result ";; middle comment")
+              "comment preserved"))))))
 
 (deftest nested-binding-value-test
   ;; Verify forms nested inside binding pair values are properly broken.
