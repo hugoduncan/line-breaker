@@ -141,6 +141,18 @@
          (and (= :binding (get-indent-rule parent config))
               (= node (second (node/named-children parent)))))))
 
+(defn- metadata-node?
+  "Returns true if node is a metadata (meta_lit) node."
+  [node]
+  (= :meta_lit (node/node-type node)))
+
+(defn- metadata-wrapped?
+  "Returns true if node's first named child is a meta_lit.
+  Such forms need special handling when breaking: keep metadata + first
+  content element together, indent to first content element's position."
+  [node]
+  (metadata-node? (first (node/named-children node))))
+
 (defn- elements-to-keep-on-first-line
   "Number of elements to keep on the first line based on indent rule.
   :defn/:def keep 2 (head + name)
@@ -154,23 +166,28 @@
   :try/:do keep 1 (body on next line)
   :map keeps 2 (first key-value pair)
   :binding-vector keeps 2 (first binding pair)
+  :metadata-wrapped keeps 2 (metadata + first content element)
   Default keeps 1 (head only)."
   [rule]
   (case rule
-    (:defn :def :fn :binding :if :case :cond-> :map :binding-vector) 2
+    (:defn :def :fn :binding :if :case :cond-> :map :binding-vector
+           :metadata-wrapped) 2
     :condp 3
     (:cond :try :do) 1
     1))
 
 (defn- get-effective-rule
   "Get the effective indent rule for a node, considering both head symbol
-  and node type. Maps use :map rule, binding vectors use :binding-vector."
+  and node type. Maps use :map rule, binding vectors use :binding-vector.
+  Forms with metadata as first child use :metadata-wrapped rule."
   [node config]
   (or (get-indent-rule node config)
       (when (= :map_lit (node/node-type node))
         :map)
       (when (binding-vector? node config)
-        :binding-vector)))
+        :binding-vector)
+      (when (metadata-wrapped? node)
+        :metadata-wrapped)))
 
 (defn- uses-pair-grouping?
   "Returns true if the node should use pair grouping when breaking.
@@ -185,18 +202,6 @@
   (contains? breakable-types (node/node-type node)))
 
 ;;; Finding breakable forms
-
-(defn- metadata-node?
-  "Returns true if node is a metadata (meta_lit) node."
-  [node]
-  (= :meta_lit (node/node-type node)))
-
-(defn- has-metadata-child?
-  "Returns true if any named child of node is a meta_lit.
-  Forms with metadata attached should be treated as atomic for breaking
-  purposes - we don't descend into their children to find breakable forms."
-  [node]
-  (some metadata-node? (node/named-children node)))
 
 (defn- node-contains-line?
   "Returns true if node spans the given 1-indexed line number."
@@ -238,15 +243,19 @@
   forms that have consecutive children on the target line. Skips forms
   that fall within ignored ranges.
 
-  Forms with metadata attached (having a meta_lit child) are treated as
-  atomic - they are not considered breakable and the search does not
-  descend into their children."
+  Forms with metadata attached (first child is meta_lit) are breakable,
+  but we don't descend into their children. This keeps the metadata attached
+  and prevents inner elements from being broken separately."
   [node line ignored-ranges]
   (when (and (node-contains-line? node line)
-             (not (node-in-ignored-range? node ignored-ranges)))
-    (if (has-metadata-child? node)
-      ;; Form has metadata - treat as atomic, don't break or descend
-      []
+             (not (node-in-ignored-range? node ignored-ranges))
+             (not (metadata-node? node)))
+    (if (metadata-wrapped? node)
+      ;; Metadata-wrapped form: breakable but don't descend into children
+      (when (and (breakable-node? node)
+                 (form-needs-breaking-on-line? node line))
+        [node])
+      ;; Normal form: check self and recurse into children
       (let [self (when (and (breakable-node? node)
                             (form-needs-breaking-on-line? node line))
                    [node])
@@ -361,14 +370,18 @@
 (defn- indent-column
   "Calculate the indent column for broken elements.
   - :binding-vector uses +1 (align to first element after bracket)
+  - :metadata-wrapped aligns to first content element (after metadata)
   - Forms with an indent rule use +2 (standard Clojure body indentation)
   - Plain function calls and data structures use +1 (align to first element)"
   [node rule]
   (let [base-col (form-start-column node)]
     (cond
       (= :binding-vector rule) (+ 1 base-col)
-      (some? rule)             (+ 2 base-col)
-      :else                    (+ 1 base-col))))
+      (= :metadata-wrapped rule)
+      ;; Align to the first content element (second child, after metadata)
+      (form-start-column (second (node/named-children node)))
+      (some? rule) (+ 2 base-col)
+      :else (+ 1 base-col))))
 
 (defn break-form
   "Generate edits to break a form across multiple lines.

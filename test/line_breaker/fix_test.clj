@@ -113,14 +113,16 @@
         (is (nil? form))))
 
     (testing "with metadata"
-      (testing "treats form with meta_lit child as atomic"
+      (testing "returns metadata-wrapped form as breakable"
         ;; The vec_lit "^double [[a b] [c d]]" has a meta_lit child.
-        ;; It should not appear as a breakable form, and we should not
-        ;; descend into its children to find breakable forms.
-        (let [tree (parser/parse-source "^double [[a b] [c d]]")
-              forms (fix/find-breakable-forms tree 1)]
-          (is (= [] forms)
-              "form with metadata is not breakable")))
+        ;; It IS breakable (with special indent handling), but we don't
+        ;; descend into its children.
+        (let [source "^double [[a b] [c d]]"
+              tree (parser/parse-source source)
+              forms (fix/find-breakable-forms tree 1)
+              form-texts (mapv node/node-text forms)]
+          (is (= [source] form-texts)
+              "metadata-wrapped form is breakable")))
 
       (testing "does not return nodes inside metadata-annotated form"
         ;; In a defn, the arg vector may have metadata attached.
@@ -507,7 +509,48 @@
       (testing "stays attached to following form"
         (let [source "(foo ^:key bar baz)"
               result (fix/fix-source source {:line-length 10})]
-          (is (= "(foo\n ^:key bar\n baz)" result)))))))
+          (is (= "(foo\n ^:key bar\n baz)" result))))
+
+      (testing "breaks metadata-wrapped vector with proper alignment"
+        ;; Metadata stays on first line with first content element.
+        ;; Subsequent elements align with the first content element.
+        (let [source "^double [[a] [b] [c]]"
+              result (fix/fix-source source {:line-length 15})]
+          (is (= "^double [[a]\n         [b]\n         [c]]" result))))
+
+      (testing "does not break metadata-wrapped vector when line fits"
+        ;; When line length is sufficient, form should not be broken.
+        (let [source "^double [[a] [b]]"
+              result (fix/fix-source source {:line-length 30})]
+          (is (= "^double [[a] [b]]" result))))
+
+      (testing "aligns with short metadata prefix"
+        ;; Shorter metadata ^ret vs ^double affects indent position.
+        (let [source "^ret [[a b] [c d] [e f]]"
+              result (fix/fix-source source {:line-length 15})]
+          (is (= "^ret [[a b]\n      [c d]\n      [e f]]" result))))
+
+      (testing "breaks type-hinted defn arg vector correctly"
+        ;; The bug case from story 142: type hint stays attached,
+        ;; destructuring vectors align properly.
+        (let [source (str "(defn- f \"doc\" "
+                          "^ret [[a b] [c d] [e f]] body)")
+              result (fix/fix-source source {:line-length 20})]
+          (is (= (str "(defn- f\n  \"doc\"\n"
+                      "  ^ret [[a b]\n"
+                      "        [c d]\n"
+                      "        [e f]]\n"
+                      "  body)")
+                 result))))
+
+      (testing "preserves metadata-wrapped form when outer form breaks"
+        ;; When defn breaks but type-hinted arg fits, keep it intact.
+        (let [source "(defn foo ^double [[x y] [a b]] body)"
+              result (fix/fix-source source {:line-length 30})]
+          (is (= (str "(defn foo\n"
+                      "  ^double [[x y] [a b]]\n"
+                      "  body)")
+                 result)))))))
 
 (deftest comment-handling-test
   ;; Verify inline comments stay attached and don't cause extra blank lines.
