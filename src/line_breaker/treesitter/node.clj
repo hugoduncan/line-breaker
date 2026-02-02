@@ -104,3 +104,14 @@
   ^Node [^Node node]
   (when node
     (optional->node (.getParent node))))
+
+(defn node-end-position
+  "Get the end position for a node.
+
+  Returns a map {:row :column} with 0-based indices.
+  Returns nil if node is nil."
+  [^Node node]
+  (when node
+    (let [point (.getEndPoint node)]
+      {:row (.row point)
+       :column (.column point)})))

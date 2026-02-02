@@ -202,6 +202,26 @@
   [node]
   (contains? breakable-types (node/node-type node)))
 
+(defn- first-pair-exceeds-limit?
+  "Returns true if the first pair of a pair-grouped form exceeds the line
+  limit AND the value is a breakable form that could benefit from being on
+  its own line.
+
+  For forms like maps and binding vectors, checks if keeping the first two
+  children (key-value pair) on the same line would exceed max-length.
+  Only returns true if the value (second child) is a breakable form, since
+  splitting a pair with an atomic value doesn't help reduce line length."
+  [node keep-count max-length]
+  (when (and max-length (>= keep-count 2))
+    (let [children (node/named-children node)]
+      (when (>= (count children) 2)
+        (let [second-child (second children)
+              end-pos (node/node-end-position second-child)
+              end-col (:column end-pos)]
+          ;; Only split if: pair exceeds limit AND value is breakable
+          (and (> end-col max-length)
+               (breakable-node? second-child)))))))
+
 ;;; Finding breakable forms
 
 (defn- node-contains-line?
@@ -420,6 +440,8 @@
 
   For forms that use pair grouping (maps, cond, case), keeps related pairs
   together (key-value, test-result, etc.) and breaks only between pairs.
+  However, if the first pair exceeds the line limit, the pair is split with
+  the key on one line and the value on the next.
 
   Comments on the same line as the preceding element stay attached.
   Comments include their trailing newline, so no extra newline is added after.
@@ -433,14 +455,23 @@
      (let [children (node/named-children node)
            rule (get-effective-rule node config)
            indent-col (indent-column node rule)
-           keep-count (elements-to-keep-on-first-line rule)
+           base-keep-count (elements-to-keep-on-first-line rule)
+           max-length (get config :line-length)
+           ;; For pair-grouped forms, if first pair exceeds limit, split it
+           keep-count (if (and (uses-pair-grouping? node config)
+                               (first-pair-exceeds-limit?
+                                node base-keep-count max-length))
+                        1
+                        base-keep-count)
            ;; Elements that need breaking: skip the ones kept on first line
            breakable-children (drop keep-count children)]
        (when (seq breakable-children)
          (let [;; Get the last element that stays on first line
                last-kept (nth children (dec keep-count))
                ;; Generate edits based on whether pair grouping applies
-               edits (if (uses-pair-grouping? node config)
+               ;; When splitting a pair, use sequential breaking for that split
+               edits (if (and (uses-pair-grouping? node config)
+                              (= keep-count base-keep-count))
                        (generate-paired-edits
                         last-kept breakable-children indent-col)
                        (generate-sequential-edits
@@ -478,6 +509,19 @@
    nil
    forms))
 
+(defn- try-break-on-lines
+  "Try breaking forms on each long line until one produces a change.
+  Returns the new source if a form was successfully broken, nil otherwise."
+  [source tree long-lines ignored-ranges config]
+  (reduce
+   (fn [_ line]
+     (let [breakable-forms (find-breakable-forms tree line ignored-ranges)
+           new-source (try-break-forms source breakable-forms config)]
+       (when new-source
+         (reduced new-source))))
+   nil
+   long-lines))
+
 (defn fix-source
   "Fix line length violations in source code.
 
@@ -489,9 +533,8 @@
   The algorithm:
   1. Find lines exceeding max-length
   2. Collect ignored byte ranges (re-collected each pass as positions shift)
-  3. Find breakable forms on first violating line (outermost to innermost)
-  4. Try breaking each form until one produces a change
-  5. Re-parse and repeat until no violations or no breakable forms"
+  3. Try each long line until one has breakable forms that produce a change
+  4. Re-parse and repeat until no violations or no breakable forms"
   [source config]
   (let [max-length (get config :line-length 80)]
     (loop [source source
@@ -504,10 +547,8 @@
             (let [tree (parser/parse-source source)
                   ;; Re-collect ignored ranges (positions shift after edits)
                   ignored-ranges (check/find-ignored-byte-ranges tree)
-                  first-long-line (first long-lines)
-                  breakable-forms
-                  (find-breakable-forms tree first-long-line ignored-ranges)
-                  new-source (try-break-forms source breakable-forms config)]
+                  new-source (try-break-on-lines
+                              source tree long-lines ignored-ranges config)]
               (if new-source
                 (recur new-source (inc iteration))
                 source))))))))

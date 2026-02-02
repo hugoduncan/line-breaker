@@ -603,10 +603,9 @@
         (let [source "{:a [1 2] :b [3 4]}"
               result (fix/fix-source source {:line-length 12})]
           (is (= "{:a [1 2]\n  :b [3 4]}" result))))
-      (testing "leaves oversized pairs together"
-        ;; Pairs stay together even if they exceed line length.
-        ;; Breaking within pairs (key on one line, value on next) is
-        ;; a potential future enhancement.
+      (testing "leaves oversized pairs with atomic values together"
+        ;; Pairs with atomic values stay together even if they exceed line
+        ;; length, since splitting wouldn't help reduce line width.
         (let [source "{:a 1 :longkey longval}"
               result (fix/fix-source source {:line-length 12})]
           (is (= "{:a 1\n  :longkey longval}" result)))))
@@ -766,6 +765,63 @@
             result (fix/fix-source source {:line-length 30})]
         (is (< (apply max (map count (str/split-lines result))) 31)
             "all lines should be within limit")))))
+
+(deftest value-expression-breaking-test
+  ;; Bug 152: Value expressions in pair-grouped forms were not being broken
+  ;; when they exceeded the line limit. When a key-value pair is too long
+  ;; and the value is a breakable form, the pair should be split with the
+  ;; key on one line and the value on the next.
+  (testing "value expression breaking"
+    (testing "for maps"
+      (testing "splits pair when value is breakable and pair exceeds limit"
+        (let [source "{:some-long-key (fn-call a b c)}"
+              result (fix/fix-source source {:line-length 25})]
+          (is (= "{:some-long-key\n  (fn-call a b c)}" result))))
+
+      (testing "breaks value after split when value still exceeds limit"
+        (let [source "{:some-long-key (fn-call a b c d e)}"
+              result (fix/fix-source source {:line-length 20})]
+          (is (str/includes? result ":some-long-key\n")
+              "key and value are split")
+          (is (< (apply max (map count (str/split-lines result))) 21)
+              "all lines within limit")))
+
+      (testing "keeps atomic values with keys even when exceeding limit"
+        ;; Splitting a pair with an atomic value doesn't help
+        (let [source "{:some-long-key atomic-val}"
+              result (fix/fix-source source {:line-length 20})]
+          (is (= source result)
+              "atomic value stays with key")))
+
+      (testing "handles multiple pairs with first pair too long"
+        (let [source "{:key1 (long-fn a b) :key2 val2}"
+              result (fix/fix-source source {:line-length 15})]
+          (is (str/includes? result ":key1\n")
+              "first pair is split")
+          (is (str/includes? result ":key2")
+              "second pair is present"))))
+
+    (testing "for cond"
+      (testing "splits test-result pair when result is breakable"
+        (let [source "(cond (test?) (long-fn a b c) :else x)"
+              result (fix/fix-source source {:line-length 20})]
+          (is (< (apply max (map count (str/split-lines result))) 21)
+              "all lines within limit"))))
+
+    (testing "for binding vectors"
+      (testing "splits binding pair when value is breakable"
+        (let [source "(let [x (long-fn a b c d e)] body)"
+              result (fix/fix-source source {:line-length 20})]
+          (is (str/includes? result "x\n")
+              "binding name and value are split")
+          (is (< (apply max (map count (str/split-lines result))) 21)
+              "all lines within limit")))
+
+      (testing "keeps atomic binding values with names"
+        (let [source "(let [some-long-name atomic-val] body)"
+              result (fix/fix-source source {:line-length 25})]
+          (is (str/includes? result "some-long-name atomic-val")
+              "atomic value stays with binding name"))))))
 
 (deftest edge-cases-test
   ;; Verify edge cases: empty, single-element, already-formatted.
