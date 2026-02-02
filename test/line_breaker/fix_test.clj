@@ -110,7 +110,29 @@
     (testing "returns nil for empty line"
       (let [tree (parser/parse-source "(a)\n\n(b)")
             form (fix/find-breakable-form tree 2)]
-        (is (nil? form))))))
+        (is (nil? form))))
+
+    (testing "with metadata"
+      (testing "treats form with meta_lit child as atomic"
+        ;; The vec_lit "^double [[a b] [c d]]" has a meta_lit child.
+        ;; It should not appear as a breakable form, and we should not
+        ;; descend into its children to find breakable forms.
+        (let [tree (parser/parse-source "^double [[a b] [c d]]")
+              forms (fix/find-breakable-forms tree 1)]
+          (is (= [] forms)
+              "form with metadata is not breakable")))
+
+      (testing "does not return nodes inside metadata-annotated form"
+        ;; In a defn, the arg vector may have metadata attached.
+        ;; The inner vectors [a b] and [c d] should not be returned.
+        (let [source "(defn foo ^ret [[a b] [c d]] body)"
+              tree (parser/parse-source source)
+              forms (fix/find-breakable-forms tree 1)
+              form-texts (map node/node-text forms)]
+          (is (not (some #{"[a b]" "[c d]"} form-texts))
+              "inner vectors in metadata-annotated form not returned")
+          (is (some #{source} form-texts)
+              "outer defn form is returned"))))))
 
 (deftest break-form-test
   ;; Verify edit generation for breaking forms.

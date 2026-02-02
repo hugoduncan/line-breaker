@@ -186,6 +186,18 @@
 
 ;;; Finding breakable forms
 
+(defn- metadata-node?
+  "Returns true if node is a metadata (meta_lit) node."
+  [node]
+  (= :meta_lit (node/node-type node)))
+
+(defn- has-metadata-child?
+  "Returns true if any named child of node is a meta_lit.
+  Forms with metadata attached should be treated as atomic for breaking
+  purposes - we don't descend into their children to find breakable forms."
+  [node]
+  (some metadata-node? (node/named-children node)))
+
 (defn- node-contains-line?
   "Returns true if node spans the given 1-indexed line number."
   [node line]
@@ -224,17 +236,24 @@
 
   Returns a vector of nodes from outermost to innermost. Only includes
   forms that have consecutive children on the target line. Skips forms
-  that fall within ignored ranges."
+  that fall within ignored ranges.
+
+  Forms with metadata attached (having a meta_lit child) are treated as
+  atomic - they are not considered breakable and the search does not
+  descend into their children."
   [node line ignored-ranges]
   (when (and (node-contains-line? node line)
              (not (node-in-ignored-range? node ignored-ranges)))
-    (let [self (when (and (breakable-node? node)
-                          (form-needs-breaking-on-line? node line))
-                 [node])
-          children-results
-          (mapcat #(find-breakable-forms-on-line % line ignored-ranges)
-                  (node/named-children node))]
-      (into (vec self) children-results))))
+    (if (has-metadata-child? node)
+      ;; Form has metadata - treat as atomic, don't break or descend
+      []
+      (let [self (when (and (breakable-node? node)
+                            (form-needs-breaking-on-line? node line))
+                   [node])
+            children-results
+            (mapcat #(find-breakable-forms-on-line % line ignored-ranges)
+                    (node/named-children node))]
+        (into (vec self) children-results)))))
 
 (defn find-breakable-forms
   "Find all breakable forms containing the given line.
