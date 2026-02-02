@@ -732,4 +732,29 @@
         (is (str/includes? result "\"s1\"")
             "first string remains intact")
         (is (str/includes? result "\"s2\"")
-            "second string remains intact")))))
+            "second string remains intact"))))
+
+  (testing "strings with special characters"
+    (testing "preserves escaped quotes within strings"
+      (let [source "(f \"say \\\"hi\\\"\" x)"
+            result (fix/fix-source source {:line-length 10})]
+        (is (str/includes? result "\"say \\\"hi\\\"\"")
+            "string with escaped quotes remains intact")))
+
+    (testing "preserves escaped newlines within strings"
+      (let [source "(f \"line1\\nline2\" x)"
+            result (fix/fix-source source {:line-length 10})]
+        (is (str/includes? result "\"line1\\nline2\"")
+            "string with escaped newline remains intact")))
+
+    (testing "preserves escaped tabs within strings"
+      (let [source "(f \"col1\\tcol2\" x)"
+            result (fix/fix-source source {:line-length 10})]
+        (is (str/includes? result "\"col1\\tcol2\"")
+            "string with escaped tab remains intact")))
+
+    (testing "preserves multiple escape sequences"
+      (let [source "(f \"a\\\"b\\nc\\td\" x)"
+            result (fix/fix-source source {:line-length 10})]
+        (is (str/includes? result "\"a\\\"b\\nc\\td\"")
+            "string with mixed escapes remains intact")))))
