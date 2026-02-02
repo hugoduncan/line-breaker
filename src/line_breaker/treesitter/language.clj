@@ -65,7 +65,8 @@
 
 (defn- find-library-path
   "Find the native library path using discovery order.
-  Returns [Path source] where source is :native-loader, :env-var, :classpath, or :library-path.
+  Returns [Path source] where source is
+     :native-loader, :env-var, :classpath, or :library-path.
   Throws ex-info if not found."
   []
   (let [os (platform/detect-os)
