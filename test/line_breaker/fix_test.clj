@@ -1575,7 +1575,7 @@
     (testing "preserves whole-line comment through collapse and re-break"
       (is (= (str "(defn my-longer-fn\n"
                   ";; does computation\n"
-                  "  [x]\n"
+                  " [x]\n"
                   "  (+\n"
                   "   x\n"
                   "   (very-long-computation x)))")

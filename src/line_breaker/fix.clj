@@ -704,15 +704,37 @@
   Each entry maps a head symbol to a rule with :after-indices (0-based
   named-child indices after which to break) and optional :after-types
   (node types after the first occurrence of which to break)."
-  {'defn      {:after-indices #{1} :after-types #{:vec_lit}}
-   'defn-     {:after-indices #{1} :after-types #{:vec_lit}}
-   'defmacro  {:after-indices #{1} :after-types #{:vec_lit}}
-   'defmethod {:after-indices #{2} :after-types #{:vec_lit}}
-   'deftest   {:after-indices #{1}}
-   'ns        {:after-indices #{1} :after-types #{:str_lit}}
-   'def       {:after-indices #{1} :after-types #{:str_lit}}
-   'defonce   {:after-indices #{1} :after-types #{:str_lit}}
-   'defmulti  {:after-indices #{1} :after-types #{:str_lit}}})
+  {'defn        {:after-indices #{1} :after-types #{:vec_lit :str_lit}}
+   'defn-       {:after-indices #{1} :after-types #{:vec_lit :str_lit}}
+   'defmacro    {:after-indices #{1} :after-types #{:vec_lit :str_lit}}
+   'defmethod   {:after-indices #{2} :after-types #{:vec_lit}}
+   'deftest     {:after-indices #{1}}
+   'ns          {:after-indices #{1} :after-types #{:str_lit}}
+   'def         {:after-indices #{1} :after-types #{:str_lit}}
+   'defonce     {:after-indices #{1} :after-types #{:str_lit}}
+   'defmulti    {:after-indices #{1} :after-types #{:str_lit}}
+   'fn          {:after-types #{:vec_lit}}
+   'bound-fn    {:after-types #{:vec_lit}}
+   'let         {:after-types #{:vec_lit}}
+   'when-let    {:after-types #{:vec_lit}}
+   'if-let      {:after-types #{:vec_lit}}
+   'when-first  {:after-types #{:vec_lit}}
+   'binding     {:after-types #{:vec_lit}}
+   'loop        {:after-types #{:vec_lit}}
+   'doseq       {:after-types #{:vec_lit}}
+   'for         {:after-types #{:vec_lit}}
+   'with-open   {:after-types #{:vec_lit}}
+   'when        {:after-indices #{1}}
+   'when-not    {:after-indices #{1}}
+   'if          {:after-indices #{1}}
+   'if-not      {:after-indices #{1}}
+   'try         {:after-indices #{0}}
+   'do          {:after-indices #{0}}
+   'cond        {:after-indices #{0}}
+   'condp       {:after-indices #{2}}
+   'cond->      {:after-indices #{1}}
+   'cond->>     {:after-indices #{1}}
+   'case        {:after-indices #{1}}})
 
 (defn- get-force-break-rule
   "Look up the force-break rule for a list_lit node.
@@ -724,26 +746,19 @@
 
 (defn- forced-break-positions
   "Compute the set of named-child indices after which to insert breaks.
-  Merges :after-indices with indices derived from :after-types. For each
-  type match, adds both the matched index and (dec index) to ensure
-  breaks both before and after the matched child (e.g., both before and
-  after an argvec in defn with docstring)."
+  Merges :after-indices with the index of the first child matching each
+  type in :after-types."
   [children rule]
   (let [base (:after-indices rule #{})
         type-indices (when-let [types (:after-types rule)]
                        (into #{}
-                             (mapcat (fn [type-kw]
-                                       (when-let [i (some
-                                                     (fn [i]
-                                                       (when (= type-kw
-                                                                (node/node-type
-                                                                 (nth children
-                                                                      i)))
-                                                         i))
-                                                     (range (count children)))]
-                                         (if (pos? i)
-                                           [(dec i) i]
-                                           [i]))))
+                             (keep (fn [type-kw]
+                                     (some (fn [i]
+                                             (when (= type-kw
+                                                      (node/node-type
+                                                       (nth children i)))
+                                               i))
+                                           (range (count children)))))
                              types))]
     (into base type-indices)))
 
