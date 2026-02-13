@@ -747,15 +747,23 @@
                              types))]
     (into base type-indices)))
 
+(defn- contiguous-line?
+  "Returns true if node1 ends on the same line that node2 starts on.
+  Unlike same-line? which compares start lines, this handles multiline
+  nodes like docstrings where the end line differs from the start line."
+  [node1 node2]
+  (let [[_ end-line] (node/node-line-range node1)]
+    (= end-line (node-start-line node2))))
+
 (defn- form-needs-forced-break?
-  "Returns true if any break position has consecutive children on the
-  same line (i.e., a break is missing)."
+  "Returns true if any break position has consecutive children where
+  the first child's end line matches the next child's start line."
   [children break-positions]
   (some (fn [idx]
           (let [next-idx (inc idx)]
             (when (< next-idx (count children))
-              (same-line? (nth children idx)
-                          (nth children next-idx)))))
+              (contiguous-line? (nth children idx)
+                                (nth children next-idx)))))
         break-positions))
 
 (defn- generate-forced-break-edits
@@ -774,7 +782,7 @@
                           (when (< next-idx (count children))
                             (let [child (nth children idx)
                                   next-child (nth children next-idx)]
-                              (when (same-line? child next-child)
+                              (when (contiguous-line? child next-child)
                                 (make-break-edit child next-child
                                                  indent-col)))))))
                 break-positions))))))
