@@ -47,15 +47,21 @@
   and :replacement (text to substitute). Edits are applied in reverse
   start offset order to preserve position validity.
 
-  Returns the modified source string."
+  Throws if any edits have overlapping byte ranges. Returns the modified
+  source string."
   [source edits]
-  (reduce
-   (fn [s {:keys [start end replacement]}]
-     (let [start-char (byte-offset->char-index s start)
-           end-char (byte-offset->char-index s end)]
-       (str (subs s 0 start-char) replacement (subs s end-char))))
-   source
-   (sort-by :start > edits)))
+  (let [sorted (sort-by :start > edits)]
+    (doseq [[higher lower] (partition 2 1 sorted)]
+      (when (> (:end lower) (:start higher))
+        (throw (ex-info "Overlapping edits detected"
+                        {:edit-a lower :edit-b higher}))))
+    (reduce
+     (fn [s {:keys [start end replacement]}]
+       (let [start-char (byte-offset->char-index s start)
+             end-char (byte-offset->char-index s end)]
+         (str (subs s 0 start-char) replacement (subs s end-char))))
+     source
+     sorted)))
 
 ;;; Breakable node detection
 
@@ -202,26 +208,6 @@
   [node]
   (contains? breakable-types (node/node-type node)))
 
-(defn- first-pair-exceeds-limit?
-  "Returns true if the first pair of a pair-grouped form exceeds the line
-  limit AND the value is a breakable form that could benefit from being on
-  its own line.
-
-  For forms like maps and binding vectors, checks if keeping the first two
-  children (key-value pair) on the same line would exceed max-length.
-  Only returns true if the value (second child) is a breakable form, since
-  splitting a pair with an atomic value doesn't help reduce line length."
-  [node keep-count max-length]
-  (when (and max-length (>= keep-count 2))
-    (let [children (node/named-children node)]
-      (when (>= (count children) 2)
-        (let [second-child (second children)
-              end-pos (node/node-end-position second-child)
-              end-col (:column end-pos)]
-          ;; Only split if: pair exceeds limit AND value is breakable
-          (and (> end-col max-length)
-               (breakable-node? second-child)))))))
-
 ;;; Finding breakable forms
 
 (defn- node-contains-line?
@@ -310,7 +296,7 @@
   ([tree line ignored-ranges]
    (first (find-breakable-forms tree line ignored-ranges))))
 
-;;; Form breaking
+;;; Byte offset helpers
 
 (defn- element-start-offset
   "Get the start byte offset of a node."
@@ -321,6 +307,42 @@
   "Get the end byte offset of a node."
   [node]
   (second (node/node-range node)))
+
+;;; Form joining (un-breaking)
+
+(defn join-form-edits
+  "Generate edits that collapse a multi-line form back to a single line.
+
+  Given a node that spans multiple lines, iterates through consecutive
+  pairs of named children and generates edits replacing inter-child
+  whitespace (newlines + indent) with single spaces. Returns a vector
+  of {:start :end :replacement} edits, or nil if the node is already
+  single-line.
+
+  Assumes only whitespace exists between consecutive named children.
+  This holds for tree-sitter-clojure forms because all meaningful
+  content (metadata, reader macros, discard forms) are named nodes,
+  and anonymous nodes (delimiters) occur only at form boundaries."
+  [node]
+  (when node
+    (let [[start-line end-line] (node/node-line-range node)]
+      (when (not= start-line end-line)
+        (let [children (node/named-children node)
+              edits (into []
+                          (keep (fn [[prev-child next-child]]
+                                  (let [end-byte (element-end-offset
+                                                  prev-child)
+                                        start-byte (element-start-offset
+                                                    next-child)]
+                                    (when (> start-byte end-byte)
+                                      {:start end-byte
+                                       :end start-byte
+                                       :replacement " "}))))
+                          (partition 2 1 children))]
+          (when (seq edits)
+            edits))))))
+
+;;; Form breaking
 
 (defn- form-start-column
   "Get the column where the form starts (0-indexed)."
@@ -336,6 +358,49 @@
   "Returns true if two nodes start on the same line."
   [node1 node2]
   (= (node-start-line node1) (node-start-line node2)))
+
+(defn- single-line-node?
+  "Returns true if node starts and ends on the same line."
+  [node]
+  (let [[start-line end-line] (node/node-line-range node)]
+    (= start-line end-line)))
+
+(defn- first-line-end-column
+  "Get the end column of a node's first line.
+  For single-line nodes, returns the end column. For multi-line nodes,
+  computes start column + length of the first line of the node's text."
+  [node]
+  (if (single-line-node? node)
+    (:column (node/node-end-position node))
+    (let [start-col (:column (node/node-position node))
+          text (node/node-text node)
+          newline-idx (.indexOf ^String text "\n")]
+      (+ start-col newline-idx))))
+
+(defn- find-exceeding-pair
+  "Find the first pair in a pair-grouped form whose elements are on the
+  same line and whose first line exceeds max-length.
+
+  Returns [name-node value-node] or nil. Uses the value's first-line
+  end column to detect violations, which correctly handles multi-line
+  values where the last line may be short. Pairs are determined by the
+  form's pair grouping structure: maps and binding vectors pair from
+  the start, while cond/case/condp/cond-> skip a prefix of non-pair
+  elements. Comments are filtered before pairing."
+  [node rule max-length]
+  (when max-length
+    (let [children (node/named-children node)
+          non-comment (remove comment-node? children)
+          prefix (if (#{:map :binding-vector} rule)
+                   0
+                   (elements-to-keep-on-first-line rule))
+          pairs (partition 2 (drop prefix non-comment))]
+      (some (fn [[name-node value-node]]
+              (when (and (same-line? name-node value-node)
+                         (> (first-line-end-column value-node)
+                            max-length))
+                [name-node value-node]))
+            pairs))))
 
 (defn- make-break-edit
   "Create a break edit between two children.
@@ -440,8 +505,12 @@
 
   For forms that use pair grouping (maps, cond, case), keeps related pairs
   together (key-value, test-result, etc.) and breaks only between pairs.
-  However, if the first pair exceeds the line limit, the pair is split with
-  the key on one line and the value on the next.
+
+  Three-phase escalation for pair-grouped forms with exceeding pairs:
+  - Phase 1: value is single-line and breakable — defer splitting, let the
+    iterative loop break the value in-place
+  - Phase 3: value is multi-line and breakable — un-break value (collapse to
+    single line), move to own line at indent-col, let iterative loop re-break
 
   Comments on the same line as the preceding element stay attached.
   Comments include their trailing newline, so no extra newline is added after.
@@ -457,27 +526,45 @@
            indent-col (indent-column node rule)
            base-keep-count (elements-to-keep-on-first-line rule)
            max-length (get config :line-length)
-           ;; For pair-grouped forms, if first pair exceeds limit, split it
-           keep-count (if (and (uses-pair-grouping? node config)
-                               (first-pair-exceeds-limit?
-                                node base-keep-count max-length))
-                        1
-                        base-keep-count)
-           ;; Elements that need breaking: skip the ones kept on first line
-           breakable-children (drop keep-count children)]
-       (when (seq breakable-children)
-         (let [;; Get the last element that stays on first line
-               last-kept (nth children (dec keep-count))
-               ;; Generate edits based on whether pair grouping applies
-               ;; When splitting a pair, use sequential breaking for that split
-               edits (if (and (uses-pair-grouping? node config)
-                              (= keep-count base-keep-count))
-                       (generate-paired-edits
-                        last-kept breakable-children indent-col)
-                       (generate-sequential-edits
-                        last-kept breakable-children indent-col))]
-           (when (seq edits)
-             edits)))))))
+           ;; For pair-grouped forms, check if any pair exceeds limit
+           exceeding-pair (when (uses-pair-grouping? node config)
+                            (find-exceeding-pair node rule max-length))
+           [exc-name exc-value] exceeding-pair
+           ;; Phase 3: multi-line breakable value — un-break and move
+           ;; to own line. Phase 2 already broke it in-place but the
+           ;; first line still exceeds.
+           phase-3? (and exceeding-pair
+                         (breakable-node? exc-value)
+                         (not (single-line-node? exc-value)))
+           breakable-children (drop base-keep-count children)]
+       (if phase-3?
+         ;; Phase 3: un-break value + split name/value + inter-pair edits
+         (let [join-edits (join-form-edits exc-value)
+               indent-str (apply str (repeat indent-col \space))
+               split-edit {:start (element-end-offset exc-name)
+                           :end (element-start-offset exc-value)
+                           :replacement (str "\n" indent-str)}
+               pair-edits (when (seq breakable-children)
+                            (generate-paired-edits
+                             (nth children (dec base-keep-count))
+                             breakable-children indent-col))
+               all-edits (into (vec pair-edits)
+                               (if join-edits
+                                 (cons split-edit join-edits)
+                                 [split-edit]))]
+           (when (seq all-edits)
+             all-edits))
+         ;; Normal breaking (Phase 1 deferral is implicit — single-line
+         ;; breakable values are kept together by generate-paired-edits)
+         (when (seq breakable-children)
+           (let [last-kept (nth children (dec base-keep-count))
+                 edits (if (uses-pair-grouping? node config)
+                         (generate-paired-edits
+                          last-kept breakable-children indent-col)
+                         (generate-sequential-edits
+                          last-kept breakable-children indent-col))]
+             (when (seq edits)
+               edits))))))))
 
 ;;; Line length checking
 

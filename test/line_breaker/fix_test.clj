@@ -40,7 +40,21 @@
     (testing "handles insertion when start equals end"
       (is (= "helloX"
              (fix/apply-edits "hello"
-                              [{:start 5 :end 5 :replacement "X"}]))))))
+                              [{:start 5 :end 5 :replacement "X"}]))))
+
+    (testing "throws on overlapping edits"
+      (is (thrown-with-msg?
+           clojure.lang.ExceptionInfo
+           #"Overlapping edits"
+           (fix/apply-edits "abcde"
+                            [{:start 1 :end 3 :replacement "X"}
+                             {:start 2 :end 4 :replacement "Y"}]))))
+
+    (testing "allows adjacent non-overlapping edits"
+      (is (= "aXYe"
+             (fix/apply-edits "abcde"
+                              [{:start 1 :end 3 :replacement "X"}
+                               {:start 3 :end 4 :replacement "Y"}]))))))
 
 (deftest breakable-node?-test
   ;; Verify breakable node detection for collection types.
@@ -561,6 +575,58 @@
                       "  body)")
                  result)))))))
 
+(deftest join-form-edits-test
+  ;; Verify collapsing multi-line forms back to single lines.
+  ;; join-form-edits generates edits that replace inter-child whitespace
+  ;; (newlines + indent) with single spaces.
+  (testing "join-form-edits"
+    (testing "for a multi-line list"
+      (testing "generates space-replacement edits"
+        (let [source "(a\n b\n c)"
+              tree (parser/parse-source source)
+              form (first (node/named-children (node/root-node tree)))
+              edits (fix/join-form-edits form)]
+          (is (some? edits))
+          (is (= "(a b c)" (fix/apply-edits source edits))))))
+
+    (testing "for a multi-line map"
+      (testing "generates space-replacement edits"
+        (let [source "{:a 1\n :b 2}"
+              tree (parser/parse-source source)
+              form (first (node/named-children (node/root-node tree)))
+              edits (fix/join-form-edits form)]
+          (is (some? edits))
+          (is (= "{:a 1 :b 2}" (fix/apply-edits source edits))))))
+
+    (testing "for a multi-line vector"
+      (testing "generates space-replacement edits"
+        (let [source "[a\n b\n c]"
+              tree (parser/parse-source source)
+              form (first (node/named-children (node/root-node tree)))
+              edits (fix/join-form-edits form)]
+          (is (some? edits))
+          (is (= "[a b c]" (fix/apply-edits source edits))))))
+
+    (testing "for an already single-line form"
+      (testing "returns nil"
+        (let [source "(a b c)"
+              tree (parser/parse-source source)
+              form (first (node/named-children (node/root-node tree)))]
+          (is (nil? (fix/join-form-edits form))))))
+
+    (testing "for a nil node"
+      (testing "returns nil"
+        (is (nil? (fix/join-form-edits nil)))))
+
+    (testing "for a deeply indented multi-line form"
+      (testing "collapses indent whitespace to single space"
+        (let [source "(a\n      b\n      c)"
+              tree (parser/parse-source source)
+              form (first (node/named-children (node/root-node tree)))
+              edits (fix/join-form-edits form)]
+          (is (some? edits))
+          (is (= "(a b c)" (fix/apply-edits source edits))))))))
+
 (deftest comment-handling-test
   ;; Verify inline comments stay attached and don't cause extra blank lines.
   (testing "comment handling"
@@ -767,61 +833,197 @@
             "all lines should be within limit")))))
 
 (deftest value-expression-breaking-test
-  ;; Bug 152: Value expressions in pair-grouped forms were not being broken
-  ;; when they exceeded the line limit. When a key-value pair is too long
-  ;; and the value is a breakable form, the pair should be split with the
-  ;; key on one line and the value on the next.
+  ;; Edge cases for pair-grouped form breaking that complement the
+  ;; systematic 3-phase coverage in pair-deferral-test: atomic (non-breakable)
+  ;; values should stay with their keys, and multi-pair forms should
+  ;; break correctly when the first pair is too long.
   (testing "value expression breaking"
     (testing "for maps"
-      (testing "splits pair when value is breakable and pair exceeds limit"
-        (let [source "{:some-long-key (fn-call a b c)}"
-              result (fix/fix-source source {:line-length 25})]
-          (is (= "{:some-long-key\n  (fn-call a b c)}" result))))
-
-      (testing "breaks value after split when value still exceeds limit"
-        (let [source "{:some-long-key (fn-call a b c d e)}"
-              result (fix/fix-source source {:line-length 20})]
-          (is (str/includes? result ":some-long-key\n")
-              "key and value are split")
-          (is (< (apply max (map count (str/split-lines result))) 21)
-              "all lines within limit")))
-
       (testing "keeps atomic values with keys even when exceeding limit"
-        ;; Splitting a pair with an atomic value doesn't help
         (let [source "{:some-long-key atomic-val}"
               result (fix/fix-source source {:line-length 20})]
           (is (= source result)
               "atomic value stays with key")))
 
       (testing "handles multiple pairs with first pair too long"
+        ;; Phase 1 defers pair splitting; Phase 2 breaks value in-place.
         (let [source "{:key1 (long-fn a b) :key2 val2}"
               result (fix/fix-source source {:line-length 15})]
-          (is (str/includes? result ":key1\n")
-              "first pair is split")
+          (is (not (str/includes? result ":key1\n"))
+              "first pair is not split")
+          (is (str/includes? result "(long-fn\n")
+              "value is broken in-place")
           (is (str/includes? result ":key2")
               "second pair is present"))))
 
-    (testing "for cond"
-      (testing "splits test-result pair when result is breakable"
-        (let [source "(cond (test?) (long-fn a b c) :else x)"
-              result (fix/fix-source source {:line-length 20})]
-          (is (< (apply max (map count (str/split-lines result))) 21)
-              "all lines within limit"))))
-
     (testing "for binding vectors"
-      (testing "splits binding pair when value is breakable"
-        (let [source "(let [x (long-fn a b c d e)] body)"
-              result (fix/fix-source source {:line-length 20})]
-          (is (str/includes? result "x\n")
-              "binding name and value are split")
-          (is (< (apply max (map count (str/split-lines result))) 21)
-              "all lines within limit")))
-
       (testing "keeps atomic binding values with names"
         (let [source "(let [some-long-name atomic-val] body)"
               result (fix/fix-source source {:line-length 25})]
           (is (str/includes? result "some-long-name atomic-val")
               "atomic value stays with binding name"))))))
+
+(deftest pair-deferral-test
+  ;; Verify the 3-phase escalation strategy for pair-grouped forms.
+  ;; Phase 1: defer pair splitting, let ancestors or inter-pair breaking
+  ;; resolve the violation.
+  ;; Phase 2: emergent from Phase 1 — the iterative loop breaks the
+  ;; value in-place when ancestors can't help.
+  (testing "Phase 1"
+    (testing "for binding vectors"
+      (testing "ancestor breaking resolves the violation"
+        ;; The let form is 38 chars. Breaking the outer (let ...) puts the
+        ;; binding vector on line 1 and body on line 2. Line 1 becomes
+        ;; 26 chars which fits within 30.
+        (let [source "(let [nm (some-fn a b c)] (bar nm baz))"
+              result (fix/fix-source source {:line-length 30})]
+          (is (= (str "(let [nm (some-fn a b c)]\n"
+                      "  (bar nm baz))")
+                 result))))
+
+      (testing "inter-pair breaking resolves the violation"
+        ;; Multiple pairs: the first pair fits on its own line once
+        ;; the second pair is moved to the next line.
+        (let [source "(let [a-long-name (some-fn x y) b 2] body)"
+              result (fix/fix-source source {:line-length 35})]
+          (is (str/includes? result "a-long-name (some-fn x y)")
+              "first pair stays together")
+          (is (str/includes? result "\n")
+              "form is broken")
+          (is (< (apply max (map count (str/split-lines result))) 36)
+              "all lines within limit"))))
+
+    (testing "for maps"
+      (testing "inter-pair breaking resolves the violation"
+        (let [source "{:key1 (some-fn x y) :key2 val2}"
+              result (fix/fix-source source {:line-length 25})]
+          (is (str/includes? result ":key1 (some-fn x y)")
+              "first pair stays together")
+          (is (< (apply max (map count (str/split-lines result))) 26)
+              "all lines within limit"))))
+
+    (testing "for cond"
+      (testing "inter-pair breaking resolves the violation"
+        (let [source "(cond (test-a?) result-a (test-b?) result-b)"
+              result (fix/fix-source source {:line-length 25})]
+          (is (str/includes? result "(test-a?) result-a")
+              "first pair stays together")
+          (is (< (apply max (map count (str/split-lines result))) 26)
+              "all lines within limit")))))
+
+  (testing "Phase 2"
+    (testing "for binding vectors"
+      (testing "breaks value in-place when ancestor breaking insufficient"
+        ;; Single pair where the name+value exceeds the limit.
+        ;; Phase 1 defers, then the iterative loop breaks the
+        ;; value form in-place.
+        (let [source "(let [a-very-long-name (some-fn arg1 arg2)] body)"
+              result (fix/fix-source source {:line-length 35})]
+          (is (str/includes? result "a-very-long-name (some-fn")
+              "name stays with value head")
+          (is (str/includes? result "(some-fn\n")
+              "value is broken in-place")
+          (is (< (apply max (map count (str/split-lines result))) 36)
+              "all lines within limit"))))
+
+    (testing "for maps"
+      (testing "breaks value in-place"
+        (let [source "{:some-key (some-fn arg1 arg2 arg3)}"
+              result (fix/fix-source source {:line-length 25})]
+          (is (str/includes? result ":some-key (some-fn")
+              "key stays with value head")
+          (is (str/includes? result "(some-fn\n")
+              "value is broken in-place")
+          (is (< (apply max (map count (str/split-lines result))) 26)
+              "all lines within limit"))))
+
+    (testing "for cond"
+      (testing "breaks result in-place"
+        (let [source "(cond (test?) (long-fn a b c) :else x)"
+              result (fix/fix-source source {:line-length 25})]
+          (is (str/includes? result "(test?) (long-fn")
+              "test stays with result head")
+          (is (< (apply max (map count (str/split-lines result))) 26)
+              "all lines within limit")))))
+
+  (testing "Phase 3"
+    (testing "for binding vectors"
+      (testing "moves value to own line when in-place breaking insufficient"
+        ;; name + value-head exceeds limit even after Phase 2.
+        ;; Phase 3 un-breaks value and moves it to its own line.
+        (let [source "(let [a-ridiculously-long-name (some-fn arg1)] body)"
+              result (fix/fix-source source {:line-length 35})]
+          (is (str/includes? result "a-ridiculously-long-name\n")
+              "value moved to own line")
+          (is (str/includes? result "(some-fn arg1)")
+              "value is present as single line or re-broken")
+          (is (< (apply max (map count (str/split-lines result))) 36)
+              "all lines within limit")))
+
+      (testing "re-breaks value on new line when still exceeding"
+        ;; After Phase 3 moves value to own line, it may still exceed.
+        ;; The iterative loop re-breaks it.
+        (let [source (str "(let [a-ridiculously-long-name"
+                          " (some-fn arg1 arg2 arg3 arg4 arg5)]"
+                          " body)")
+              result (fix/fix-source source {:line-length 35})]
+          (is (str/includes? result "a-ridiculously-long-name\n")
+              "value moved to own line")
+          (is (str/includes? result "(some-fn\n")
+              "value re-broken on new line")
+          (is (< (apply max (map count (str/split-lines result))) 36)
+              "all lines within limit"))))
+
+    (testing "for maps"
+      (testing "moves value to own line"
+        (let [source "{:a-key-that-is-very-long (some-fn arg1 arg2)}"
+              result (fix/fix-source source {:line-length 30})]
+          (is (str/includes? result ":a-key-that-is-very-long\n")
+              "value moved to own line")
+          (is (< (apply max (map count (str/split-lines result))) 31)
+              "all lines within limit")))
+
+      (testing "re-breaks value on new line when still exceeding"
+        (let [source "{:long-key (fn-call a b c d e)}"
+              result (fix/fix-source source {:line-length 15})]
+          (is (str/includes? result ":long-key\n")
+              "value moved to own line")
+          (is (str/includes? result "(fn-call\n")
+              "value re-broken on new line")
+          (is (< (apply max (map count (str/split-lines result))) 16)
+              "all lines within limit"))))
+
+    (testing "for cond"
+      (testing "moves result to own line"
+        ;; Atomic test name ensures it won't be broken before Phase 3.
+        (let [source (str "(cond long-test-name"
+                          " (some-long-fn a b c))")
+              result (fix/fix-source source {:line-length 25})]
+          (is (str/includes? result "long-test-name\n")
+              "result moved to own line")
+          (is (< (apply max (map count (str/split-lines result))) 26)
+              "all lines within limit"))))
+
+    (testing "for condp"
+      (testing "moves result to own line"
+        (let [source "(condp = x (long-test? a b) (long-fn c d) :else e)"
+              result (fix/fix-source source {:line-length 25})]
+          (is (< (apply max (map count (str/split-lines result))) 26)
+              "all lines within limit"))))
+
+    (testing "for case"
+      (testing "moves result to own line"
+        (let [source "(case x :a-long-test-val (some-long-fn a b c))"
+              result (fix/fix-source source {:line-length 25})]
+          (is (< (apply max (map count (str/split-lines result))) 26)
+              "all lines within limit"))))
+
+    (testing "for cond->"
+      (testing "moves result to own line"
+        (let [source "(cond-> x (a-very-long-test?) (some-long-fn a b))"
+              result (fix/fix-source source {:line-length 25})]
+          (is (< (apply max (map count (str/split-lines result))) 26)
+              "all lines within limit"))))))
 
 (deftest edge-cases-test
   ;; Verify edge cases: empty, single-element, already-formatted.
