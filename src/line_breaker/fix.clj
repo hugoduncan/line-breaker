@@ -202,26 +202,6 @@
   [node]
   (contains? breakable-types (node/node-type node)))
 
-(defn- first-pair-exceeds-limit?
-  "Returns true if the first pair of a pair-grouped form exceeds the line
-  limit AND the value is a breakable form that could benefit from being on
-  its own line.
-
-  For forms like maps and binding vectors, checks if keeping the first two
-  children (key-value pair) on the same line would exceed max-length.
-  Only returns true if the value (second child) is a breakable form, since
-  splitting a pair with an atomic value doesn't help reduce line length."
-  [node keep-count max-length]
-  (when (and max-length (>= keep-count 2))
-    (let [children (node/named-children node)]
-      (when (>= (count children) 2)
-        (let [second-child (second children)
-              end-pos (node/node-end-position second-child)
-              end-col (:column end-pos)]
-          ;; Only split if: pair exceeds limit AND value is breakable
-          (and (> end-col max-length)
-               (breakable-node? second-child)))))))
-
 ;;; Finding breakable forms
 
 (defn- node-contains-line?
@@ -368,6 +348,36 @@
   [node1 node2]
   (= (node-start-line node1) (node-start-line node2)))
 
+(defn- single-line-node?
+  "Returns true if node starts and ends on the same line."
+  [node]
+  (let [[start-line end-line] (node/node-line-range node)]
+    (= start-line end-line)))
+
+(defn- find-exceeding-pair
+  "Find the first pair in a pair-grouped form whose elements are on the
+  same line and whose end column exceeds max-length.
+
+  Returns [name-node value-node] or nil. Pairs are determined by the
+  form's pair grouping structure: maps and binding vectors pair from
+  the start, while cond/case/condp/cond-> skip a prefix of non-pair
+  elements. Comments are filtered before pairing."
+  [node rule max-length]
+  (when max-length
+    (let [children (node/named-children node)
+          non-comment (remove comment-node? children)
+          prefix (if (#{:map :binding-vector} rule)
+                   0
+                   (elements-to-keep-on-first-line rule))
+          pairs (partition 2 (drop prefix non-comment))]
+      (some (fn [[name-node value-node]]
+              (when (and (same-line? name-node value-node)
+                         (> (:column (node/node-end-position
+                                      value-node))
+                            max-length))
+                [name-node value-node]))
+            pairs))))
+
 (defn- make-break-edit
   "Create a break edit between two children.
   Returns nil if no edit needed (comment attached to preceding element).
@@ -471,8 +481,9 @@
 
   For forms that use pair grouping (maps, cond, case), keeps related pairs
   together (key-value, test-result, etc.) and breaks only between pairs.
-  However, if the first pair exceeds the line limit, the pair is split with
-  the key on one line and the value on the next.
+  When a pair exceeds the line limit and the value is a single-line breakable
+  form, the pair is kept together (deferred) to let the iterative loop try
+  breaking the value in-place first.
 
   Comments on the same line as the preceding element stay attached.
   Comments include their trailing newline, so no extra newline is added after.
@@ -488,10 +499,18 @@
            indent-col (indent-column node rule)
            base-keep-count (elements-to-keep-on-first-line rule)
            max-length (get config :line-length)
-           ;; For pair-grouped forms, if first pair exceeds limit, split it
-           keep-count (if (and (uses-pair-grouping? node config)
-                               (first-pair-exceeds-limit?
-                                node base-keep-count max-length))
+           ;; For pair-grouped forms, check if any pair exceeds limit
+           exceeding-pair (when (uses-pair-grouping? node config)
+                            (find-exceeding-pair node rule max-length))
+           [_ exc-value] exceeding-pair
+           ;; Phase 1: single-line breakable value → defer (don't split),
+           ;; let the iterative loop try breaking the value in-place.
+           ;; Temporary fallback: multi-line breakable value in first
+           ;; kept pair → eager split (Phase 3 will replace this).
+           keep-count (if (and exceeding-pair
+                               (breakable-node? exc-value)
+                               (not (single-line-node? exc-value))
+                               (#{:map :binding-vector} rule))
                         1
                         base-keep-count)
            ;; Elements that need breaking: skip the ones kept on first line
