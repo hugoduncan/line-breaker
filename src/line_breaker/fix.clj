@@ -95,6 +95,7 @@
    'def             :def
    'defonce         :def
    'defmulti        :def
+   'ns              :def
    'fn              :fn
    'bound-fn        :fn
    'let             :binding
