@@ -29,6 +29,7 @@ Examples:
   line-breaker                     Check all files in current directory
   line-breaker src                 Check all files in src directory
   line-breaker --fix src/foo.clj   Fix a specific file
+  line-breaker --reformat src      Reformat all files in src
   line-breaker --line-length 100   Check with custom line length
 
 Exit codes:
