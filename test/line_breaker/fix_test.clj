@@ -1382,3 +1382,76 @@
               "multiple metadata items stay together")
           (is (str/includes? result "^:deprecated legacy-fn")
               "metadata stays attached to symbol"))))))
+
+(deftest collapse-top-level-forms-test
+  ;; Verify collapsing all top-level forms to single lines.
+  ;; collapse-top-level-forms recursively collapses each top-level form,
+  ;; preserving comment newlines and multi-line string content.
+  (testing "collapse-top-level-forms"
+    (testing "collapses a multi-line form to single line"
+      (is (= "(defn foo [x] (+ x 1))"
+             (fix/collapse-top-level-forms
+              "(defn foo\n  [x]\n  (+ x 1))"))))
+
+    (testing "collapses deeply nested multi-line forms"
+      (is (= "(defn foo [x] (+ x 1))"
+             (fix/collapse-top-level-forms
+              "(defn foo\n  [x]\n  (+\n    x\n    1))"))))
+
+    (testing "preserves EOL comment"
+      (is (= "(defn foo [x] ;; the arg\n (+ x 1))"
+             (fix/collapse-top-level-forms
+              "(defn foo\n  [x] ;; the arg\n  (+ x 1))"))))
+
+    (testing "preserves whole-line comment leading newline"
+      (is (= "(defn foo\n;; add one\n [x] (+ x 1))"
+             (fix/collapse-top-level-forms
+              "(defn foo\n  ;; add one\n  [x]\n  (+ x 1))"))))
+
+    (testing "leaves multi-line string content untouched"
+      (is (= "(def sql \"SELECT *\n   FROM users\")"
+             (fix/collapse-top-level-forms
+              "(def sql\n  \"SELECT *\n   FROM users\")"))))
+
+    (testing "collapses multiple top-level forms independently"
+      (is (= "(defn foo [x] x)\n\n(defn bar [y] y)"
+             (fix/collapse-top-level-forms
+              (str "(defn foo\n  [x]\n  x)"
+                   "\n\n"
+                   "(defn bar\n  [y]\n  y)")))))
+
+    (testing "leaves already single-line form unchanged"
+      (is (= "(+ 1 2)"
+             (fix/collapse-top-level-forms "(+ 1 2)"))))
+
+    (testing "collapses ignored forms"
+      ;; Ignore directives are not respected during collapse
+      (is (= "#_:line-breaker/ignore\n(defn foo [x] (+ x 1))"
+             (fix/collapse-top-level-forms
+              (str "#_:line-breaker/ignore\n"
+                   "(defn foo\n  [x]\n  (+ x 1))")))))))
+
+(deftest reformat-source-test
+  ;; Verify the two-pass collapse-then-break reformat approach.
+  ;; reformat-source first collapses all forms, then applies fix-source
+  ;; to re-break lines exceeding the configured line length.
+  (testing "reformat-source"
+    (testing "re-breaks poorly broken form correctly"
+      (is (= "(defn foo [x] (+ x 1))"
+             (fix/reformat-source
+              "(defn foo\n  [x]\n  (+ x\n    1))"
+              {:line-length 40}))))
+
+    (testing "leaves form within limit as single line"
+      (is (= "(defn foo [x] (+ x 1))"
+             (fix/reformat-source
+              "(defn foo\n  [x]\n  (+ x 1))"
+              {:line-length 40}))))
+
+    (testing "collapses then re-breaks when exceeding limit"
+      (is (= "(defn my-function\n  [x y]\n  (+ x y (- x y)))"
+             (fix/reformat-source
+              (str "(defn my-function [x y]\n"
+                   "  (+ x y\n"
+                   "    (- x y)))")
+              {:line-length 30}))))))

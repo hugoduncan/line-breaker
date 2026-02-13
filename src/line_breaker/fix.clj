@@ -649,3 +649,54 @@
               (if new-source
                 (recur new-source (inc iteration))
                 source))))))))
+
+;;; Reformat
+
+(defn- collect-collapse-edits
+  "Recursively collect collapse edits for a node and all its descendants.
+  Returns a vector of edits that collapse all internal whitespace to single
+  spaces (with comment-aware newline preservation), or nil if the node is
+  already single-line."
+  [node]
+  (when-let [[start-line end-line] (node/node-line-range node)]
+    (when (not= start-line end-line)
+      (let [own-edits (or (join-form-edits node) [])
+            children (or (node/named-children node) [])]
+        (reduce
+         (fn [edits child]
+           (if-let [child-edits (collect-collapse-edits child)]
+             (into edits child-edits)
+             edits))
+         own-edits
+         children)))))
+
+(defn collapse-top-level-forms
+  "Collapse every top-level form to a single line.
+  Parses the source, iterates top-level forms in reverse order, and
+  recursively replaces inter-child whitespace with single spaces.
+  Comment-aware: whole-line comments preserve their leading newline,
+  EOL comments preserve their trailing newline (part of the comment node).
+  Multi-line string content is not modified.
+  Ignore directives are not respected — all forms are collapsed."
+  [source]
+  (let [tree (parser/parse-source source)
+        root (node/root-node tree)
+        top-level-forms (node/named-children root)]
+    (reduce
+     (fn [s form]
+       (let [edits (collect-collapse-edits form)]
+         (if (seq edits)
+           (apply-edits s edits)
+           s)))
+     source
+     (rseq top-level-forms))))
+
+(defn reformat-source
+  "Reformat source by collapsing all forms then re-breaking as needed.
+  Two-pass approach: first collapses every top-level form to a single
+  line using collapse-top-level-forms, then applies fix-source to
+  re-break any lines exceeding the configured line length."
+  [source config]
+  (-> source
+      collapse-top-level-forms
+      (fix-source config)))
