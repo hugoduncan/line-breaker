@@ -63,6 +63,16 @@
      source
      sorted)))
 
+(defn- edits-change-source?
+  "Returns true if at least one edit differs from the current source content."
+  [source edits]
+  (boolean
+   (some (fn [{:keys [start end replacement]}]
+           (let [start-char (byte-offset->char-index source start)
+                 end-char (byte-offset->char-index source end)]
+             (not= replacement (subs source start-char end-char))))
+         edits)))
+
 ;;; Breakable node detection
 
 (def ^:private breakable-types
@@ -593,32 +603,41 @@
   than 10-20 passes) while catching bugs that cause infinite loops."
   100)
 
-(defn- try-break-forms
-  "Try breaking each form in order until one produces a change.
-  Returns the new source if a form was successfully broken, nil otherwise."
-  [source forms config]
-  (reduce
-   (fn [_ form]
-     (let [edits (break-form form config)]
-       (when (seq edits)
-         (let [new-source (apply-edits source edits)]
-           (when (not= new-source source)
-             (reduced new-source))))))
-   nil
-   forms))
-
 (defn- try-break-on-lines
-  "Try breaking forms on each long line until one produces a change.
-  Returns the new source if a form was successfully broken, nil otherwise."
+  "Break the outermost form on every long line in a single pass.
+
+  Breadth-first: breaks all outermost forms across all long lines before
+  descending into sub-forms. Deduplicates by byte range so a form spanning
+  multiple long lines is only broken once. Falls back to deeper forms
+  when the outermost form on a line produces no change.
+  Returns the new source if any forms were broken, nil otherwise."
   [source tree long-lines ignored-ranges config]
-  (reduce
-   (fn [_ line]
-     (let [breakable-forms (find-breakable-forms tree line ignored-ranges)
-           new-source (try-break-forms source breakable-forms config)]
-       (when new-source
-         (reduced new-source))))
-   nil
-   long-lines))
+  (let [seen (volatile! #{})
+        all-edits
+        (into
+         []
+         (mapcat
+          (fn [line]
+            (let [forms (find-breakable-forms
+                         tree line ignored-ranges)]
+              ;; Try each form (outermost first) until one
+              ;; produces edits that actually change the source
+              (some
+               (fn [form]
+                 (let [range (node/node-range form)]
+                   (when-not (@seen range)
+                     (let [edits (break-form form config)]
+                       (when (and (seq edits)
+                                  (edits-change-source?
+                                   source edits))
+                         (vswap! seen conj range)
+                         edits)))))
+               forms))))
+         long-lines)]
+    (when (seq all-edits)
+      (let [new-source (apply-edits source all-edits)]
+        (when (not= new-source source)
+          new-source)))))
 
 (defn fix-source
   "Fix line length violations in source code.
@@ -628,11 +647,14 @@
   fixed source string. Forms preceded by #_:line-breaker/ignore are not
   modified.
 
-  The algorithm:
+  The algorithm uses breadth-first breaking:
   1. Find lines exceeding max-length
   2. Collect ignored byte ranges (re-collected each pass as positions shift)
-  3. Try each long line until one has breakable forms that produce a change
-  4. Re-parse and repeat until no violations or no breakable forms"
+  3. Break the outermost form on every long line in a single pass
+  4. Re-parse and repeat until no violations or no breakable forms
+
+  This ensures sibling forms at the same depth are all broken before
+  descending into sub-forms."
   [source config]
   (let [max-length (get config :line-length 80)]
     (loop [source source
