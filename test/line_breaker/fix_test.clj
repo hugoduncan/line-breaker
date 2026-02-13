@@ -172,7 +172,7 @@
             form (fix/find-breakable-form tree 1)
             edits (fix/break-form form)
             result (fix/apply-edits "{:a 1 :b 2}" edits)]
-        (is (= "{:a 1\n  :b 2}" result))))
+        (is (= "{:a 1\n :b 2}" result))))
 
     (testing "returns nil for single-element form"
       (let [tree (parser/parse-source "(a)")
@@ -704,17 +704,17 @@
       (testing "keeps key-value pairs together"
         (let [source "{:a 1 :b 2 :c 3}"
               result (fix/fix-source source {:line-length 10})]
-          (is (= "{:a 1\n  :b 2\n  :c 3}" result))))
+          (is (= "{:a 1\n :b 2\n :c 3}" result))))
       (testing "handles nested values"
         (let [source "{:a [1 2] :b [3 4]}"
               result (fix/fix-source source {:line-length 12})]
-          (is (= "{:a [1 2]\n  :b [3 4]}" result))))
+          (is (= "{:a [1 2]\n :b [3 4]}" result))))
       (testing "leaves oversized pairs with atomic values together"
         ;; Pairs with atomic values stay together even if they exceed line
         ;; length, since splitting wouldn't help reduce line width.
         (let [source "{:a 1 :longkey longval}"
               result (fix/fix-source source {:line-length 12})]
-          (is (= "{:a 1\n  :longkey longval}" result)))))
+          (is (= "{:a 1\n :longkey longval}" result)))))
 
     (testing "for case"
       (testing "handles default clause (odd element count)"

@@ -496,7 +496,7 @@
   [node rule]
   (let [base-col (form-start-column node)]
     (cond
-      (= :binding-vector rule) (+ 1 base-col)
+      (#{:binding-vector :map} rule) (+ 1 base-col)
       (= :metadata-wrapped rule)
       ;; Align to the first content element (second child, after metadata).
       ;; Fall back to base-col + 1 if no content element exists.
