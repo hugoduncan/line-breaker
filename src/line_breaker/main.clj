@@ -16,6 +16,7 @@ Reformat Clojure code to enforce maximum line length.
 Options:
   --check         Check files for violations (default mode)
   --fix           Fix files by reformatting long lines
+  --reformat      Collapse and re-break every top-level form
   --stdout        Output reformatted content to stdout
   --line-length N Maximum line length (default: 80)
   -q, --quiet     Suppress summary output
@@ -96,6 +97,22 @@ Exit codes:
             (println (str "Fixed: " file)))))))
   0)
 
+(defn- process-reformat
+  "Process files in reformat mode.
+  Reads each file, collapses and re-breaks all top-level forms, writes
+  back in place. Reports reformatted files to stderr unless quiet.
+  Returns 0 on success."
+  [files config quiet?]
+  (doseq [file files]
+    (let [source (slurp file)
+          result (fix/reformat-source source config)]
+      (when (not= source result)
+        (spit file result)
+        (when-not quiet?
+          (binding [*out* *err*]
+            (println (str "Reformatted: " file)))))))
+  0)
+
 (defn- process-files
   "Process files according to mode.
   Returns exit code."
@@ -108,6 +125,9 @@ Exit codes:
 
     (:fix opts)
     (process-fix files config (:quiet opts))
+
+    (:reformat opts)
+    (process-reformat files config (:quiet opts))
 
     (:check opts)
     (process-check files (:line-length config) (:quiet opts))

@@ -19,6 +19,7 @@
         (is (str/includes? out "Usage: line-breaker"))
         (is (str/includes? out "--check"))
         (is (str/includes? out "--fix"))
+        (is (str/includes? out "--reformat"))
         (is (str/includes? out "--stdout"))
         (is (str/includes? out "--line-length"))
         (is (= 0 exit-code))))
@@ -255,6 +256,83 @@
               (is (str/includes? out "(ns a)"))
               (is (str/includes? out "(ns b)"))
               (is (= 0 exit-code)))))))))
+
+(deftest reformat-mode-test
+  ;; Tests that --reformat mode collapses and re-breaks forms in place.
+  ;; Verifies file modification, quiet mode, line-length override,
+  ;; and directory traversal.
+  (testing "run in reformat mode"
+    (testing "given file with poorly broken form"
+      (testing "collapses and re-breaks in place"
+        (with-temp-dir [root]
+          (let [file (fs/path root "test.clj")
+                content "(defn foo\n  [x]\n  (+ x 1))"]
+            (spit (str file) content)
+            (let [[_out err exit-code]
+                  (with-captured-output
+                    (main/run ["--reformat" (str file)]))]
+              (is (= 0 exit-code))
+              (is (str/includes? err "Reformatted:"))
+              ;; Should be collapsed to one line
+              (is (= "(defn foo [x] (+ x 1))"
+                     (slurp (str file)))))))))
+
+    (testing "given file with no changes needed"
+      (testing "does not modify file"
+        (with-temp-dir [root]
+          (let [file (fs/path root "test.clj")
+                content "(defn foo [x] (+ x 1))"]
+            (spit (str file) content)
+            (let [[_out err exit-code]
+                  (with-captured-output
+                    (main/run ["--reformat" (str file)]))]
+              (is (= 0 exit-code))
+              (is (not (str/includes? err "Reformatted:")))
+              (is (= content (slurp (str file)))))))))
+
+    (testing "with --quiet flag"
+      (testing "suppresses Reformatted: output"
+        (with-temp-dir [root]
+          (let [file (fs/path root "test.clj")
+                content "(defn foo\n  [x]\n  (+ x 1))"]
+            (spit (str file) content)
+            (let [[_out err exit-code]
+                  (with-captured-output
+                    (main/run ["--reformat" "--quiet"
+                               (str file)]))]
+              (is (= 0 exit-code))
+              (is (not (str/includes? err "Reformatted:"))))))))
+
+    (testing "with --line-length override"
+      (testing "uses CLI value for re-breaking"
+        (with-temp-dir [root]
+          (let [file (fs/path root "test.clj")
+                ;; This form is 30 chars collapsed
+                content "(defn foo\n  [x]\n  (+ x 1))"]
+            (spit (str file) content)
+            (let [[_out _err exit-code]
+                  (with-captured-output
+                    (main/run ["--reformat" "--line-length" "20"
+                               (str file)]))]
+              (is (= 0 exit-code))
+              ;; Should be re-broken since it exceeds 20
+              (let [result (slurp (str file))]
+                (is (str/includes? result "\n"))))))))
+
+    (testing "given a directory"
+      (testing "reformats all matching files"
+        (with-temp-dir [root]
+          (let [file1 (fs/path root "a.clj")
+                file2 (fs/path root "b.clj")]
+            (spit (str file1) "(defn a\n  [x]\n  x)")
+            (spit (str file2) "(defn b\n  [y]\n  y)")
+            (let [[_out err exit-code]
+                  (with-captured-output
+                    (main/run ["--reformat" (str root)]))]
+              (is (= 0 exit-code))
+              (is (= "(defn a [x] x)" (slurp (str file1))))
+              (is (= "(defn b [y] y)" (slurp (str file2))))
+              (is (str/includes? err "Reformatted:")))))))))
 
 (deftest config-loading-test
   (testing "run with config file"

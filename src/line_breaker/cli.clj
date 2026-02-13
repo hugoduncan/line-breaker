@@ -11,6 +11,8 @@
            :desc "Check files for line length violations (default mode)"}
    :fix {:coerce :boolean
          :desc "Fix files by reformatting long lines"}
+   :reformat {:coerce :boolean
+              :desc "Collapse and re-break every top-level form"}
    :stdout {:coerce :boolean
             :desc "Output reformatted content to stdout"}
    :line-length {:coerce :long
@@ -30,7 +32,7 @@
   (let [result (cli/parse-args args {:spec cli-spec})
         opts (:opts result)
         positional-args (:args result)]
-    {:opts (if (or (:fix opts) (:stdout opts) (:help opts))
+    {:opts (if (or (:fix opts) (:reformat opts) (:stdout opts) (:help opts))
              opts
              (assoc opts :check true))
      :args (vec positional-args)}))

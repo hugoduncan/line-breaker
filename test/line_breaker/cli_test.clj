@@ -23,6 +23,10 @@
       (is (= {:opts {:fix true} :args []}
              (cli/parse-args ["--fix"]))))
 
+    (testing "parses --reformat flag"
+      (is (= {:opts {:reformat true} :args []}
+             (cli/parse-args ["--reformat"]))))
+
     (testing "parses --stdout flag"
       (is (= {:opts {:stdout true} :args []}
              (cli/parse-args ["--stdout"]))))
