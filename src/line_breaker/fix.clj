@@ -656,7 +656,12 @@
   "Recursively collect collapse edits for a node and all its descendants.
   Returns a vector of edits that collapse all internal whitespace to single
   spaces (with comment-aware newline preservation), or nil if the node is
-  already single-line."
+  already single-line.
+
+  Parent and child edits never overlap: join-form-edits targets whitespace
+  *between* a node's named children (gaps outside child byte ranges), while
+  recursive child edits target whitespace *inside* each child's byte range.
+  These regions are disjoint by construction."
   [node]
   (when-let [[start-line end-line] (node/node-line-range node)]
     (when (not= start-line end-line)
