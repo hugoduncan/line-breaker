@@ -1431,19 +1431,110 @@
               (str "#_:line-breaker/ignore\n"
                    "(defn foo\n  [x]\n  (+ x 1))")))))))
 
+(deftest apply-forced-breaks-test
+  ;; Verify forced line breaks at structurally significant positions.
+  ;; apply-forced-breaks inserts breaks after specific child indices
+  ;; and after specific child types in matching forms.
+  (testing "apply-forced-breaks"
+    (testing "given a defn"
+      (testing "breaks after name and argvec"
+        (is (= "(defn foo\n  [x]\n  (+ x 1))"
+               (fix/apply-forced-breaks
+                "(defn foo [x] (+ x 1))"
+                {})))))
+
+    (testing "given a defn with docstring"
+      (testing "breaks after name, after docstring, and after argvec"
+        (is (= (str "(defn foo\n"
+                    "  \"doc\"\n"
+                    "  [x]\n"
+                    "  (+ x 1))")
+               (fix/apply-forced-breaks
+                "(defn foo \"doc\" [x] (+ x 1))"
+                {})))))
+
+    (testing "given a multi-arity defn"
+      (testing "breaks after name only"
+        (is (= "(defn foo\n  ([x] x) ([x y] y))"
+               (fix/apply-forced-breaks
+                "(defn foo ([x] x) ([x y] y))"
+                {})))))
+
+    (testing "given a defn with metadata on name"
+      (testing "breaks after metadata-wrapped name and argvec"
+        (is (= "(defn ^:private foo\n  [x]\n  x)"
+               (fix/apply-forced-breaks
+                "(defn ^:private foo [x] x)"
+                {})))))
+
+    (testing "given a defmethod"
+      (testing "breaks after dispatch-val and argvec"
+        (is (= "(defmethod foo :bar\n  [x]\n  x)"
+               (fix/apply-forced-breaks
+                "(defmethod foo :bar [x] x)"
+                {})))))
+
+    (testing "given a deftest"
+      (testing "breaks after name"
+        (is (= "(deftest my-test\n  (is (= 1 1)))"
+               (fix/apply-forced-breaks
+                "(deftest my-test (is (= 1 1)))"
+                {})))))
+
+    (testing "given a ns"
+      (testing "breaks after name"
+        (is (= "(ns my.ns\n  (:require [foo]))"
+               (fix/apply-forced-breaks
+                "(ns my.ns (:require [foo]))"
+                {})))))
+
+    (testing "given a def"
+      (testing "breaks after name"
+        (is (= "(def foo\n  42)"
+               (fix/apply-forced-breaks "(def foo 42)" {})))))
+
+    (testing "given a defonce"
+      (testing "breaks after name"
+        (is (= "(defonce foo\n  42)"
+               (fix/apply-forced-breaks "(defonce foo 42)" {})))))
+
+    (testing "given a defmulti"
+      (testing "breaks after name"
+        (is (= "(defmulti foo\n  :type)"
+               (fix/apply-forced-breaks "(defmulti foo :type)" {})))))
+
+    (testing "given nested forms"
+      (testing "breaks outer before inner"
+        (is (= "(def foo\n  (defn bar\n    [x]\n    x))"
+               (fix/apply-forced-breaks
+                "(def foo (defn bar [x] x))"
+                {})))))
+
+    (testing "given an already-broken form"
+      (testing "returns unchanged"
+        (let [s "(defn foo\n  [x]\n  (+ x 1))"]
+          (is (= s (fix/apply-forced-breaks s {}))))))
+
+    (testing "with user config override"
+      (testing "uses config :force-breaks over defaults"
+        (is (= "(defn foo [x] (+ x 1))"
+               (fix/apply-forced-breaks
+                "(defn foo [x] (+ x 1))"
+                {:force-breaks {'defn {}}})))))))
+
 (deftest reformat-source-test
-  ;; Verify the two-pass collapse-then-break reformat approach.
-  ;; reformat-source first collapses all forms, then applies fix-source
-  ;; to re-break lines exceeding the configured line length.
+  ;; Verify the three-pass collapse, force-break, then re-break approach.
+  ;; reformat-source first collapses all forms, then inserts forced
+  ;; breaks, then applies fix-source to re-break exceeding lines.
   (testing "reformat-source"
     (testing "re-breaks poorly broken form correctly"
-      (is (= "(defn foo [x] (+ x 1))"
+      (is (= "(defn foo\n  [x]\n  (+ x 1))"
              (fix/reformat-source
               "(defn foo\n  [x]\n  (+ x\n    1))"
               {:line-length 40}))))
 
-    (testing "leaves form within limit as single line"
-      (is (= "(defn foo [x] (+ x 1))"
+    (testing "applies forced breaks even within limit"
+      (is (= "(defn foo\n  [x]\n  (+ x 1))"
              (fix/reformat-source
               "(defn foo\n  [x]\n  (+ x 1))"
               {:line-length 40}))))
@@ -1457,7 +1548,8 @@
               {:line-length 30}))))
 
     (testing "preserves EOL comment through collapse and re-break"
-      (is (= (str "(defn my-longer-fn [x] ;; arg\n"
+      (is (= (str "(defn my-longer-fn\n"
+                  "  [x] ;; arg\n"
                   " (+\n"
                   "  x\n"
                   "  (very-long-computation x)))")
@@ -1470,8 +1562,8 @@
 
     (testing "preserves whole-line comment through collapse and re-break"
       (is (= (str "(defn my-longer-fn\n"
-                  "  ;; does computation\n"
-                  "  [x]\n"
+                  ";; does computation\n"
+                  " [x]\n"
                   "  (+\n"
                   "   x\n"
                   "   (very-long-computation x)))")

@@ -266,22 +266,21 @@
       (testing "collapses and re-breaks in place"
         (with-temp-dir [root]
           (let [file (fs/path root "test.clj")
-                content "(defn foo\n  [x]\n  (+ x 1))"]
+                content "(defn foo\n  [x]\n  (+ x\n    1))"]
             (spit (str file) content)
             (let [[_out err exit-code]
                   (with-captured-output
                     (main/run ["--reformat" (str file)]))]
               (is (= 0 exit-code))
               (is (str/includes? err "Reformatted:"))
-              ;; Should be collapsed to one line
-              (is (= "(defn foo [x] (+ x 1))"
+              (is (= "(defn foo\n  [x]\n  (+ x 1))"
                      (slurp (str file)))))))))
 
     (testing "given file with no changes needed"
       (testing "does not modify file"
         (with-temp-dir [root]
           (let [file (fs/path root "test.clj")
-                content "(defn foo [x] (+ x 1))"]
+                content "(defn foo\n  [x]\n  (+ x 1))"]
             (spit (str file) content)
             (let [[_out err exit-code]
                   (with-captured-output
@@ -294,7 +293,7 @@
       (testing "suppresses Reformatted: output"
         (with-temp-dir [root]
           (let [file (fs/path root "test.clj")
-                content "(defn foo\n  [x]\n  (+ x 1))"]
+                content "(defn foo\n  [x]\n  (+ x\n    1))"]
             (spit (str file) content)
             (let [[_out err exit-code]
                   (with-captured-output
@@ -307,8 +306,7 @@
       (testing "uses CLI value for re-breaking"
         (with-temp-dir [root]
           (let [file (fs/path root "test.clj")
-                ;; This form is 30 chars collapsed
-                content "(defn foo\n  [x]\n  (+ x 1))"]
+                content "(+ 1 2 3 4 5 6 7 8 9 10)"]
             (spit (str file) content)
             (let [[_out _err exit-code]
                   (with-captured-output
@@ -324,14 +322,14 @@
         (with-temp-dir [root]
           (let [file1 (fs/path root "a.clj")
                 file2 (fs/path root "b.clj")]
-            (spit (str file1) "(defn a\n  [x]\n  x)")
-            (spit (str file2) "(defn b\n  [y]\n  y)")
+            (spit (str file1) "(defn a [x] x)")
+            (spit (str file2) "(defn b [y] y)")
             (let [[_out err exit-code]
                   (with-captured-output
                     (main/run ["--reformat" (str root)]))]
               (is (= 0 exit-code))
-              (is (= "(defn a [x] x)" (slurp (str file1))))
-              (is (= "(defn b [y] y)" (slurp (str file2))))
+              (is (= "(defn a\n  [x]\n  x)" (slurp (str file1))))
+              (is (= "(defn b\n  [y]\n  y)" (slurp (str file2))))
               (is (str/includes? err "Reformatted:")))))))))
 
 (deftest config-loading-test

@@ -697,12 +697,130 @@
      source
      (rseq top-level-forms))))
 
+;;; Forced line breaks
+
+(def ^:private default-force-break-rules
+  "Rules for inserting forced line breaks in specific forms.
+  Each entry maps a head symbol to a rule with :after-indices (0-based
+  named-child indices after which to break) and optional :after-types
+  (node types after the first occurrence of which to break)."
+  {'defn      {:after-indices #{1} :after-types #{:vec_lit}}
+   'defn-     {:after-indices #{1} :after-types #{:vec_lit}}
+   'defmacro  {:after-indices #{1} :after-types #{:vec_lit}}
+   'defmethod {:after-indices #{2} :after-types #{:vec_lit}}
+   'deftest   {:after-indices #{1}}
+   'ns        {:after-indices #{1}}
+   'def       {:after-indices #{1}}
+   'defonce   {:after-indices #{1}}
+   'defmulti  {:after-indices #{1}}})
+
+(defn- get-force-break-rule
+  "Look up the force-break rule for a list_lit node.
+  Checks config's :force-breaks first, then defaults."
+  [node config]
+  (when-let [head-sym (get-head-symbol node)]
+    (or (get-in config [:force-breaks head-sym])
+        (get default-force-break-rules head-sym))))
+
+(defn- forced-break-positions
+  "Compute the set of named-child indices after which to insert breaks.
+  Merges :after-indices with indices derived from :after-types. For each
+  type match, adds both the matched index and (dec index) to ensure
+  breaks both before and after the matched child (e.g., both before and
+  after an argvec in defn with docstring)."
+  [children rule]
+  (let [base (:after-indices rule #{})
+        type-indices (when-let [types (:after-types rule)]
+                       (into #{}
+                             (mapcat (fn [type-kw]
+                                       (when-let [i (some
+                                                     (fn [i]
+                                                       (when (= type-kw
+                                                                (node/node-type
+                                                                 (nth children
+                                                                      i)))
+                                                         i))
+                                                     (range (count children)))]
+                                         (if (pos? i)
+                                           [(dec i) i]
+                                           [i]))))
+                             types))]
+    (into base type-indices)))
+
+(defn- form-needs-forced-break?
+  "Returns true if any break position has consecutive children on the
+  same line (i.e., a break is missing)."
+  [children break-positions]
+  (some (fn [idx]
+          (let [next-idx (inc idx)]
+            (when (< next-idx (count children))
+              (same-line? (nth children idx)
+                          (nth children next-idx)))))
+        break-positions))
+
+(defn- generate-forced-break-edits
+  "Generate edits to insert forced line breaks in a form.
+  Returns a vector of edits or nil if no breaks needed."
+  [node config]
+  (let [children (node/named-children node)
+        rule (get-force-break-rule node config)]
+    (when rule
+      (let [break-positions (forced-break-positions children rule)
+            indent-col (indent-column node (get-effective-rule node config))]
+        (when (form-needs-forced-break? children break-positions)
+          (into []
+                (keep (fn [idx]
+                        (let [next-idx (inc idx)]
+                          (when (< next-idx (count children))
+                            (let [child (nth children idx)
+                                  next-child (nth children next-idx)]
+                              (when (same-line? child next-child)
+                                (make-break-edit child next-child
+                                                 indent-col)))))))
+                break-positions))))))
+
+(defn- find-first-forcible-form
+  "Pre-order walk returning the first list_lit that matches a force-break
+  rule and needs breaks inserted."
+  [node config]
+  (when node
+    (if (and (= :list_lit (node/node-type node))
+             (let [rule (get-force-break-rule node config)]
+               (when rule
+                 (let [children (node/named-children node)
+                       positions (forced-break-positions children rule)]
+                   (form-needs-forced-break? children positions)))))
+      node
+      (some #(find-first-forcible-form % config)
+            (node/named-children node)))))
+
+(defn apply-forced-breaks
+  "Insert forced line breaks at structurally significant positions.
+  Iteratively finds forms matching force-break rules and inserts line
+  breaks, re-parsing between each to maintain correct column positions."
+  [source config]
+  (loop [s source
+         iteration 0]
+    (if (>= iteration max-iterations)
+      s
+      (let [tree (parser/parse-source s)
+            root (node/root-node tree)
+            form (find-first-forcible-form root config)]
+        (if-not form
+          s
+          (let [edits (generate-forced-break-edits form config)]
+            (if (seq edits)
+              (recur (apply-edits s edits) (inc iteration))
+              s)))))))
+
 (defn reformat-source
-  "Reformat source by collapsing all forms then re-breaking as needed.
-  Two-pass approach: first collapses every top-level form to a single
-  line using collapse-top-level-forms, then applies fix-source to
-  re-break any lines exceeding the configured line length."
+  "Reformat source by collapsing, applying forced breaks, then re-breaking.
+  Three-pass approach: first collapses every top-level form to a single
+  line, then inserts forced line breaks at structurally significant
+  positions, then applies fix-source to re-break any lines exceeding
+  the configured line length."
   [source config]
   (-> source
       collapse-top-level-forms
+      (apply-forced-breaks config)
       (fix-source config)))
