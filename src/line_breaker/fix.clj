@@ -337,7 +337,17 @@
                                     (when (> start-byte end-byte)
                                       {:start end-byte
                                        :end start-byte
-                                       :replacement " "}))))
+                                       :replacement
+                                       (if (and (= :comment
+                                                   (node/node-type
+                                                    next-child))
+                                                (not= (second
+                                                       (node/node-line-range
+                                                        prev-child))
+                                                      (node-start-line
+                                                       next-child)))
+                                         "\n"
+                                         " ")}))))
                           (partition 2 1 children))]
           (when (seq edits)
             edits))))))

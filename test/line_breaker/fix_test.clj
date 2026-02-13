@@ -625,7 +625,47 @@
               form (first (node/named-children (node/root-node tree)))
               edits (fix/join-form-edits form)]
           (is (some? edits))
-          (is (= "(a b c)" (fix/apply-edits source edits))))))))
+          (is (= "(a b c)" (fix/apply-edits source edits))))))
+
+    (testing "for a whole-line comment"
+      (testing "preserves leading newline"
+        (let [source "(foo\n ;; comment\n bar)"
+              tree (parser/parse-source source)
+              form (first (node/named-children (node/root-node tree)))
+              edits (fix/join-form-edits form)
+              result (fix/apply-edits source edits)]
+          (is (some? edits))
+          (is (str/includes? result "\n;; comment")
+              "newline before comment preserved")
+          (is (not (str/includes? result "foo ;; comment"))
+              "comment not placed on same line as code"))))
+
+    (testing "for an EOL comment"
+      (testing "collapses normally without adding newline"
+        (let [source "(foo ;; eol\n bar\n baz)"
+              tree (parser/parse-source source)
+              form (first (node/named-children (node/root-node tree)))
+              edits (fix/join-form-edits form)
+              result (fix/apply-edits source edits)]
+          (is (some? edits))
+          (is (= "(foo ;; eol\n bar baz)" result)
+              "EOL comment stays on same line, rest collapsed"))))
+
+    (testing "for mixed EOL and whole-line comments"
+      (testing "handles each comment type correctly"
+        (let [source "(foo ;; eol\n ;; whole\n bar)"
+              tree (parser/parse-source source)
+              form (first (node/named-children (node/root-node tree)))
+              edits (fix/join-form-edits form)
+              result (fix/apply-edits source edits)]
+          (is (some? edits))
+          (is (str/includes? result "foo ;; eol")
+              "EOL comment stays on same line")
+          ;; The whole-line comment stays on its own line because the
+          ;; preceding EOL comment node includes a trailing \n.
+          ;; The indent before ;; whole is normalized to a single space.
+          (is (str/includes? result ";; eol\n ;; whole")
+              "whole-line comment on its own line"))))))
 
 (deftest comment-handling-test
   ;; Verify inline comments stay attached and don't cause extra blank lines.
