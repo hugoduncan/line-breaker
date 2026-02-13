@@ -311,7 +311,12 @@
   pairs of named children and generates edits replacing inter-child
   whitespace (newlines + indent) with single spaces. Returns a vector
   of {:start :end :replacement} edits, or nil if the node is already
-  single-line."
+  single-line.
+
+  Assumes only whitespace exists between consecutive named children.
+  This holds for tree-sitter-clojure forms because all meaningful
+  content (metadata, reader macros, discard forms) are named nodes,
+  and anonymous nodes (delimiters) occur only at form boundaries."
   [node]
   (when node
     (let [[start-line end-line] (node/node-line-range node)]
