@@ -47,15 +47,21 @@
   and :replacement (text to substitute). Edits are applied in reverse
   start offset order to preserve position validity.
 
-  Returns the modified source string."
+  Throws if any edits have overlapping byte ranges. Returns the modified
+  source string."
   [source edits]
-  (reduce
-   (fn [s {:keys [start end replacement]}]
-     (let [start-char (byte-offset->char-index s start)
-           end-char (byte-offset->char-index s end)]
-       (str (subs s 0 start-char) replacement (subs s end-char))))
-   source
-   (sort-by :start > edits)))
+  (let [sorted (sort-by :start > edits)]
+    (doseq [[higher lower] (partition 2 1 sorted)]
+      (when (> (:end lower) (:start higher))
+        (throw (ex-info "Overlapping edits detected"
+                        {:edit-a lower :edit-b higher}))))
+    (reduce
+     (fn [s {:keys [start end replacement]}]
+       (let [start-char (byte-offset->char-index s start)
+             end-char (byte-offset->char-index s end)]
+         (str (subs s 0 start-char) replacement (subs s end-char))))
+     source
+     sorted)))
 
 ;;; Breakable node detection
 

@@ -40,7 +40,21 @@
     (testing "handles insertion when start equals end"
       (is (= "helloX"
              (fix/apply-edits "hello"
-                              [{:start 5 :end 5 :replacement "X"}]))))))
+                              [{:start 5 :end 5 :replacement "X"}]))))
+
+    (testing "throws on overlapping edits"
+      (is (thrown-with-msg?
+           clojure.lang.ExceptionInfo
+           #"Overlapping edits"
+           (fix/apply-edits "abcde"
+                            [{:start 1 :end 3 :replacement "X"}
+                             {:start 2 :end 4 :replacement "Y"}]))))
+
+    (testing "allows adjacent non-overlapping edits"
+      (is (= "aXYe"
+             (fix/apply-edits "abcde"
+                              [{:start 1 :end 3 :replacement "X"}
+                               {:start 3 :end 4 :replacement "Y"}]))))))
 
 (deftest breakable-node?-test
   ;; Verify breakable node detection for collection types.
