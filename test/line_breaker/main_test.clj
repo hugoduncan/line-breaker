@@ -368,10 +368,17 @@
           (is (= 2 exit-code))
           (is (str/includes? err "line-breaker: file-error:")))))
 
-    (testing "given multiple mode flags"
+    (testing "given --fix with --reformat"
       (testing "exits 2 with arg-error message"
         (let [[_out err exit-code] (with-captured-output
                                      (main/run ["--fix" "--reformat"]))]
+          (is (= 2 exit-code))
+          (is (str/includes? err "line-breaker: arg-error:")))))
+
+    (testing "given --reformat with --stdout"
+      (testing "exits 2 with arg-error message"
+        (let [[_out err exit-code] (with-captured-output
+                                     (main/run ["--reformat" "--stdout"]))]
           (is (= 2 exit-code))
           (is (str/includes? err "line-breaker: arg-error:")))))
 
