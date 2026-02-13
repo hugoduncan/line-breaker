@@ -1454,4 +1454,31 @@
               (str "(defn my-function [x y]\n"
                    "  (+ x y\n"
                    "    (- x y)))")
+              {:line-length 30}))))
+
+    (testing "preserves EOL comment through collapse and re-break"
+      (is (= (str "(defn my-longer-fn [x] ;; arg\n"
+                  " (+\n"
+                  "  x\n"
+                  "  (very-long-computation x)))")
+             (fix/reformat-source
+              (str "(defn my-longer-fn\n"
+                   "  [x] ;; arg\n"
+                   "  (+ x\n"
+                   "    (very-long-computation x)))")
+              {:line-length 30}))))
+
+    (testing "preserves whole-line comment through collapse and re-break"
+      (is (= (str "(defn my-longer-fn\n"
+                  "  ;; does computation\n"
+                  "  [x]\n"
+                  "  (+\n"
+                  "   x\n"
+                  "   (very-long-computation x)))")
+             (fix/reformat-source
+              (str "(defn my-longer-fn\n"
+                   "  ;; does computation\n"
+                   "  [x]\n"
+                   "  (+ x\n"
+                   "    (very-long-computation x)))")
               {:line-length 30}))))))
