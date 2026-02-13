@@ -709,10 +709,10 @@
    'defmacro  {:after-indices #{1} :after-types #{:vec_lit}}
    'defmethod {:after-indices #{2} :after-types #{:vec_lit}}
    'deftest   {:after-indices #{1}}
-   'ns        {:after-indices #{1}}
-   'def       {:after-indices #{1}}
-   'defonce   {:after-indices #{1}}
-   'defmulti  {:after-indices #{1}}})
+   'ns        {:after-indices #{1} :after-types #{:str_lit}}
+   'def       {:after-indices #{1} :after-types #{:str_lit}}
+   'defonce   {:after-indices #{1} :after-types #{:str_lit}}
+   'defmulti  {:after-indices #{1} :after-types #{:str_lit}}})
 
 (defn- get-force-break-rule
   "Look up the force-break rule for a list_lit node.

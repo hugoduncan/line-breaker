@@ -1486,12 +1486,24 @@
         (is (= "(ns my.ns\n  (:require [foo]))"
                (fix/apply-forced-breaks
                 "(ns my.ns (:require [foo]))"
+                {}))))
+      (testing "breaks after docstring"
+        (is (= (str "(ns my.ns\n"
+                    "  \"A namespace.\"\n"
+                    "  (:require [foo]))")
+               (fix/apply-forced-breaks
+                "(ns my.ns \"A namespace.\" (:require [foo]))"
                 {})))))
 
     (testing "given a def"
       (testing "breaks after name"
         (is (= "(def foo\n  42)"
-               (fix/apply-forced-breaks "(def foo 42)" {})))))
+               (fix/apply-forced-breaks "(def foo 42)" {}))))
+      (testing "breaks after docstring"
+        (is (= "(def foo\n  \"A var.\"\n  42)"
+               (fix/apply-forced-breaks
+                "(def foo \"A var.\" 42)"
+                {})))))
 
     (testing "given a defonce"
       (testing "breaks after name"
