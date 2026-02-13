@@ -24,14 +24,26 @@
           :alias :h
           :desc "Show help"}})
 
+(def ^:private mode-flags
+  "CLI flags that select the processing mode."
+  [:check :fix :reformat :stdout])
+
 (defn parse-args
   "Parse command-line arguments.
   Returns {:opts {...} :args [...]} where :opts contains the parsed options
-  and :args contains positional file/directory arguments."
+  and :args contains positional file/directory arguments.
+  Throws ex-info with :type :arg-error when multiple mode flags are given."
   [args]
   (let [result (cli/parse-args args {:spec cli-spec})
         opts (:opts result)
-        positional-args (:args result)]
+        positional-args (:args result)
+        active-modes (filterv #(get opts %) mode-flags)]
+    (when (> (count active-modes) 1)
+      (throw (ex-info (str "only one mode flag allowed, got: "
+                           (str/join ", " (map #(str "--" (name %))
+                                               active-modes)))
+                      {:type :arg-error
+                       :modes active-modes})))
     {:opts (if (or (:fix opts) (:reformat opts) (:stdout opts) (:help opts))
              opts
              (assoc opts :check true))

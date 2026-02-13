@@ -55,10 +55,21 @@
       (is (= {:opts {:fix true :line-length 120} :args ["src/foo.clj"]}
              (cli/parse-args ["--fix" "--line-length" "120" "src/foo.clj"]))))
 
-    (testing "when multiple modes specified, last wins"
-      ;; babashka.cli default behavior: later flags override earlier ones
-      (is (= {:opts {:fix true :stdout true} :args []}
+    (testing "when multiple modes specified"
+      (testing "throws arg-error"
+        (is (thrown-with-msg?
+             clojure.lang.ExceptionInfo
+             #"only one mode flag allowed"
              (cli/parse-args ["--fix" "--stdout"]))))
+
+      (testing "includes conflicting modes in ex-data"
+        (try
+          (cli/parse-args ["--check" "--reformat"])
+          (is false "Should have thrown")
+          (catch clojure.lang.ExceptionInfo e
+            (is (= :arg-error (:type (ex-data e))))
+            (is (= [:check :reformat]
+                   (:modes (ex-data e))))))))
 
     (testing "when --line-length is given without a value"
       ;; babashka.cli treats flag as boolean true then fails coercion
