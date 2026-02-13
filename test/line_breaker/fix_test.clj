@@ -561,6 +561,58 @@
                       "  body)")
                  result)))))))
 
+(deftest join-form-edits-test
+  ;; Verify collapsing multi-line forms back to single lines.
+  ;; join-form-edits generates edits that replace inter-child whitespace
+  ;; (newlines + indent) with single spaces.
+  (testing "join-form-edits"
+    (testing "for a multi-line list"
+      (testing "generates space-replacement edits"
+        (let [source "(a\n b\n c)"
+              tree (parser/parse-source source)
+              form (first (node/named-children (node/root-node tree)))
+              edits (fix/join-form-edits form)]
+          (is (some? edits))
+          (is (= "(a b c)" (fix/apply-edits source edits))))))
+
+    (testing "for a multi-line map"
+      (testing "generates space-replacement edits"
+        (let [source "{:a 1\n :b 2}"
+              tree (parser/parse-source source)
+              form (first (node/named-children (node/root-node tree)))
+              edits (fix/join-form-edits form)]
+          (is (some? edits))
+          (is (= "{:a 1 :b 2}" (fix/apply-edits source edits))))))
+
+    (testing "for a multi-line vector"
+      (testing "generates space-replacement edits"
+        (let [source "[a\n b\n c]"
+              tree (parser/parse-source source)
+              form (first (node/named-children (node/root-node tree)))
+              edits (fix/join-form-edits form)]
+          (is (some? edits))
+          (is (= "[a b c]" (fix/apply-edits source edits))))))
+
+    (testing "for an already single-line form"
+      (testing "returns nil"
+        (let [source "(a b c)"
+              tree (parser/parse-source source)
+              form (first (node/named-children (node/root-node tree)))]
+          (is (nil? (fix/join-form-edits form))))))
+
+    (testing "for a nil node"
+      (testing "returns nil"
+        (is (nil? (fix/join-form-edits nil)))))
+
+    (testing "for a deeply indented multi-line form"
+      (testing "collapses indent whitespace to single space"
+        (let [source "(a\n      b\n      c)"
+              tree (parser/parse-source source)
+              form (first (node/named-children (node/root-node tree)))
+              edits (fix/join-form-edits form)]
+          (is (some? edits))
+          (is (= "(a b c)" (fix/apply-edits source edits))))))))
+
 (deftest comment-handling-test
   ;; Verify inline comments stay attached and don't cause extra blank lines.
   (testing "comment handling"

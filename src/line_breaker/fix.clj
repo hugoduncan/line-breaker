@@ -310,7 +310,7 @@
   ([tree line ignored-ranges]
    (first (find-breakable-forms tree line ignored-ranges))))
 
-;;; Form breaking
+;;; Byte offset helpers
 
 (defn- element-start-offset
   "Get the start byte offset of a node."
@@ -321,6 +321,37 @@
   "Get the end byte offset of a node."
   [node]
   (second (node/node-range node)))
+
+;;; Form joining (un-breaking)
+
+(defn join-form-edits
+  "Generate edits that collapse a multi-line form back to a single line.
+
+  Given a node that spans multiple lines, iterates through consecutive
+  pairs of named children and generates edits replacing inter-child
+  whitespace (newlines + indent) with single spaces. Returns a vector
+  of {:start :end :replacement} edits, or nil if the node is already
+  single-line."
+  [node]
+  (when node
+    (let [[start-line end-line] (node/node-line-range node)]
+      (when (not= start-line end-line)
+        (let [children (node/named-children node)
+              edits (into []
+                          (keep (fn [[prev-child next-child]]
+                                  (let [end-byte (element-end-offset
+                                                  prev-child)
+                                        start-byte (element-start-offset
+                                                    next-child)]
+                                    (when (> start-byte end-byte)
+                                      {:start end-byte
+                                       :end start-byte
+                                       :replacement " "}))))
+                          (partition 2 1 children))]
+          (when (seq edits)
+            edits))))))
+
+;;; Form breaking
 
 (defn- form-start-column
   "Get the column where the form starts (0-indexed)."
