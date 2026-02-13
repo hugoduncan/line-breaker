@@ -836,16 +836,15 @@
                       "                 c)}")
                  result))))
 
-      (testing "breaks value in-place even when first line still exceeds"
-        ;; Phase 1/2 breaks value in-place. First line may still exceed
-        ;; when the key+value-head is too wide. Phase 3 will resolve
-        ;; this by moving the value to its own line.
+      (testing "moves value to own line when in-place breaking insufficient"
+        ;; Phase 3: key+value-head too wide after in-place breaking.
+        ;; Value is un-broken, moved to own line, then re-broken.
         (let [source "{:some-long-key (fn-call a b c d e)}"
               result (fix/fix-source source {:line-length 20})]
-          (is (not (str/includes? result ":some-long-key\n"))
-              "key and value not split")
-          (is (str/includes? result "(fn-call\n")
-              "value is broken in-place")))
+          (is (str/includes? result ":some-long-key\n")
+              "value moved to own line")
+          (is (< (apply max (map count (str/split-lines result))) 21)
+              "all lines within limit")))
 
       (testing "keeps atomic values with keys even when exceeding limit"
         (let [source "{:some-long-key atomic-val}"
@@ -969,6 +968,85 @@
               result (fix/fix-source source {:line-length 25})]
           (is (str/includes? result "(test?) (long-fn")
               "test stays with result head")
+          (is (< (apply max (map count (str/split-lines result))) 26)
+              "all lines within limit")))))
+
+  (testing "Phase 3"
+    (testing "for binding vectors"
+      (testing "moves value to own line when in-place breaking insufficient"
+        ;; name + value-head exceeds limit even after Phase 2.
+        ;; Phase 3 un-breaks value and moves it to its own line.
+        (let [source "(let [a-ridiculously-long-name (some-fn arg1)] body)"
+              result (fix/fix-source source {:line-length 35})]
+          (is (str/includes? result "a-ridiculously-long-name\n")
+              "value moved to own line")
+          (is (str/includes? result "(some-fn arg1)")
+              "value is present as single line or re-broken")
+          (is (< (apply max (map count (str/split-lines result))) 36)
+              "all lines within limit")))
+
+      (testing "re-breaks value on new line when still exceeding"
+        ;; After Phase 3 moves value to own line, it may still exceed.
+        ;; The iterative loop re-breaks it.
+        (let [source (str "(let [a-ridiculously-long-name"
+                          " (some-fn arg1 arg2 arg3 arg4 arg5)]"
+                          " body)")
+              result (fix/fix-source source {:line-length 35})]
+          (is (str/includes? result "a-ridiculously-long-name\n")
+              "value moved to own line")
+          (is (str/includes? result "(some-fn\n")
+              "value re-broken on new line")
+          (is (< (apply max (map count (str/split-lines result))) 36)
+              "all lines within limit"))))
+
+    (testing "for maps"
+      (testing "moves value to own line"
+        (let [source "{:a-key-that-is-very-long (some-fn arg1 arg2)}"
+              result (fix/fix-source source {:line-length 30})]
+          (is (str/includes? result ":a-key-that-is-very-long\n")
+              "value moved to own line")
+          (is (< (apply max (map count (str/split-lines result))) 31)
+              "all lines within limit")))
+
+      (testing "re-breaks value on new line when still exceeding"
+        (let [source "{:long-key (fn-call a b c d e)}"
+              result (fix/fix-source source {:line-length 15})]
+          (is (str/includes? result ":long-key\n")
+              "value moved to own line")
+          (is (str/includes? result "(fn-call\n")
+              "value re-broken on new line")
+          (is (< (apply max (map count (str/split-lines result))) 16)
+              "all lines within limit"))))
+
+    (testing "for cond"
+      (testing "moves result to own line"
+        ;; Atomic test name ensures it won't be broken before Phase 3.
+        (let [source (str "(cond long-test-name"
+                          " (some-long-fn a b c))")
+              result (fix/fix-source source {:line-length 25})]
+          (is (str/includes? result "long-test-name\n")
+              "result moved to own line")
+          (is (< (apply max (map count (str/split-lines result))) 26)
+              "all lines within limit"))))
+
+    (testing "for condp"
+      (testing "moves result to own line"
+        (let [source "(condp = x (long-test? a b) (long-fn c d) :else e)"
+              result (fix/fix-source source {:line-length 25})]
+          (is (< (apply max (map count (str/split-lines result))) 26)
+              "all lines within limit"))))
+
+    (testing "for case"
+      (testing "moves result to own line"
+        (let [source "(case x :a-long-test-val (some-long-fn a b c))"
+              result (fix/fix-source source {:line-length 25})]
+          (is (< (apply max (map count (str/split-lines result))) 26)
+              "all lines within limit"))))
+
+    (testing "for cond->"
+      (testing "moves result to own line"
+        (let [source "(cond-> x (a-very-long-test?) (some-long-fn a b))"
+              result (fix/fix-source source {:line-length 25})]
           (is (< (apply max (map count (str/split-lines result))) 26)
               "all lines within limit"))))))
 

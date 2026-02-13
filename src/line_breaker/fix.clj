@@ -354,11 +354,25 @@
   (let [[start-line end-line] (node/node-line-range node)]
     (= start-line end-line)))
 
+(defn- first-line-end-column
+  "Get the end column of a node's first line.
+  For single-line nodes, returns the end column. For multi-line nodes,
+  computes start column + length of the first line of the node's text."
+  [node]
+  (if (single-line-node? node)
+    (:column (node/node-end-position node))
+    (let [start-col (:column (node/node-position node))
+          text (node/node-text node)
+          newline-idx (.indexOf ^String text "\n")]
+      (+ start-col newline-idx))))
+
 (defn- find-exceeding-pair
   "Find the first pair in a pair-grouped form whose elements are on the
-  same line and whose end column exceeds max-length.
+  same line and whose first line exceeds max-length.
 
-  Returns [name-node value-node] or nil. Pairs are determined by the
+  Returns [name-node value-node] or nil. Uses the value's first-line
+  end column to detect violations, which correctly handles multi-line
+  values where the last line may be short. Pairs are determined by the
   form's pair grouping structure: maps and binding vectors pair from
   the start, while cond/case/condp/cond-> skip a prefix of non-pair
   elements. Comments are filtered before pairing."
@@ -372,8 +386,7 @@
           pairs (partition 2 (drop prefix non-comment))]
       (some (fn [[name-node value-node]]
               (when (and (same-line? name-node value-node)
-                         (> (:column (node/node-end-position
-                                      value-node))
+                         (> (first-line-end-column value-node)
                             max-length))
                 [name-node value-node]))
             pairs))))
@@ -481,9 +494,12 @@
 
   For forms that use pair grouping (maps, cond, case), keeps related pairs
   together (key-value, test-result, etc.) and breaks only between pairs.
-  When a pair exceeds the line limit and the value is a single-line breakable
-  form, the pair is kept together (deferred) to let the iterative loop try
-  breaking the value in-place first.
+
+  Three-phase escalation for pair-grouped forms with exceeding pairs:
+  - Phase 1: value is single-line and breakable — defer splitting, let the
+    iterative loop break the value in-place
+  - Phase 3: value is multi-line and breakable — un-break value (collapse to
+    single line), move to own line at indent-col, let iterative loop re-break
 
   Comments on the same line as the preceding element stay attached.
   Comments include their trailing newline, so no extra newline is added after.
@@ -502,32 +518,42 @@
            ;; For pair-grouped forms, check if any pair exceeds limit
            exceeding-pair (when (uses-pair-grouping? node config)
                             (find-exceeding-pair node rule max-length))
-           [_ exc-value] exceeding-pair
-           ;; Phase 1: single-line breakable value → defer (don't split),
-           ;; let the iterative loop try breaking the value in-place.
-           ;; Temporary fallback: multi-line breakable value in first
-           ;; kept pair → eager split (Phase 3 will replace this).
-           keep-count (if (and exceeding-pair
-                               (breakable-node? exc-value)
-                               (not (single-line-node? exc-value))
-                               (#{:map :binding-vector} rule))
-                        1
-                        base-keep-count)
-           ;; Elements that need breaking: skip the ones kept on first line
-           breakable-children (drop keep-count children)]
-       (when (seq breakable-children)
-         (let [;; Get the last element that stays on first line
-               last-kept (nth children (dec keep-count))
-               ;; Generate edits based on whether pair grouping applies
-               ;; When splitting a pair, use sequential breaking for that split
-               edits (if (and (uses-pair-grouping? node config)
-                              (= keep-count base-keep-count))
-                       (generate-paired-edits
-                        last-kept breakable-children indent-col)
-                       (generate-sequential-edits
-                        last-kept breakable-children indent-col))]
-           (when (seq edits)
-             edits)))))))
+           [exc-name exc-value] exceeding-pair
+           ;; Phase 3: multi-line breakable value — un-break and move
+           ;; to own line. Phase 2 already broke it in-place but the
+           ;; first line still exceeds.
+           phase-3? (and exceeding-pair
+                         (breakable-node? exc-value)
+                         (not (single-line-node? exc-value)))
+           breakable-children (drop base-keep-count children)]
+       (if phase-3?
+         ;; Phase 3: un-break value + split name/value + inter-pair edits
+         (let [join-edits (join-form-edits exc-value)
+               indent-str (apply str (repeat indent-col \space))
+               split-edit {:start (element-end-offset exc-name)
+                           :end (element-start-offset exc-value)
+                           :replacement (str "\n" indent-str)}
+               pair-edits (when (seq breakable-children)
+                            (generate-paired-edits
+                             (nth children (dec base-keep-count))
+                             breakable-children indent-col))
+               all-edits (into (vec pair-edits)
+                               (if join-edits
+                                 (cons split-edit join-edits)
+                                 [split-edit]))]
+           (when (seq all-edits)
+             all-edits))
+         ;; Normal breaking (Phase 1 deferral is implicit — single-line
+         ;; breakable values are kept together by generate-paired-edits)
+         (when (seq breakable-children)
+           (let [last-kept (nth children (dec base-keep-count))
+                 edits (if (uses-pair-grouping? node config)
+                         (generate-paired-edits
+                          last-kept breakable-children indent-col)
+                         (generate-sequential-edits
+                          last-kept breakable-children indent-col))]
+             (when (seq edits)
+               edits))))))))
 
 ;;; Line length checking
 
