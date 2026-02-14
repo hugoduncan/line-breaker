@@ -250,7 +250,24 @@
       (let [short-source "(a b c)"
             long-source (str "(" (apply str (repeat 40 "a ")) ")")]
         (is (= short-source (fix/fix-source short-source {})))
-        (is (not= long-source (fix/fix-source long-source {})))))))
+        (is (not= long-source (fix/fix-source long-source {})))))
+
+    (testing "given parent and child forms on different long lines"
+      (testing "does not use child's stale column for indent"
+        ;; After pair-breaking, the closing `)))) (reduce` puts reduce
+        ;; at a high column on a different line than the parent let.
+        ;; fix-source must not break reduce using that stale column.
+        (let [source (str "  (let [s (sort > e)]\n"
+                          "    (doseq [[h l] (partition 2 1 s)]\n"
+                          "      (when (> (:end l) (:s h))\n"
+                          "        (throw (ex-info \"err\""
+                          " {:a l :b h}))))"
+                          " (reduce (fn [s e]"
+                          " (str s e)) source s))")
+              result (fix/fix-source source {:line-length 40})]
+          ;; reduce's fn arg must be at col 5, not col 50+
+          (is (re-find #"(?m)^ {5}\(fn " result)
+              "fn indented at reduce-col + 1"))))))
 
 (deftest indent-rules-test
   ;; Verify that :defn and :def indent rules keep name on first line.
@@ -1687,3 +1704,60 @@
                      "  :one (= x 2)\n"
                      "  :two)")
                 {:line-length 80})))))))
+
+(deftest reformat-no-rightward-drift-test
+  ;; When fix-source processes multiple long lines in one pass, a
+  ;; parent form (e.g. let) on line N and a child form (e.g. reduce)
+  ;; on line N+1 could both be broken. The child's indent must be
+  ;; computed from its position AFTER the parent's edits move it, not
+  ;; from its pre-edit column on the collapsed line.
+  (testing "reformat-source"
+    (testing "given nested forms on a long collapsed line"
+      (testing "does not drift child indentation rightward"
+        (let [input (str "(defn process\n"
+                         "  [source edits]\n"
+                         "  (let [sorted (sort-by :s > edits)]\n"
+                         "    (doseq [[h l] (partition 2 1 sorted)]\n"
+                         "      (when (> (:end l) (:start h))\n"
+                         "        (throw (ex-info \"err\""
+                         " {:a l :b h}))))\n"
+                         "    (reduce\n"
+                         "     (fn [s {:keys [start end rep]}]\n"
+                         "       (str (subs s 0 start)"
+                         " rep (subs s end)))\n"
+                         "     source\n"
+                         "     sorted)))")
+              result (fix/reformat-source input {:line-length 40})]
+          ;; reduce's children must be at column 5 (reduce-col + 1),
+          ;; not at a high column from the collapsed line
+          (is (every? #(<= (count %) 40)
+                      (.split result "\n"))
+              "no line exceeds line-length")
+          ;; Check reduce's fn arg is properly indented
+          (is (re-find #"(?m)^ {5}\(fn " result)
+              "fn arg indented at col 5 (reduce col+1)"))))
+
+    (testing "given deeply nested let with body forms on a single line"
+      (testing "breaks body forms at correct indentation"
+        (let [input (str "(defn run\n"
+                         "  [x]\n"
+                         "  (let [a (compute x)]\n"
+                         "    (when (pos? a)\n"
+                         "      (println a))\n"
+                         "    (transform a x)))")
+              result (fix/reformat-source input {:line-length 30})]
+          ;; Verify no extreme indentation
+          (is (every? #(<= (count %) 30)
+                      (.split result "\n"))
+              "no line exceeds line-length"))))
+
+    (testing "given a form that was already correct"
+      (testing "is idempotent"
+        (let [input (str "(defn foo\n"
+                         "  [x y]\n"
+                         "  (let [a (bar x)]\n"
+                         "    (baz a y)))")
+              result (fix/reformat-source input {:line-length 40})]
+          (is (= result
+                 (fix/reformat-source result {:line-length 40}))
+              "second reformat produces same output"))))))
