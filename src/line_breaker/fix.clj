@@ -617,13 +617,25 @@
                 existing-edits))
         new-edits))
 
+(defn- inside-broken-form?
+  "Returns true if range is contained within any range in broken-ranges.
+  A child form whose parent was already broken in this pass should not
+  be broken until the next pass, when it will have correct column
+  positions after re-parsing."
+  [broken-ranges [start end]]
+  (some (fn [[s e]]
+          (and (<= s start) (<= end e)))
+        broken-ranges))
+
 (defn- try-break-on-lines
   "Break the outermost form on every long line in a single pass.
 
   Breadth-first: breaks all outermost forms across all long lines before
   descending into sub-forms. Deduplicates by byte range so a form spanning
   multiple long lines is only broken once. Skips forms whose edits would
-  overlap with already-collected edits (retried next iteration).
+  overlap with already-collected edits (retried next iteration). Skips
+  forms contained within an already-broken form to avoid using stale
+  column positions for indent computation.
   Falls back to deeper forms when the outermost form on a line produces
   no change.
   Returns the new source if any forms were broken, nil otherwise."
@@ -642,7 +654,8 @@
               (some
                (fn [form]
                  (let [range (node/node-range form)]
-                   (when-not (@seen range)
+                   (when-not (or (@seen range)
+                                 (inside-broken-form? @seen range))
                      (let [edits (break-form form config)]
                        (when (and (seq edits)
                                   (edits-change-source?
