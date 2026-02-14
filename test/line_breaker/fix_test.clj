@@ -1586,3 +1586,104 @@
                    "  (+ x\n"
                    "    (very-long-computation x)))")
               {:line-length 30}))))))
+
+(deftest apply-pair-breaking-test
+  ;; Verify that apply-pair-breaking forces pair-grouped forms onto
+  ;; separate lines even when they fit within the line length.
+  ;; Single-pair forms are left on one line.
+  (testing
+   "apply-pair-breaking"
+    (testing "given a map with multiple pairs"
+      (testing "breaks each pair onto its own line"
+        (is (= "{:a 1\n :b 2\n :c 3}"
+               (fix/apply-pair-breaking
+                "{:a 1 :b 2 :c 3}" {})))))
+    (testing "given a map with one pair"
+      (testing "leaves it on one line"
+        (is (= "{:a 1}"
+               (fix/apply-pair-breaking
+                "{:a 1}" {})))))
+    (testing "given a cond with multiple clauses"
+      (testing "breaks each clause onto its own line"
+        (is (= (str "(cond\n"
+                    "  (= x 1) :one\n"
+                    "  (= x 2) :two\n"
+                    "  :else :other)")
+               (fix/apply-pair-breaking
+                (str "(cond (= x 1) :one"
+                     " (= x 2) :two"
+                     " :else :other)")
+                {})))))
+    (testing "given a cond with one clause"
+      (testing "leaves it on one line"
+        (is (= "(cond (= x 1) :one)"
+               (fix/apply-pair-breaking
+                "(cond (= x 1) :one)"
+                {})))))
+    (testing "given a condp with multiple clauses"
+      (testing "breaks each clause onto its own line"
+        (is (= (str "(condp = x\n"
+                    "  1 :one\n"
+                    "  2 :two)")
+               (fix/apply-pair-breaking
+                "(condp = x 1 :one 2 :two)"
+                {})))))
+    (testing "given a case with multiple clauses"
+      (testing "breaks each clause onto its own line"
+        (is (= (str "(case x\n"
+                    "  1 :one\n"
+                    "  2 :two)")
+               (fix/apply-pair-breaking
+                "(case x 1 :one 2 :two)"
+                {})))))
+    (testing "given a cond-> with multiple clauses"
+      (testing "breaks each clause onto its own line"
+        (is (= (str "(cond-> x\n"
+                    "  true inc\n"
+                    "  false dec)")
+               (fix/apply-pair-breaking
+                "(cond-> x true inc false dec)"
+                {})))))
+    (testing "given a binding vector"
+      (testing "breaks each pair onto its own line"
+        (is (= "(let [a 1\n      b 2] (+ a b))"
+               (fix/apply-pair-breaking
+                "(let [a 1 b 2] (+ a b))"
+                {})))))
+    (testing "given nested maps"
+      (testing "breaks both outer and inner maps"
+        (is (= "{:a {:x 1\n     :y 2}\n :b 3}"
+               (fix/apply-pair-breaking
+                "{:a {:x 1 :y 2} :b 3}"
+                {})))))))
+
+(deftest reformat-source-pair-breaking-test
+  ;; Verify that reformat-source forces pair-grouped forms to break
+  ;; even when they fit within the line length after collapse.
+  (testing
+   "reformat-source with pair breaking"
+    (testing "given a map that fits on one line"
+      (testing "forces pair breaking"
+        (is (= "{:a 1\n :b 2\n :c 3}"
+               (fix/reformat-source
+                "{:a 1 :b 2 :c 3}"
+                {:line-length 80})))))
+    (testing "given a defn containing a map"
+      (testing "forces map pair breaking"
+        (is (= (str "(defn foo\n"
+                    "  []\n"
+                    "  {:a 1\n"
+                    "   :b 2})")
+               (fix/reformat-source
+                "(defn foo [] {:a 1 :b 2})"
+                {:line-length 80})))))
+    (testing "given a poorly broken cond"
+      (testing "collapses then pair-breaks"
+        (is (= (str "(cond\n"
+                    "  (= x 1) :one\n"
+                    "  (= x 2) :two)")
+               (fix/reformat-source
+                (str "(cond (= x 1)\n"
+                     "  :one (= x 2)\n"
+                     "  :two)")
+                {:line-length 80})))))))

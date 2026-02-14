@@ -899,11 +899,103 @@
               (recur (apply-edits s edits) (inc iteration))
               s)))))))
 
+;;; Forced pair breaking (reformat only)
+
+(defn- pair-group-count
+  "Count the number of pairs in a pair-grouped form.
+  For maps and binding vectors, all children form pairs. For cond/case/
+  condp/cond->, skips the non-pair prefix elements. Comments are
+  excluded before counting."
+  [node config]
+  (let [rule (get-effective-rule node config)
+        children (node/named-children node)
+        prefix (if (#{:map :binding-vector} rule)
+                 0
+                 (elements-to-keep-on-first-line rule))
+        non-comment (remove comment-node? (drop prefix children))]
+    (count (partition-all 2 non-comment))))
+
+(defn- has-unseparated-pairs?
+  "Returns true if node has consecutive pairs sharing a line.
+  Pairs that should each be on their own line are identified by the
+  pair grouping structure. If any pair's first element is on the same
+  line as the previous pair's last element, breaking is needed."
+  [node config]
+  (let [rule (get-effective-rule node config)
+        children (node/named-children node)
+        prefix (if (#{:map :binding-vector} rule)
+                 0
+                 (elements-to-keep-on-first-line rule))
+        non-comment (remove comment-node? (drop prefix children))
+        pairs (partition-all 2 non-comment)]
+    (some
+     (fn [[prev-pair next-pair]]
+       (let [prev-last (last prev-pair)
+             next-first (first next-pair)]
+         (contiguous-line? prev-last next-first)))
+     (partition 2 1 pairs))))
+
+(defn- needs-pair-breaking?
+  "Returns true if node is a pair-grouped form with >1 pair that has
+  consecutive pairs on the same line. Does not require at-line-start
+  because the pre-order walk breaks outermost forms first, ensuring
+  inner forms are at their final position when reached."
+  [node config]
+  (and
+   (breakable-node? node)
+   (uses-pair-grouping? node config)
+   (> (pair-group-count node config) 1)
+   (has-unseparated-pairs? node config)))
+
+(defn- generate-pair-break-edits
+  "Generate edits to break a pair-grouped form so each pair is on its
+  own line. Returns edits or nil."
+  [node config]
+  (let [rule (get-effective-rule node config)
+        children (node/named-children node)
+        base-keep-count (elements-to-keep-on-first-line rule)
+        indent-col (indent-column node rule)
+        breakable-children (drop base-keep-count children)]
+    (when (seq breakable-children)
+      (let [last-kept (nth children (dec base-keep-count))
+            edits (generate-paired-edits
+                   last-kept breakable-children indent-col)]
+        (when (seq edits)
+          edits)))))
+
+(defn- find-first-pair-breakable-form
+  "Pre-order walk returning the first pair-grouped form that needs
+  pair breaking: single-line with >1 pair."
+  [node config]
+  (when node
+    (if (needs-pair-breaking? node config)
+      node
+      (some
+       #(find-first-pair-breakable-form % config)
+       (node/named-children node)))))
+
+(defn apply-pair-breaking
+  "Force pair-grouped forms to break so each pair is on its own line.
+  Iteratively finds the first qualifying form, applies edits, and
+  re-parses until no more forms need breaking."
+  [source config]
+  (loop [s source
+         iteration 0]
+    (if (>= iteration max-iterations)
+      s
+      (let [tree (parser/parse-source s)
+            root (node/root-node tree)
+            form (find-first-pair-breakable-form root config)]
+        (if-not form
+          s
+          (let [edits (generate-pair-break-edits form config)]
+            (if (seq edits)
+              (recur (apply-edits s edits) (inc iteration))
+              s)))))))
+
 (defn reformat-source
-  "Reformat source by collapsing then iteratively applying forced breaks
-  and fix-source until stable. Forced breaks only apply to forms at the
-  start of their line, so the loop converges as fix-source positions
-  more forms correctly for forced breaking on each iteration."
+  "Reformat source by collapsing then iteratively applying forced breaks,
+  pair breaking, and fix-source until stable."
   [source config]
   (let [collapsed (collapse-top-level-forms source)]
     (loop [s collapsed
@@ -912,6 +1004,7 @@
         s
         (let [result (-> s
                          (apply-forced-breaks config)
+                         (apply-pair-breaking config)
                          (fix-source config))]
           (if (= result s)
             result
