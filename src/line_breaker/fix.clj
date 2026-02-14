@@ -844,25 +844,46 @@
                                                  indent-col)))))))
                 break-positions))))))
 
+(defn- at-line-start?
+  "Returns true if only whitespace precedes node on its line.
+  Forms in the middle of a line (after other code) are not at line start.
+  Used to skip forced breaks on forms not yet at their final column."
+  [node source]
+  (let [start-byte (first (node/node-range node))
+        start-char (byte-offset->char-index source start-byte)]
+    (loop [i (dec start-char)]
+      (if (neg? i)
+        true
+        (let [c (.charAt source i)]
+          (cond
+            (= c \newline) true
+            (Character/isWhitespace c) (recur (dec i))
+            :else false))))))
+
 (defn- find-first-forcible-form
   "Pre-order walk returning the first list_lit that matches a force-break
-  rule and needs breaks inserted."
-  [node config]
+  rule and needs breaks inserted. Only returns forms at the start of
+  their line (preceded only by whitespace) to avoid applying forced
+  breaks at transient column positions before parent forms are broken."
+  [node source config]
   (when node
     (if (and (= :list_lit (node/node-type node))
+             (at-line-start? node source)
              (let [rule (get-force-break-rule node config)]
                (when rule
                  (let [children (node/named-children node)
                        positions (forced-break-positions children rule)]
                    (form-needs-forced-break? children positions)))))
       node
-      (some #(find-first-forcible-form % config)
+      (some #(find-first-forcible-form % source config)
             (node/named-children node)))))
 
 (defn apply-forced-breaks
   "Insert forced line breaks at structurally significant positions.
   Iteratively finds forms matching force-break rules and inserts line
-  breaks, re-parsing between each to maintain correct column positions."
+  breaks, re-parsing between each to maintain correct column positions.
+  Only breaks forms at the start of their line to avoid applying
+  forced breaks at transient column positions."
   [source config]
   (loop [s source
          iteration 0]
@@ -870,7 +891,7 @@
       s
       (let [tree (parser/parse-source s)
             root (node/root-node tree)
-            form (find-first-forcible-form root config)]
+            form (find-first-forcible-form root s config)]
         (if-not form
           s
           (let [edits (generate-forced-break-edits form config)]
@@ -879,13 +900,19 @@
               s)))))))
 
 (defn reformat-source
-  "Reformat source by collapsing, applying forced breaks, then re-breaking.
-  Three-pass approach: first collapses every top-level form to a single
-  line, then inserts forced line breaks at structurally significant
-  positions, then applies fix-source to re-break any lines exceeding
-  the configured line length."
+  "Reformat source by collapsing then iteratively applying forced breaks
+  and fix-source until stable. Forced breaks only apply to forms at the
+  start of their line, so the loop converges as fix-source positions
+  more forms correctly for forced breaking on each iteration."
   [source config]
-  (-> source
-      collapse-top-level-forms
-      (apply-forced-breaks config)
-      (fix-source config)))
+  (let [collapsed (collapse-top-level-forms source)]
+    (loop [s collapsed
+           iteration 0]
+      (if (>= iteration max-iterations)
+        s
+        (let [result (-> s
+                         (apply-forced-breaks config)
+                         (fix-source config))]
+          (if (= result s)
+            result
+            (recur result (inc iteration))))))))
