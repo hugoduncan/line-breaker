@@ -606,16 +606,30 @@
   than 10-20 passes) while catching bugs that cause infinite loops."
   100)
 
+(defn- edits-overlap?
+  "Returns true if any edit in new-edits overlaps with any in
+  existing-edits. Edits overlap when their byte ranges intersect."
+  [existing-edits new-edits]
+  (some (fn [new-edit]
+          (some (fn [existing]
+                  (and (< (:start new-edit) (:end existing))
+                       (< (:start existing) (:end new-edit))))
+                existing-edits))
+        new-edits))
+
 (defn- try-break-on-lines
   "Break the outermost form on every long line in a single pass.
 
   Breadth-first: breaks all outermost forms across all long lines before
   descending into sub-forms. Deduplicates by byte range so a form spanning
-  multiple long lines is only broken once. Falls back to deeper forms
-  when the outermost form on a line produces no change.
+  multiple long lines is only broken once. Skips forms whose edits would
+  overlap with already-collected edits (retried next iteration).
+  Falls back to deeper forms when the outermost form on a line produces
+  no change.
   Returns the new source if any forms were broken, nil otherwise."
   [source tree long-lines ignored-ranges config]
   (let [seen (volatile! #{})
+        collected (volatile! [])
         all-edits
         (into
          []
@@ -632,8 +646,11 @@
                      (let [edits (break-form form config)]
                        (when (and (seq edits)
                                   (edits-change-source?
-                                   source edits))
+                                   source edits)
+                                  (not (edits-overlap?
+                                        @collected edits)))
                          (vswap! seen conj range)
+                         (vswap! collected into edits)
                          edits)))))
                forms))))
          long-lines)]
