@@ -1008,7 +1008,9 @@
 
 (defn reformat-source
   "Reformat source by collapsing then iteratively applying forced breaks,
-  pair breaking, and fix-source until stable."
+  fix-source, and pair breaking until stable.
+  Pair breaking runs after fix-source so forms are at their correct
+  column positions when pair-break indentation is computed."
   [source config]
   (let [collapsed (collapse-top-level-forms source)]
     (loop [s collapsed
@@ -1017,8 +1019,8 @@
         s
         (let [result (-> s
                          (apply-forced-breaks config)
-                         (apply-pair-breaking config)
-                         (fix-source config))]
+                         (fix-source config)
+                         (apply-pair-breaking config))]
           (if (= result s)
             result
             (recur result (inc iteration))))))))
