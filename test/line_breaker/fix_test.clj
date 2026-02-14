@@ -1562,9 +1562,9 @@
     (testing "preserves EOL comment through collapse and re-break"
       (is (= (str "(defn my-longer-fn\n"
                   "  [x] ;; arg\n"
-                  " (+\n"
-                  "  x\n"
-                  "  (very-long-computation x)))")
+                  "  (+\n"
+                  "   x\n"
+                  "   (very-long-computation x)))")
              (fix/reformat-source
               (str "(defn my-longer-fn\n"
                    "  [x] ;; arg\n"

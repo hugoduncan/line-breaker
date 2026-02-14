@@ -234,13 +234,16 @@
 
 (defn- form-needs-breaking-on-line?
   "Returns true if form has consecutive children both on the target line.
-  A form already broken (children on separate lines) returns false."
+  Uses end-line for prev-child to handle multiline nodes (e.g. after
+  forced breaks, a multiline child ends on a line where the next sibling
+  starts). A form already broken (children on separate lines) returns
+  false."
   [node line]
   (let [children (node/named-children node)]
     (some (fn [[prev-child next-child]]
-            (let [prev-line (node-start-line prev-child)
+            (let [[_ prev-end-line] (node/node-line-range prev-child)
                   next-line (node-start-line next-child)]
-              (= prev-line next-line line)))
+              (= prev-end-line next-line line)))
           (partition 2 1 children))))
 
 (defn- node-in-ignored-range?
