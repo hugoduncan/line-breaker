@@ -79,6 +79,11 @@ Install pre-commit hooks (auto-formats and lints):
 ./scripts/install-hooks.sh
 ```
 
+### Working on --reformat
+
+Always commit changes before testing --reformat on the projects own
+codebase, so you can revert without losing work.
+
 ## Conventions
 
 - Use semantic commit messages
