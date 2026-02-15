@@ -1,0 +1,2 @@
+{:indents {with-temp-dir :binding
+           with-captured-output :do}}
