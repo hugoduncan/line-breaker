@@ -1618,8 +1618,8 @@
 
     (testing "preserves whole-line comment through collapse and re-break"
       (is (= (str "(defn my-longer-fn\n"
-                  ";; does computation\n"
-                  " [x]\n"
+                  "  ;; does computation\n"
+                  "  [x]\n"
                   "  (+\n"
                   "   x\n"
                   "   (very-long-computation x)))")
@@ -1731,6 +1731,42 @@
                      "  :one (= x 2)\n"
                      "  :two)")
                 {:line-length 80})))))))
+
+(deftest reformat-comment-indentation-test
+  ;; Verify that whole-line comments inside pair-grouped forms retain
+  ;; correct indentation after collapse and re-break, and that forms
+  ;; following comment chains in forced-break positions are re-indented.
+  (testing "reformat-source"
+    (testing "given whole-line comments inside cond branches"
+      (testing "indents comments to cond body indent"
+        (let [input (str "(cond\n"
+                         "  (= :x rule)\n"
+                         "  ;; First comment.\n"
+                         "  ;; Second comment.\n"
+                         "  (if-let [c (f n)]\n"
+                         "    (g c)\n"
+                         "    (+ 1 b))\n"
+                         "  (some? r) (+ 2 b)\n"
+                         "  :else (+ 1 b))")
+              result (fix/reformat-source input {:line-length 40})]
+          (is (re-find #"(?m)^  ;; First comment\." result)
+              "first comment at column 2")
+          (is (re-find #"(?m)^  ;; Second comment\." result)
+              "second comment at column 2")
+          (is (re-find #"(?m)^  \(if-let " result)
+              "if-let at column 2"))))
+
+    (testing "given a defn with comment before argvec"
+      (testing "indents comment and argvec to body indent"
+        (let [input (str "(defn foo\n"
+                         "  ;; doc comment\n"
+                         "  [x]\n"
+                         "  (+ x 1))")
+              result (fix/reformat-source input {:line-length 40})]
+          (is (re-find #"(?m)^  ;; doc comment" result)
+              "comment at column 2")
+          (is (re-find #"(?m)^  \[x\]" result)
+              "argvec at column 2"))))))
 
 (deftest reformat-no-rightward-drift-test
   ;; When fix-source processes multiple long lines in one pass, a

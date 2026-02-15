@@ -122,6 +122,7 @@
    'when            :if
    'when-not        :if
    'when-first      :if
+   'testing         :if
    'case            :case
    'cond            :cond
    'condp           :condp
@@ -285,6 +286,39 @@
                     (node/named-children node))]
         (into (vec self) children-results)))))
 
+(defn- has-preceding-sibling-on-line?
+  "Returns true if node has a preceding sibling in its parent that
+  ends on the same line where node starts."
+  [node]
+  (when-let [parent (node/node-parent node)]
+    (let [node-start (node-start-line node)
+          node-range (node/node-range node)]
+      (some (fn [[prev-child next-child]]
+              (and (= (node/node-range next-child) node-range)
+                   (= (second (node/node-line-range prev-child))
+                      node-start)))
+            (partition 2 1 (node/named-children parent))))))
+
+(defn- find-ancestor-needing-sibling-separation
+  "Walk up from node to find the outermost ancestor that shares its
+  start line with a preceding sibling. Returns that ancestor's parent
+  (the breakable form whose children need separating), or nil.
+  Returns the outermost match so it is not blocked by
+  inside-broken-form? when an inner ancestor has already been broken."
+  [node]
+  (loop [n node
+         result nil]
+    (if-not n
+      result
+      (let [parent (node/node-parent n)]
+        (if-not parent
+          result
+          (recur parent
+                 (if (and (has-preceding-sibling-on-line? n)
+                          (breakable-node? parent))
+                   parent
+                   result)))))))
+
 (defn find-breakable-forms
   "Find all breakable forms containing the given line.
 
@@ -295,7 +329,8 @@
   ([tree line]
    (find-breakable-forms tree line #{}))
   ([tree line ignored-ranges]
-   (find-breakable-forms-on-line (node/root-node tree) line ignored-ranges)))
+   (find-breakable-forms-on-line
+    (node/root-node tree) line ignored-ranges)))
 
 (defn find-breakable-form
   "Find the outermost breakable form containing the given line.
@@ -450,44 +485,29 @@
        :end (element-start-offset next-child)
        :replacement (str "\n" indent-spaces)})))
 
-(defn- find-actual-prev-sibling
-  "Find the actual previous sibling of target-node in all-children.
-  Returns the node immediately before target-node, or fallback if target-node
-  is not found or is the first element."
-  [all-children target-node fallback]
-  (let [target-start (element-start-offset target-node)]
-    (or (last (take-while #(< (element-start-offset %) target-start)
-                          all-children))
-        fallback)))
-
 (defn- generate-paired-edits
   "Generate edits for pair-grouped breaking.
 
-  Groups elements in pairs and breaks only between pairs. Comments are filtered
-  out before pairing to prevent disrupting the grouping logic, but when
-  generating break edits, the actual previous sibling (which may be a comment)
-  is used so comments are preserved correctly."
+  Groups elements in pairs and breaks between pairs. Comments are filtered
+  out before pairing to prevent disrupting the grouping logic. Break edits
+  are generated for pair-start elements, comments, and elements following
+  comments so that whole-line comments within pairs get proper indentation."
   [last-kept breakable-children indent-col]
   ;; Filter out comments before pairing to avoid disrupting pair grouping.
   ;; Comments in binding vectors would otherwise shift the pairing (e.g.,
   ;; [a 1 ;comment b 2] would incorrectly pair as [[;comment b] [2]]).
   (let [non-comment-children (remove comment-node? breakable-children)
         pairs (partition-all 2 non-comment-children)
-        ;; For each pair, break before its first element.
-        ;; Use the actual previous sibling (may be a comment) for correct edits.
-        first-of-pairs (map first pairs)
-        prev-of-first-pair (find-actual-prev-sibling
-                            breakable-children (first first-of-pairs) last-kept)
-        prev-elements (cons prev-of-first-pair
-                            (map (fn [pair-first]
-                                   (find-actual-prev-sibling
-                                    breakable-children pair-first last-kept))
-                                 (rest first-of-pairs)))
-        break-points (map vector prev-elements first-of-pairs)]
+        pair-starts (into #{} (map first) pairs)
+        all-pairs (cons [last-kept (first breakable-children)]
+                        (partition 2 1 breakable-children))]
     (into []
           (keep (fn [[prev-child next-child]]
-                  (make-break-edit prev-child next-child indent-col)))
-          break-points)))
+                  (when (or (contains? pair-starts next-child)
+                            (comment-node? next-child)
+                            (comment-node? prev-child))
+                    (make-break-edit prev-child next-child indent-col))))
+          all-pairs)))
 
 (defn- generate-sequential-edits
   "Generate edits for sequential (non-paired) breaking.
@@ -642,30 +662,49 @@
   [source tree long-lines ignored-ranges config]
   (let [seen (volatile! #{})
         collected (volatile! [])
+        try-form
+        (fn [form]
+          (let [range (node/node-range form)]
+            (when-not (@seen range)
+              (let [edits (break-form form config)]
+                (when (and (seq edits)
+                           (edits-change-source?
+                            source edits)
+                           (not (edits-overlap?
+                                 @collected edits)))
+                  (vswap! seen conj range)
+                  (vswap! collected into edits)
+                  edits)))))
         all-edits
         (into
          []
          (mapcat
           (fn [line]
             (let [forms (find-breakable-forms
-                         tree line ignored-ranges)]
-              ;; Try each form (outermost first) until one
-              ;; produces edits that actually change the source
-              (some
-               (fn [form]
-                 (let [range (node/node-range form)]
-                   (when-not (or (@seen range)
-                                 (inside-broken-form? @seen range))
-                     (let [edits (break-form form config)]
-                       (when (and (seq edits)
-                                  (edits-change-source?
-                                   source edits)
-                                  (not (edits-overlap?
-                                        @collected edits)))
-                         (vswap! seen conj range)
-                         (vswap! collected into edits)
-                         edits)))))
-               forms))))
+                         tree line ignored-ranges)
+                  ;; Check if any form has an ancestor with a
+                  ;; preceding sibling on its line. Breaking the
+                  ;; ancestor's parent separates siblings and
+                  ;; reduces indentation for all descendants.
+                  ancestor-forms
+                  (into []
+                        (comp
+                         (map find-ancestor-needing-sibling-separation)
+                         (filter some?)
+                         (filter
+                          #(not (node-in-ignored-range?
+                                 % ignored-ranges)))
+                         (distinct))
+                        forms)
+                  ;; Try ancestor forms first (prioritize sibling
+                  ;; separation), then regular forms. Both respect
+                  ;; inside-broken-form? to avoid stale column positions.
+                  guard (fn [form]
+                          (let [range (node/node-range form)]
+                            (when-not (inside-broken-form? @seen range)
+                              (try-form form))))]
+              (or (some guard ancestor-forms)
+                  (some guard forms)))))
          long-lines)]
     (when (seq all-edits)
       (let [new-source (apply-edits source all-edits)]
@@ -873,36 +912,63 @@
   (let [[_ end-line] (node/node-line-range node1)]
     (= end-line (node-start-line node2))))
 
+(defn- needs-break-or-reindent?
+  "Check if a (child, next-child) pair needs a break or re-indent edit."
+  [child next-child indent-col]
+  (or (contiguous-line? child next-child)
+      (not= indent-col (form-start-column next-child))))
+
 (defn- form-needs-forced-break?
-  "Returns true if any break position has consecutive children where
-  the first child's end line matches the next child's start line."
-  [children break-positions]
-  (some (fn [idx]
-          (let [next-idx (inc idx)]
-            (when (< next-idx (count children))
-              (contiguous-line? (nth children idx)
-                                (nth children next-idx)))))
-        break-positions))
+  "Returns true if any break position has consecutive children on the
+  same line, or if any child in the comment chain following a break
+  position has wrong indentation."
+  [children break-positions indent-col]
+  (let [n (count children)]
+    (some (fn [idx]
+            (loop [i idx]
+              (let [ni (inc i)]
+                (when (< ni n)
+                  (let [child (nth children i)
+                        next-child (nth children ni)]
+                    (or (needs-break-or-reindent?
+                         child next-child indent-col)
+                        ;; Follow through comments to check elements
+                        ;; after them
+                        (when (comment-node? next-child)
+                          (recur ni))))))))
+          break-positions)))
 
 (defn- generate-forced-break-edits
   "Generate edits to insert forced line breaks in a form.
-  Returns a vector of edits or nil if no breaks needed."
+  Also re-indents children at break positions that are on their own
+  line but at the wrong column. Follows comment chains: when a break
+  position's next child is a comment, continues generating edits for
+  consecutive comments and the first non-comment element after them."
   [node config]
   (let [children (node/named-children node)
-        rule (get-force-break-rule node config)]
+        rule (get-force-break-rule node config)
+        n (count children)]
     (when rule
       (let [break-positions (forced-break-positions children rule)
             indent-col (indent-column node (get-effective-rule node config))]
-        (when (form-needs-forced-break? children break-positions)
+        (when (form-needs-forced-break? children break-positions indent-col)
           (into []
-                (keep (fn [idx]
-                        (let [next-idx (inc idx)]
-                          (when (< next-idx (count children))
-                            (let [child (nth children idx)
-                                  next-child (nth children next-idx)]
-                              (when (contiguous-line? child next-child)
-                                (make-break-edit child next-child
-                                                 indent-col)))))))
+                (mapcat
+                 (fn [idx]
+                   (loop [i idx
+                          edits []]
+                     (let [ni (inc i)]
+                       (if (>= ni n)
+                         edits
+                         (let [child (nth children i)
+                               next-child (nth children ni)
+                               edit (when (needs-break-or-reindent?
+                                           child next-child indent-col)
+                                      (make-break-edit
+                                       child next-child indent-col))]
+                           (if (comment-node? next-child)
+                             (recur ni (if edit (conj edits edit) edits))
+                             (if edit (conj edits edit) edits))))))))
                 break-positions))))))
 
 (defn- at-line-start?
@@ -923,9 +989,10 @@
 
 (defn- find-first-forcible-form
   "Pre-order walk returning the first list_lit that matches a force-break
-  rule and needs breaks inserted. Only returns forms at the start of
-  their line (preceded only by whitespace) to avoid applying forced
-  breaks at transient column positions before parent forms are broken."
+  rule and needs breaks inserted or re-indented. Only returns forms at
+  the start of their line (preceded only by whitespace) to avoid applying
+  forced breaks at transient column positions before parent forms are
+  broken."
   [node source config]
   (when node
     (if (and (= :list_lit (node/node-type node))
@@ -933,8 +1000,12 @@
              (let [rule (get-force-break-rule node config)]
                (when rule
                  (let [children (node/named-children node)
-                       positions (forced-break-positions children rule)]
-                   (form-needs-forced-break? children positions)))))
+                       positions (forced-break-positions children rule)
+                       indent-col (indent-column
+                                   node
+                                   (get-effective-rule node config))]
+                   (form-needs-forced-break?
+                    children positions indent-col)))))
       node
       (some #(find-first-forcible-form % source config)
             (node/named-children node)))))
