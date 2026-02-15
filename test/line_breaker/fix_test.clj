@@ -1471,10 +1471,37 @@
                 {})))))
 
     (testing "given a multi-arity defn"
-      (testing "breaks after name only"
-        (is (= "(defn foo\n  ([x] x) ([x y] y))"
+      (testing "breaks after name and after argvec in each arity"
+        (is (= (str "(defn foo\n"
+                    "  ([x]\n"
+                    "   x)\n"
+                    "  ([x y]\n"
+                    "   y))")
                (fix/apply-forced-breaks
                 "(defn foo ([x] x) ([x y] y))"
+                {})))))
+
+    (testing "given a multi-arity fn"
+      (testing "breaks after argvec in each arity"
+        (is (= (str "(fn\n"
+                    "  ([x]\n"
+                    "   x)\n"
+                    "  ([x y]\n"
+                    "   y))")
+               (fix/apply-forced-breaks
+                "(fn ([x] x) ([x y] y))"
+                {})))))
+
+    (testing "given a multi-arity defn with docstring"
+      (testing "breaks after name, docstring, and argvec in each arity"
+        (is (= (str "(defn foo\n"
+                    "  \"doc\"\n"
+                    "  ([x]\n"
+                    "   x)\n"
+                    "  ([x y]\n"
+                    "   y))")
+               (fix/apply-forced-breaks
+                "(defn foo \"doc\" ([x] x) ([x y] y))"
                 {})))))
 
     (testing "given a defn with metadata on name"

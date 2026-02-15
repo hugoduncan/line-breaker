@@ -791,13 +791,61 @@
    'cond->>     {:after-indices #{1}}
    'case        {:after-indices #{1}}})
 
+(def ^:private multi-arity-parent-syms
+  "Symbols whose forms can contain multi-arity clauses."
+  #{'defn 'defn- 'defmacro 'fn 'bound-fn})
+
+(def ^:private arity-clause-rule
+  "Force-break rule for arity clauses: break after the arg vector."
+  {:after-types #{:vec_lit}})
+
+(defn- arity-clause?
+  "Returns true if node is an arity clause inside a multi-arity form.
+  An arity clause is a list_lit whose first named child is a vec_lit
+  and whose parent is a defn-family form."
+  [node]
+  (and (= :list_lit (node/node-type node))
+       (let [first-child (first (node/named-children node))]
+         (= :vec_lit (node/node-type first-child)))
+       (when-let [parent (node/node-parent node)]
+         (contains? multi-arity-parent-syms
+                    (get-head-symbol parent)))))
+
+(defn- arity-clause-indices
+  "Return indices of arity-clause children (list_lit starting with vec_lit)."
+  [children]
+  (into []
+        (keep-indexed
+         (fn [i child]
+           (when (and (= :list_lit (node/node-type child))
+                      (let [fc (first (node/named-children child))]
+                        (= :vec_lit (node/node-type fc))))
+             i)))
+        children))
+
 (defn- get-force-break-rule
   "Look up the force-break rule for a list_lit node.
-  Checks config's :force-breaks first, then defaults."
+  Checks config's :force-breaks first, then defaults.
+  For multi-arity defn-family forms, adds break positions between
+  arity clauses. Also matches arity clauses inside multi-arity forms."
   [node config]
-  (when-let [head-sym (get-head-symbol node)]
-    (or (get-in config [:force-breaks head-sym])
-        (get default-force-break-rules head-sym))))
+  (or (when-let [head-sym (get-head-symbol node)]
+        (let [base-rule (or (get-in config [:force-breaks head-sym])
+                            (get default-force-break-rules head-sym))]
+          (if (and base-rule (contains? multi-arity-parent-syms head-sym))
+            (let [children (node/named-children node)
+                  arity-idxs (arity-clause-indices children)]
+              (if (> (count arity-idxs) 1)
+                ;; Break before first arity and between each arity clause
+                (update base-rule :after-indices
+                        (fn [idxs]
+                          (into (or idxs #{})
+                                (cons (dec (first arity-idxs))
+                                      (butlast arity-idxs)))))
+                base-rule))
+            base-rule)))
+      (when (arity-clause? node)
+        arity-clause-rule)))
 
 (defn- forced-break-positions
   "Compute the set of named-child indices after which to insert breaks.
