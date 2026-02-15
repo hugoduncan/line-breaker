@@ -838,6 +838,30 @@
   "Force-break rule for arity clauses: break after the arg vector."
   {:after-types #{:vec_lit}})
 
+(def ^:private ns-require-import-kws
+  "Keywords that identify require/import forms inside ns."
+  #{":require" ":import"})
+
+(defn- ns-require-import?
+  "Returns true if node is a (:require ...) or (:import ...) inside ns.
+  These are list_lit nodes whose first named child is a kwd_lit with text
+  :require or :import, and whose parent's head symbol is ns."
+  [node]
+  (and (= :list_lit (node/node-type node))
+       (let [first-child (first (node/named-children node))]
+         (and (= :kwd_lit (node/node-type first-child))
+              (contains? ns-require-import-kws
+                         (node/node-text first-child))))
+       (when-let [parent (node/node-parent node)]
+         (= 'ns (get-head-symbol parent)))))
+
+(defn- ns-require-import-rule
+  "Build a force-break rule for a require/import form.
+  Breaks after the keyword and between every child."
+  [node]
+  (let [n (count (node/named-children node))]
+    {:after-indices (into #{} (range 0 (dec n)))}))
+
 (defn- arity-clause?
   "Returns true if node is an arity clause inside a multi-arity form.
   An arity clause is a list_lit whose first named child is a vec_lit
@@ -866,25 +890,43 @@
   "Look up the force-break rule for a list_lit node.
   Checks config's :force-breaks first, then defaults.
   For multi-arity defn-family forms, adds break positions between
-  arity clauses. Also matches arity clauses inside multi-arity forms."
+  arity clauses. Also matches arity clauses inside multi-arity forms
+  and :require/:import forms inside ns."
   [node config]
   (or (when-let [head-sym (get-head-symbol node)]
         (let [base-rule (or (get-in config [:force-breaks head-sym])
                             (get default-force-break-rules head-sym))]
-          (if (and base-rule (contains? multi-arity-parent-syms head-sym))
+          (cond
+            (and base-rule (contains? multi-arity-parent-syms head-sym))
             (let [children (node/named-children node)
                   arity-idxs (arity-clause-indices children)]
               (if (> (count arity-idxs) 1)
-                ;; Break before first arity and between each arity clause
                 (update base-rule :after-indices
                         (fn [idxs]
                           (into (or idxs #{})
                                 (cons (dec (first arity-idxs))
                                       (butlast arity-idxs)))))
                 base-rule))
-            base-rule)))
+            ;; For ns, break between all clause children (list_lit)
+            (and base-rule (= 'ns head-sym))
+            (let [children (node/named-children node)
+                  clause-idxs (into []
+                                    (keep-indexed
+                                     (fn [i c]
+                                       (when (= :list_lit (node/node-type c))
+                                         i)))
+                                    children)]
+              (if (> (count clause-idxs) 1)
+                (update base-rule :after-indices
+                        (fn [idxs]
+                          (into (or idxs #{})
+                                (butlast clause-idxs))))
+                base-rule))
+            :else base-rule)))
       (when (arity-clause? node)
-        arity-clause-rule)))
+        arity-clause-rule)
+      (when (ns-require-import? node)
+        (ns-require-import-rule node))))
 
 (defn- forced-break-positions
   "Compute the set of named-child indices after which to insert breaks.

@@ -1527,16 +1527,60 @@
 
     (testing "given a ns"
       (testing "breaks after name"
-        (is (= "(ns my.ns\n  (:require [foo]))"
+        (is (= (str "(ns my.ns\n"
+                    "  (:require\n"
+                    "   [foo]))")
                (fix/apply-forced-breaks
                 "(ns my.ns (:require [foo]))"
                 {}))))
       (testing "breaks after docstring"
         (is (= (str "(ns my.ns\n"
                     "  \"A namespace.\"\n"
-                    "  (:require [foo]))")
+                    "  (:require\n"
+                    "   [foo]))")
                (fix/apply-forced-breaks
                 "(ns my.ns \"A namespace.\" (:require [foo]))"
+                {}))))
+      (testing "breaks each require libspec onto its own line"
+        (is (= (str "(ns my.ns\n"
+                    "  (:require\n"
+                    "   [a]\n"
+                    "   [b]\n"
+                    "   [c]))")
+               (fix/apply-forced-breaks
+                "(ns my.ns (:require [a] [b] [c]))"
+                {}))))
+      (testing "breaks symbol libspecs"
+        (is (= (str "(ns my.ns\n"
+                    "  (:require\n"
+                    "   clojure.string\n"
+                    "   clojure.set))")
+               (fix/apply-forced-breaks
+                "(ns my.ns (:require clojure.string clojure.set))"
+                {}))))
+      (testing "breaks import children onto own lines"
+        (is (= (str "(ns my.ns\n"
+                    "  (:import\n"
+                    "   [java.io File]\n"
+                    "   [java.util Map]))")
+               (fix/apply-forced-breaks
+                "(ns my.ns (:import [java.io File] [java.util Map]))"
+                {}))))
+      (testing "breaks single-child require after keyword"
+        (is (= (str "(ns my.ns\n"
+                    "  (:require\n"
+                    "   [a]))")
+               (fix/apply-forced-breaks
+                "(ns my.ns (:require [a]))"
+                {}))))
+      (testing "breaks between require and import clauses"
+        (is (= (str "(ns my.ns\n"
+                    "  (:require\n"
+                    "   [a])\n"
+                    "  (:import\n"
+                    "   [java.io File]))")
+               (fix/apply-forced-breaks
+                "(ns my.ns (:require [a]) (:import [java.io File]))"
                 {})))))
 
     (testing "given a def"
@@ -1629,7 +1673,27 @@
                    "  [x]\n"
                    "  (+ x\n"
                    "    (very-long-computation x)))")
-              {:line-length 30}))))))
+              {:line-length 30}))))
+
+    (testing "reformats ns require onto separate lines"
+      (is (= (str "(ns my.ns\n"
+                  "  (:require\n"
+                  "   [a]\n"
+                  "   [b]\n"
+                  "   [c]))")
+             (fix/reformat-source
+              (str "(ns my.ns\n"
+                   "  (:require [a] [b]\n"
+                   "            [c]))")
+              {:line-length 80}))))
+
+    (testing "reformats ns import onto separate lines"
+      (is (= (str "(ns my.ns\n"
+                  "  (:import\n"
+                  "   [java.io File]))")
+             (fix/reformat-source
+              "(ns my.ns (:import [java.io File]))"
+              {:line-length 80}))))))
 
 (deftest apply-pair-breaking-test
   ;; Verify that apply-pair-breaking forces pair-grouped forms onto
