@@ -829,68 +829,68 @@
         (into
          []
          (mapcat
-                    (fn [line]
-                      (let [forms (find-breakable-forms
-                                   tree
-                                   line
-                                   ignored-ranges)
+          (fn [line]
+            (let [forms (find-breakable-forms
+                         tree
+                         line
+                         ignored-ranges)
                             ;; Check if any form has an ancestor with a
                             ;; preceding sibling on its line. Breaking the
                             ;; ancestor's parent separates siblings and
                             ;; reduces indentation for all descendants.
-                            ancestor-forms
-                            (sort-by
-                             (fn [f]
-                               (let [[s e] (node/node-range f)]
-                                 (- s e)))
-                             (into
-                              []
-                              (comp
-                               (mapcat
-                                find-ancestors-needing-sibling-separation)
-                               (filter
-                                #(not
-                                  (node-in-ignored-range? % ignored-ranges)))
-                               (distinct))
-                              forms))
+                  ancestor-forms
+                  (sort-by
+                   (fn [f]
+                     (let [[s e] (node/node-range f)]
+                       (- s e)))
+                   (into
+                    []
+                    (comp
+                     (mapcat
+                      find-ancestors-needing-sibling-separation)
+                     (filter
+                      #(not
+                        (node-in-ignored-range? % ignored-ranges)))
+                     (distinct))
+                    forms))
                             ;; Try ancestor forms first, outermost
                             ;; first. Both respect
                             ;; inside-broken-form? to avoid stale
                             ;; column positions.
-                            guard (fn [form]
-                                    (let [range (node/node-range form)]
-                                      (when-not (inside-broken-form?
-                                                 @seen
-                                                 range)
-                                        (try-form form))))]
-                        (or
-                         (some guard ancestor-forms)
-                         (some guard forms)
+                  guard (fn [form]
+                          (let [range (node/node-range form)]
+                            (when-not (inside-broken-form?
+                                       @seen
+                                       range)
+                              (try-form form))))]
+              (or
+               (some guard ancestor-forms)
+               (some guard forms)
                          ;; Fallback: when no breakable forms found
                          ;; (e.g. line has only an unbreakable atom),
                          ;; find an ancestor that still has children
                          ;; on the same line. Breaking it separates
                          ;; children and reduces descendant indent.
-                         (when-let [n (find-node-on-line tree line)]
-                           (or
-                            (when-let [anc (find-unbroken-breakable-ancestor n)]
-                              (guard anc))
+               (when-let [n (find-node-on-line tree line)]
+                 (or
+                  (when-let [anc (find-unbroken-breakable-ancestor n)]
+                    (guard anc))
                             ;; Collapse a stale-indent ancestor so
                             ;; fix-source re-breaks at the correct
                             ;; position.
-                            (when-let [stale (find-stale-indent-ancestor
-                                              n
-                                              config)]
-                              (let [range (node/node-range stale)
-                                    edits (collect-collapse-edits stale)]
-                                (when (and
-                                       (seq edits)
-                                       (not (@seen range))
-                                       (edits-change-source? source edits)
-                                       (not (edits-overlap? @collected edits)))
-                                  (vswap! seen conj range)
-                                  (vswap! collected into edits)
-                                  edits)))))))))
+                  (when-let [stale (find-stale-indent-ancestor
+                                    n
+                                    config)]
+                    (let [range (node/node-range stale)
+                          edits (collect-collapse-edits stale)]
+                      (when (and
+                             (seq edits)
+                             (not (@seen range))
+                             (edits-change-source? source edits)
+                             (not (edits-overlap? @collected edits)))
+                        (vswap! seen conj range)
+                        (vswap! collected into edits)
+                        edits)))))))))
          long-lines)]
     (when (seq all-edits)
       (let [new-source (apply-edits source all-edits)]
@@ -1106,6 +1106,13 @@
                 (into
                  (or idxs #{})
                  (cons (dec (first arity-idxs)) (butlast arity-idxs)))))
+             base-rule))
+         ;; For do, break between every body form
+         (and base-rule (= 'do head-sym))
+         (let [n (count (node/named-children node))]
+           (if (> n 2)
+             (assoc base-rule
+                    :after-indices (set (range 0 (dec n))))
              base-rule))
          ;; For ns, break between all clause children (list_lit)
          (and base-rule (= 'ns head-sym))

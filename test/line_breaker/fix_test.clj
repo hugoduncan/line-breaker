@@ -1519,6 +1519,27 @@
       (testing "returns unchanged"
         (let [s "(defn foo\n  [x]\n  (+ x 1))"]
           (is (= s (fix/apply-forced-breaks s {}))))))
+    (testing "given a do with multiple body forms"
+      (testing "breaks between every body form"
+        (is
+         (=
+          "(do\n  (a)\n  (b)\n  (c))"
+          (fix/apply-forced-breaks
+           "(do (a) (b) (c))" {})))))
+    (testing "given a do with two body forms"
+      (testing "breaks between them"
+        (is
+         (=
+          "(do\n  (a)\n  (b))"
+          (fix/apply-forced-breaks
+           "(do (a) (b))" {})))))
+    (testing "given a do with one body form"
+      (testing "only breaks after do keyword"
+        (is
+         (=
+          "(do\n  (a))"
+          (fix/apply-forced-breaks
+           "(do (a))" {})))))
     (testing "with user config override"
       (testing "uses config :force-breaks over defaults"
         (is
@@ -1601,6 +1622,13 @@
         (str "(ns my.ns\n" "  (:import\n" "   [java.io File]))")
         (fix/reformat-source
          "(ns my.ns (:import [java.io File]))"
+         {:line-length 80}))))
+    (testing "breaks do body forms onto separate lines"
+      (is
+       (=
+        "(do\n  (a)\n  (b)\n  (c))"
+        (fix/reformat-source
+         "(do (a)\n  (b) (c))"
          {:line-length 80}))))))
 
 (deftest apply-pair-breaking-test
