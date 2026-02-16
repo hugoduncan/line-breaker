@@ -8,8 +8,7 @@
   then clean up the directory. Wrapper around fs/with-temp-dir
   that accepts the simpler [[sym] & body] syntax."
   [[sym] & body]
-  `(fs/with-temp-dir [~sym {}]
-     ~@body))
+  `(fs/with-temp-dir [~sym {}] ~@body))
 
 (defmacro with-captured-output
   "Capture stdout and stderr during body execution.

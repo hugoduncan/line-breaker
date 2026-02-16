@@ -39,11 +39,13 @@
         positional-args (:args result)
         active-modes (filterv #(get opts %) mode-flags)]
     (when (> (count active-modes) 1)
-      (throw (ex-info (str "only one mode flag allowed, got: "
-                           (str/join ", " (map #(str "--" (name %))
-                                               active-modes)))
-                      {:type :arg-error
-                       :modes active-modes})))
+      (throw
+       (ex-info
+        (str
+         "only one mode flag allowed, got: "
+         (str/join ", " (map #(str "--" (name %)) active-modes)))
+        {:type :arg-error
+         :modes active-modes})))
     {:opts (if (or (:fix opts) (:reformat opts) (:stdout opts) (:help opts))
              opts
              (assoc opts :check true))
@@ -74,24 +76,24 @@
   Returns [\".\"] contents when paths is empty."
   [paths extensions]
   (let [paths (if (seq paths) paths ["."])]
-    (->> paths
-         (mapcat (fn [path]
-                   (cond
-                     (not (fs/exists? path))
-                     (throw (ex-info (str "Path does not exist: " path)
-                                     {:type :file-error
-                                      :path path}))
-
-                     (fs/directory? path)
-                     (let [pattern (glob-pattern-for-extensions extensions)]
-                       (fs/glob path pattern))
-
-                     (matches-extension? path extensions)
-                     [(fs/absolutize path)]
-
-                     :else
-                     [])))
-         (map (comp str fs/normalize fs/absolutize))
-         sort
-         vec)))
+    (->>
+     paths
+     (mapcat
+      (fn [path]
+        (cond
+          (not
+           (fs/exists?
+            path)) (throw
+                    (ex-info
+                     (str "Path does not exist: " path)
+                     {:type :file-error
+                      :path path}))
+          (fs/directory?
+           path) (let [pattern (glob-pattern-for-extensions extensions)]
+                   (fs/glob path pattern))
+          (matches-extension? path extensions) [(fs/absolutize path)]
+          :else [])))
+     (map (comp str fs/normalize fs/absolutize))
+     sort
+     vec)))
 
