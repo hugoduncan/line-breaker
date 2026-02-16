@@ -573,7 +573,8 @@
                     breakable-children
                     indent-col))]
              (when (seq edits)
-               (if (and exceeding-pair
+               (if (and
+                    exceeding-pair
                         (single-line-node? exc-value)
                         (rules/breakable-node? exc-value)
                         (let [pair-width
@@ -664,8 +665,10 @@
   positions after re-parsing.
   Public for use by reformat.clj batch edit collection."
   [broken-ranges [start end]]
-  (some (fn [[s e]]
-          (and (<= s start) (<= end e))) broken-ranges))
+  (some
+   (fn [[s e]]
+          (and (<= s start) (<= end e)))
+   broken-ranges))
 
 (defn try-collect-edits
   "Collect edits for a form if they are new, change source, and don't overlap.
@@ -776,19 +779,106 @@
         (when (not= new-source source)
           new-source)))))
 
+;;; Multiline child breaking
+
+(defn- has-multiline-child?
+  "Returns true if any named child of node spans multiple lines."
+  [node]
+  (some
+   (fn [child]
+     (let [[start-line end-line] (node/node-line-range child)]
+       (and start-line end-line (not= start-line end-line))))
+   (node/named-children node)))
+
+(defn- needs-multiline-child-breaking?
+  "Returns true if node is breakable, not pair-grouped, has a multi-line
+  child, and has consecutive named children sharing a line.
+  Pair-grouped forms (maps, binding vectors, cond, etc.) are excluded
+  because pair-breaking already handles their layout."
+  [node config]
+  (and
+   (rules/breakable-node? node)
+   (not (rules/uses-pair-grouping? node config))
+   (has-consecutive-children-on-line? node)
+   (has-multiline-child? node)))
+
+(defn- generate-multiline-child-break-edits
+  "Generate edits to separate children sharing lines in a form with
+  multi-line children. Only inserts breaks between children that share
+  a line — does not collapse existing multi-line children."
+  [node config]
+  (let [rule (rules/get-effective-rule node config)
+        children (node/named-children node)
+        base-keep-count (rules/elements-to-keep-on-first-line rule)
+        indent-col (indent-column node rule)
+        breakable-children (drop base-keep-count children)]
+    (when (seq breakable-children)
+      (let [last-kept (nth children (dec base-keep-count))
+            all-pairs (cons
+                       [last-kept (first breakable-children)]
+                       (partition 2 1 breakable-children))
+            edits
+            (into
+             []
+             (keep
+              (fn [[prev-child next-child]]
+                (let [[_ prev-end] (node/node-line-range prev-child)
+                      next-start (node-start-line next-child)]
+                  (when (= prev-end next-start)
+                    (make-break-edit
+                     prev-child next-child indent-col)))))
+             all-pairs)]
+        (when (seq edits)
+          edits)))))
+
+(defn- find-multiline-child-forms
+  "Walk tree pre-order to find all forms needing multiline-child breaking."
+  [root config]
+  (let [results (transient [])]
+    (letfn
+     [(walk
+             [node]
+              (when node
+                (when (needs-multiline-child-breaking? node config)
+                  (conj! results node))
+                (doseq [child (node/named-children node)]
+                  (walk child))))]
+      (walk root))
+    (persistent! results)))
+
+(defn- try-break-multiline-children
+  "Find and break forms with multi-line children sharing lines.
+  Returns the new source if any changes were made, nil otherwise."
+  [source tree config]
+  (let [root (node/root-node tree)
+        forms (find-multiline-child-forms root config)]
+    (when (seq forms)
+      (let [edits
+            (into
+             []
+             (mapcat
+              (fn [form]
+                (generate-multiline-child-break-edits form config)))
+             forms)]
+        (when (and (seq edits) (edits-change-source? source edits))
+          (let [new-source (apply-edits source edits)]
+            (when (not= new-source source)
+              new-source)))))))
+
 (defn fix-source
-  "Fix line length violations in source code.
+  "Fix line length violations and multiline-child sharing in source code.
 
   Takes a source string and config map with :line-length. Iteratively breaks
-  forms until all lines fit or only unbreakable atoms remain. Returns the
-  fixed source string. Forms preceded by #_:line-breaker/ignore are not
-  modified.
+  forms until all lines fit or only unbreakable atoms remain. Also separates
+  children sharing lines with multi-line siblings. Returns the fixed source
+  string. Forms preceded by #_:line-breaker/ignore are not modified.
 
   The algorithm uses breadth-first breaking:
   1. Find lines exceeding max-length
   2. Collect ignored byte ranges (re-collected each pass as positions shift)
   3. Break the outermost form on every long line in a single pass
-  4. Re-parse and repeat until no violations or no breakable forms
+  4. Separate children sharing lines with multi-line siblings
+  5. Re-parse and repeat until stable
 
   This ensures sibling forms at the same depth are all broken before
   descending into sub-forms."
@@ -798,19 +888,23 @@
            iteration 0]
       (if (>= iteration max-iterations)
         source
-        (let [long-lines (find-long-lines source max-length)]
-          (if (empty? long-lines)
-            source
-            (let [tree (parser/parse-source source)
-                  ignored-ranges
-                  (check/find-ignored-byte-ranges tree)
-                  new-source (try-break-on-lines
-                              source
-                              tree
-                              long-lines
-                              ignored-ranges
-                              config)]
-              (if new-source
-                (recur new-source (inc iteration))
-                source))))))))
+        (let [long-lines (find-long-lines source max-length)
+              tree (parser/parse-source source)
+              ignored-ranges
+              (check/find-ignored-byte-ranges tree)
+              line-source
+              (when (seq long-lines)
+                (try-break-on-lines
+                 source tree long-lines ignored-ranges config))
+              ;; Check for multiline-child sharing after line fixes
+              source' (or line-source source)
+              tree' (if line-source
+                      (parser/parse-source source')
+                      tree)
+              child-source
+              (try-break-multiline-children source' tree' config)
+              new-source (or child-source source')]
+          (if (not= new-source source)
+            (recur new-source (inc iteration))
+            source))))))
 

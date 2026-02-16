@@ -762,3 +762,21 @@
            (str "files at col 7 (bracket+1),"
                 " got:\n"
                 result)))))))
+
+(deftest multiline-child-breaking-test
+  ;; When a function call has a child that becomes multi-line (e.g. a
+  ;; map arg that gets pair-broken), sibling args should be placed on
+  ;; their own lines rather than sharing the closing delimiter's line.
+  ;; This tests the MultilineChildBreaking rule from the spec.
+  (testing "reformat-source"
+    (testing "given a function call with a map arg"
+      (testing "separates sibling args after map is pair-broken"
+        (let [input "(f {:a 1 :b 2} \"x\" \"y\")"
+              result (reformat/reformat-source
+                      input
+                      {:line-length 25})]
+          (is
+           (not (re-find #"\}.*\"" result))
+              (str "no string args on same line as },"
+                   " got:\n"
+                   result)))))))
