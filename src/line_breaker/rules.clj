@@ -116,7 +116,20 @@
     (metadata-node? first-child)))
 
 (defn elements-to-keep-on-first-line
-  "Number of elements to keep on the first line based on indent rule."
+  "Number of elements to keep on the first line based on indent rule.
+  :defn/:def keep 2 (head + name)
+  :fn keeps 2 (head + arg vector)
+  :binding keeps 2 (head + binding vector)
+  :if keeps 2 (head + test)
+  :case keeps 2 (head + test-expr)
+  :cond keeps 1 (head only, pair group remaining)
+  :condp keeps 3 (head + pred + expr, pair group remaining)
+  :cond-> keeps 2 (head + initial-expr, pair group remaining)
+  :try/:do keep 1 (body on next line)
+  :map keeps 2 (first key-value pair)
+  :binding-vector keeps 2 (first binding pair)
+  :metadata-wrapped keeps 2 (metadata + first content element)
+  Default keeps 1 (head only)."
   [rule]
   (case rule
     (:defn
