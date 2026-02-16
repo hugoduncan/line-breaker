@@ -569,34 +569,6 @@
       (some? rule) (+ 2 base-col)
       :else (+ 1 base-col))))
 
-(defn- has-stale-indent?
-  "Returns true if node is multi-line and its second named child
-  is indented more than expected based on the node's current position.
-  This detects forms that were broken at one column then moved to
-  another without adjusting internal indentation."
-  [node config]
-  (when (and (breakable-node? node) (not (single-line-node? node)))
-    (let [children (node/named-children node)
-          rule (get-effective-rule node config)
-          expected-col (indent-column node rule)]
-      (when (>= (count children) 2)
-        (let [second-child (second children)
-              actual-col (form-start-column second-child)]
-          (and
-           (not (same-line? (first children) second-child))
-           (> actual-col (+ expected-col 2))))))))
-
-(defn- find-stale-indent-ancestor
-  "Walk up from node to find the innermost breakable ancestor with
-  stale indentation — its children are at a column inconsistent with
-  the form's current position."
-  [node config]
-  (loop [n (node/node-parent node)]
-    (when n
-      (if (has-stale-indent? n config)
-        n
-        (recur (node/node-parent n))))))
-
 (defn make-break-edit
   "Create a break edit between two children.
   Returns nil if no edit needed (comment attached to preceding element).
@@ -853,7 +825,7 @@
       existing-edits))
    new-edits))
 
-(defn- inside-broken-form?
+(defn inside-broken-form?
   "Returns true if range is contained within any range in broken-ranges.
   A child form whose parent was already broken in this pass should not
   be broken until the next pass, when it will have correct column
@@ -862,7 +834,7 @@
   (some (fn [[s e]]
           (and (<= s start) (<= end e))) broken-ranges))
 
-(defn- try-collect-edits
+(defn try-collect-edits
   "Collect edits for a form if they are new, change source, and don't overlap.
   Returns [updated-state edits] on success, [state nil] otherwise.
   State is a map with :seen (set of byte ranges) and :collected (vec of edits)."
@@ -944,21 +916,7 @@
                     [state nil])]
               (if result
                 [state result]
-                ;; Collapse a stale-indent ancestor so
-                ;; fix-source re-breaks at the correct position.
-                (if-let [stale (find-stale-indent-ancestor n config)]
-                  (do
-                    (trace/trace!
-                     {:level :stale-indent
-                      :form (trace/node-summary stale)})
-                    (let [edits (collect-collapse-edits stale)
-                          [new-state collected]
-                          (try-collect-edits
-                           state source stale edits)]
-                      (if collected
-                        [new-state {:edits collected}]
-                        [new-state nil])))
-                  [state nil])))
+                [state nil]))
             [state nil]))))))
 
 (defn- try-break-on-lines

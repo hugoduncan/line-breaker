@@ -12,13 +12,18 @@
 
 ;;; Tree walking
 
-(defn- find-first-preorder
-  "Pre-order walk returning the first node for which pred returns true."
+(defn- find-all-preorder
+  "Pre-order walk collecting all nodes for which pred returns true.
+  Returns a vector of matching nodes, outermost first."
   [pred node]
   (when node
-    (if (pred node)
-      node
-      (some #(find-first-preorder pred %) (node/named-children node)))))
+    (let [self (when (pred node) [node])
+          children-results
+          (into
+           []
+           (mapcat #(find-all-preorder pred %))
+           (node/named-children node))]
+      (into (or self []) children-results))))
 
 ;;; Collapse
 
@@ -375,8 +380,9 @@
 
 (defn apply-forced-breaks
   "Insert forced line breaks at structurally significant positions.
-  Iteratively finds forms matching force-break rules and inserts line
-  breaks, re-parsing between each to maintain correct column positions.
+  Batches all qualifying forms per parse, skipping children of
+  already-broken parents and overlapping edits. Deferred overlaps
+  are retried on the next iteration after re-parse.
   When check-position? is false, skips the at-line-start? guard for use
   after the pipeline has stabilized and all positions are final."
   ([source config]
@@ -388,25 +394,41 @@
        s
        (let [tree (parser/parse-source s)
              root (node/root-node tree)
-             src-arg (when check-position?
-                       s)
-             form (find-first-preorder
-                   #(needs-forced-breaking? % src-arg config)
-                   root)]
-         (if-not form
+             src-arg (when check-position? s)
+             forms (find-all-preorder
+                    #(needs-forced-breaking? % src-arg config)
+                    root)]
+         (if (empty? forms)
            (do
              (trace/trace! {:level :forced-breaks
                             :check-position? check-position?
                             :iterations iteration
                             :outcome :stable})
              s)
-           (let [edits (generate-forced-break-edits form config)]
+           (let [{:keys [collected]}
+                 (reduce
+                  (fn [state form]
+                    (let [range (node/node-range form)]
+                      (if (fix/inside-broken-form?
+                           (:seen state) range)
+                        state
+                        (let [edits
+                              (generate-forced-break-edits
+                               form config)
+                              [new-state _]
+                              (fix/try-collect-edits
+                               state s form edits)]
+                          new-state))))
+                  {:seen #{} :collected []}
+                  forms)]
              (trace/trace! {:level :forced-breaks
                             :check-position? check-position?
                             :iteration iteration
-                            :form (trace/node-summary form)})
-             (if (and (seq edits) (fix/edits-change-source? s edits))
-               (recur (fix/apply-edits s edits) (inc iteration))
+                            :edit-count (count collected)})
+             (if (and (seq collected)
+                      (fix/edits-change-source? s collected))
+               (recur (fix/apply-edits s collected)
+                      (inc iteration))
                s))))))))
 
 ;;; Forced pair breaking
@@ -495,8 +517,8 @@
 
 (defn apply-pair-breaking
   "Force pair-grouped forms to break so each pair is on its own line.
-  Iteratively finds the first qualifying form, applies edits, and
-  re-parses until no more forms need breaking.
+  Batches all qualifying forms per parse, skipping children of
+  already-broken parents and overlapping edits.
   When rule-filter is provided, only processes forms whose effective rule
   is in the filter set."
   ([source config]
@@ -508,23 +530,39 @@
        s
        (let [tree (parser/parse-source s)
              root (node/root-node tree)
-             form (find-first-preorder
-                   #(needs-pair-breaking? % config rule-filter)
-                   root)]
-         (if-not form
+             forms (find-all-preorder
+                    #(needs-pair-breaking? % config rule-filter)
+                    root)]
+         (if (empty? forms)
            (do
              (trace/trace! {:level :pair-breaking
                             :rule-filter rule-filter
                             :iterations iteration
                             :outcome :stable})
              s)
-           (let [edits (generate-pair-break-edits form config)]
+           (let [{:keys [collected]}
+                 (reduce
+                  (fn [state form]
+                    (let [range (node/node-range form)]
+                      (if (fix/inside-broken-form?
+                           (:seen state) range)
+                        state
+                        (let [edits
+                              (generate-pair-break-edits
+                               form config)
+                              [new-state _]
+                              (fix/try-collect-edits
+                               state s form edits)]
+                          new-state))))
+                  {:seen #{} :collected []}
+                  forms)]
              (trace/trace! {:level :pair-breaking
                             :rule-filter rule-filter
                             :iteration iteration
-                            :form (trace/node-summary form)})
-             (if (seq edits)
-               (recur (fix/apply-edits s edits) (inc iteration))
+                            :edit-count (count collected)})
+             (if (seq collected)
+               (recur (fix/apply-edits s collected)
+                      (inc iteration))
                s))))))))
 
 ;;; Multiline child breaking
@@ -555,8 +593,8 @@
 
 (defn apply-multiline-child-breaking
   "Break forms that contain multi-line children so every child is on
-  its own line. Iteratively finds qualifying forms and applies break
-  edits, re-parsing between each."
+  its own line. Batches all qualifying forms per parse, skipping
+  children of already-broken parents and overlapping edits."
   [source config]
   (loop [s source
          iteration 0]
@@ -564,69 +602,75 @@
       s
       (let [tree (parser/parse-source s)
             root (node/root-node tree)
-            form (find-first-preorder
-                  #(needs-multiline-child-breaking? % config)
-                  root)]
-        (if-not form
+            forms (find-all-preorder
+                   #(needs-multiline-child-breaking? % config)
+                   root)]
+        (if (empty? forms)
           (do
             (trace/trace! {:level :multiline-child
                            :iterations iteration
                            :outcome :stable})
             s)
-          (let [result (fix/break-form form config)
-                edits (:edits result)]
+          (let [{:keys [collected]}
+                (reduce
+                 (fn [state form]
+                   (let [range (node/node-range form)]
+                     (if (fix/inside-broken-form?
+                          (:seen state) range)
+                       state
+                       (let [result
+                             (fix/break-form form config)
+                             edits (:edits result)
+                             [new-state _]
+                             (fix/try-collect-edits
+                              state s form edits)]
+                         new-state))))
+                 {:seen #{} :collected []}
+                 forms)]
             (trace/trace! {:level :multiline-child
                            :iteration iteration
-                           :form (trace/node-summary form)})
-            (if (and (seq edits) (fix/edits-change-source? s edits))
-              (recur (fix/apply-edits s edits) (inc iteration))
+                           :edit-count (count collected)})
+            (if (and (seq collected)
+                     (fix/edits-change-source? s collected))
+              (recur (fix/apply-edits s collected)
+                     (inc iteration))
               s)))))))
 
 ;;; Reformat pipeline
 
-(defn reformat-source
-  "Reformat source by collapsing then iteratively applying all passes
-  until stable. Each iteration runs forced breaks (position-checked),
-  non-binding pair breaking, fix-source, binding pair breaking, multiline
-  child breaking, then forced breaks again without position checking to
-  catch mid-line forms, followed by fix-source and multiline child
-  breaking for any changes from the unchecked forced breaks."
+(defn- run-middle-steps
+  "Run the middle pipeline steps: non-binding pair breaking, fix-source,
+  binding pair breaking, and multiline child breaking."
   [source config]
-  (let [collapsed (collapse-top-level-forms source)]
-    (loop [s collapsed
-           iteration 0]
-      (if (>= iteration fix/max-iterations)
-        s
-        (let [s1 (apply-forced-breaks s config)
-              s2 (apply-pair-breaking
-                  s1 config non-binding-pair-rules)
-              s3 (fix/fix-source s2 config)
-              s4 (apply-pair-breaking
-                  s3 config binding-pair-rules)
-              s5 (apply-multiline-child-breaking s4 config)
-              s6 (apply-forced-breaks s5 config false)
-              s7 (fix/fix-source s6 config)
-              result (apply-multiline-child-breaking
-                      s7 config)]
-          (trace/trace!
-           {:level :pipeline
-            :iteration iteration
-            :changed-steps
-            (cond-> []
-              (not= s s1)
-              (conj :forced-breaks-checked)
-              (not= s1 s2)
-              (conj :non-binding-pair-breaking)
-              (not= s2 s3) (conj :fix-source-1)
-              (not= s3 s4)
-              (conj :binding-pair-breaking)
-              (not= s4 s5)
-              (conj :multiline-child-1)
-              (not= s5 s6)
-              (conj :forced-breaks-unchecked)
-              (not= s6 s7) (conj :fix-source-2)
-              (not= s7 result)
-              (conj :multiline-child-2))})
-          (if (= result s)
-            result
-            (recur result (inc iteration))))))))
+  (let [s1 (apply-pair-breaking
+            source config non-binding-pair-rules)
+        s2 (fix/fix-source s1 config)
+        s3 (apply-pair-breaking
+            s2 config binding-pair-rules)
+        s4 (apply-multiline-child-breaking s3 config)]
+    s4))
+
+(defn reformat-source
+  "Reformat source by collapsing then applying a single-pass pipeline.
+  Runs forced breaks (position-checked), middle steps (pair breaking,
+  fix-source, multiline child), then forced breaks (unchecked). If the
+  unchecked pass changed anything, re-runs middle steps once."
+  [source config]
+  (let [collapsed (collapse-top-level-forms source)
+        s1 (apply-forced-breaks collapsed config)
+        s2 (run-middle-steps s1 config)
+        s3 (apply-forced-breaks s2 config false)
+        result (if (not= s3 s2)
+                 (run-middle-steps s3 config)
+                 s3)]
+    (trace/trace!
+     {:level :pipeline
+      :changed-steps
+      (cond-> []
+        (not= collapsed s1)
+        (conj :forced-breaks-checked)
+        (not= s1 s2) (conj :middle-steps)
+        (not= s2 s3)
+        (conj :forced-breaks-unchecked)
+        (not= s3 result) (conj :middle-steps-rerun))})
+    result))
