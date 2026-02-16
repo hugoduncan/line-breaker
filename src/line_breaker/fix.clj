@@ -9,6 +9,9 @@
    [line-breaker.treesitter.node :as node]
    [line-breaker.treesitter.parser :as parser]))
 
+(declare collect-collapse-edits)
+(declare ^:private collapse-repositioned-children)
+
 ;;; Edit application
 
 (defn byte-offset->char-index
@@ -465,12 +468,12 @@
 
 (defn- break-exceeding-pair
   "Split an exceeding pair onto separate lines and generate inter-pair edits.
-  When the value is multi-line, also collapses it to a single line first so
-  it gets properly re-broken at the new indent position.
+  When the value is multi-line, recursively collapses it (including nested
+  forms) to a single line so it gets re-broken at the new indent position.
   Returns a result map {:edits [...]} or nil."
   [exc-name exc-value children base-keep-count breakable-children
    indent-col]
-  (let [join-edits (join-form-edits exc-value)
+  (let [join-edits (collect-collapse-edits exc-value)
         indent-str (apply str (repeat indent-col \space))
         split-edit {:start (element-end-offset exc-name)
                     :end (element-start-offset exc-value)
@@ -506,6 +509,9 @@
     (single-line, breakable), backtracks to split the pair onto its own line
   - If the value is multi-line and breakable, collapses it to a single line
     and moves to own line at indent-col for re-breaking
+
+  When breaking repositions children that are already multi-line, also
+  collapses them so the next iteration re-breaks at the correct indent.
 
   Comments on the same line as the preceding element stay attached.
   Comments include their trailing newline, so no extra newline is added after.
@@ -577,7 +583,11 @@
                  (break-exceeding-pair
                   exc-name exc-value children base-keep-count
                   breakable-children indent-col)
-                 {:edits edits})))))))))
+                 (let [collapse-edits
+                       (collapse-repositioned-children
+                        breakable-children)]
+                   {:edits
+                    (into edits collapse-edits)}))))))))))
 
 ;;; Line length checking
 
@@ -611,6 +621,19 @@
              edits))
          own-edits
          children)))))
+
+(defn- collapse-repositioned-children
+  "Generate collapse edits for multi-line children being repositioned.
+  When a parent form is broken, children that move to new lines have
+  stale internal indent. Collapsing them lets the next iteration
+  re-break at the correct position."
+  [breakable-children]
+  (into
+   []
+   (comp
+    (remove single-line-node?)
+    (mapcat collect-collapse-edits))
+   breakable-children))
 
 ;;; Iterative multi-pass breaking
 

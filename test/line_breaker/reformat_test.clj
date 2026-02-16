@@ -738,3 +738,27 @@
           (is
            (re-find #"(?m):task \(do$" result)
            ":task and (do stay on the same line"))))))
+
+(deftest let-binding-indent-after-pair-split-test
+  ;; When a map pair is split (:task on one line, (let ... on the
+  ;; next), the let binding vector's subsequent pairs should be
+  ;; indented at the correct column (bracket+1), not at the stale
+  ;; column from before the pair split moved the let form.
+  (testing "reformat-source"
+    (testing "given a map with a let-binding value"
+      (testing "indents binding pairs at bracket+1"
+        (let [input (str
+                     "{:a 1"
+                     " :task (let [cmd *cmd-line-args*"
+                     " files (get-files dir)]"
+                     " (run cmd files))}")
+              result (reformat/reformat-source
+                      input
+                      {:line-length 40})]
+          (is
+           (re-find
+            #"(?m)^ {7}files"
+            result)
+           (str "files at col 7 (bracket+1),"
+                " got:\n"
+                result)))))))
