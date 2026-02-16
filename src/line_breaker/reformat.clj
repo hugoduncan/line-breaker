@@ -377,6 +377,25 @@
                          (rules/get-effective-rule node config))]
          (form-needs-forced-break? children positions indent-col))))))
 
+(defn- batch-collect-edits
+  "Reduce over forms, skipping children of already-broken parents and
+  collecting non-overlapping edits via try-collect-edits.
+  Returns the collected edits vector.  edit-fn is called with each form
+  and should return a seq of edits or nil."
+  [source forms edit-fn]
+  (:collected
+   (reduce
+    (fn [state form]
+      (let [range (node/node-range form)]
+        (if (fix/inside-broken-form? (:seen state) range)
+          state
+          (let [edits (edit-fn form)
+                [new-state _]
+                (fix/try-collect-edits state source form edits)]
+            new-state))))
+    {:seen #{} :collected []}
+    forms)))
+
 (defn apply-forced-breaks
   "Insert forced line breaks at structurally significant positions.
   Batches all qualifying forms per parse, skipping children of
@@ -396,30 +415,15 @@
              src-arg (when check-position? s)
              forms (find-all-preorder
                     #(needs-forced-breaking? % src-arg config)
-                    root)]
-         (if (empty? forms)
-           s
-           (let [{:keys [collected]}
-                 (reduce
-                  (fn [state form]
-                    (let [range (node/node-range form)]
-                      (if (fix/inside-broken-form?
-                           (:seen state) range)
-                        state
-                        (let [edits
-                              (generate-forced-break-edits
-                               form config)
-                              [new-state _]
-                              (fix/try-collect-edits
-                               state s form edits)]
-                          new-state))))
-                  {:seen #{} :collected []}
-                  forms)]
-             (if (and (seq collected)
-                      (fix/edits-change-source? s collected))
-               (recur (fix/apply-edits s collected)
-                      (inc iteration))
-               s))))))))
+                    root)
+             collected (batch-collect-edits
+                        s forms
+                        #(generate-forced-break-edits % config))]
+         (if (and (seq collected)
+                  (fix/edits-change-source? s collected))
+           (recur (fix/apply-edits s collected)
+                  (inc iteration))
+           s))))))
 
 ;;; Forced pair breaking
 
@@ -502,29 +506,15 @@
             root (node/root-node tree)
             forms (find-all-preorder
                    #(needs-pair-breaking? % config)
-                   root)]
-        (if (empty? forms)
-          s
-          (let [{:keys [collected]}
-                (reduce
-                 (fn [state form]
-                   (let [range (node/node-range form)]
-                     (if (fix/inside-broken-form?
-                          (:seen state) range)
-                       state
-                       (let [edits
-                             (generate-pair-break-edits
-                              form config)
-                             [new-state _]
-                             (fix/try-collect-edits
-                              state s form edits)]
-                         new-state))))
-                 {:seen #{} :collected []}
-                 forms)]
-            (if (seq collected)
-              (recur (fix/apply-edits s collected)
-                     (inc iteration))
-              s)))))))
+                   root)
+            collected (batch-collect-edits
+                       s forms
+                       #(generate-pair-break-edits % config))]
+        (if (seq collected)
+          (recur (fix/apply-edits s collected)
+                 (inc iteration))
+          s)))))
+
 ;;; Reformat pipeline
 
 (defn- run-middle-steps
