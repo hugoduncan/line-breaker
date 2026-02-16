@@ -4,20 +4,28 @@ Analysis of the reformat pipeline's iteration/convergence
 behavior, run against the project's own codebase (src/ and
 test/ — 23 files).
 
-## Pipeline (outer loop)
+## Pipeline
 
-The outer `reformat-source` loop runs all 8 pipeline steps
-then checks for stability.
+**Note:** This analysis was performed on the original 8-step pipeline.
+The pipeline has since been simplified to:
+
+1. Collapse
+2. Forced breaks (position-checked)
+3. Pair breaking (all types, unified)
+4. fix-source
+5. Forced breaks (unchecked)
+6. Conditional re-run of steps 3-4
+
+The non-binding/binding pair-breaking split was unified (no
+behavioral change). Multiline-child breaking was removed
+(fix-source already handles these cases). The original
+analysis data is preserved below for reference.
+
+Original analysis (8-step pipeline, 23 files):
 
 - Total pipeline iterations: 47 across 23 files
 - Max iteration count: 2 (check.clj; all others converge
   in 1)
-- Every file needs at least 1 pipeline iteration (iteration
-  0 always makes changes)
-- Only check.clj needs a second pass — the unchecked
-  forced-breaks + multiline-child-2 pass at iteration 0
-  produces output that triggers another forced-breaks-checked
-  change
 
 Changed steps frequency (across all pipeline iterations):
 
@@ -30,10 +38,6 @@ Changed steps frequency (across all pipeline iterations):
 | non-binding-pair-breaking | 6 |
 | multiline-child-1 | 2 |
 | multiline-child-2 | 1 |
-
-fix-source-2 and multiline-child-2 rarely trigger — they
-exist to handle changes from unchecked forced breaks but
-multiline-child-2 only fires once across all files.
 
 ## Forced breaks sub-loop
 
@@ -97,9 +101,11 @@ moved them.
 1. **Forced breaks is the bottleneck**: up to 90 iterations
    for a single file, processing one form at a time with a
    full re-parse each time. Batch processing would help.
+   (Resolved: inner loops now batch edits.)
 
 2. **Pipeline converges fast**: max 2 outer iterations. The
-   inner loops do the heavy lifting.
+   inner loops do the heavy lifting. (Resolved: outer loop
+   replaced with conditional re-run.)
 
 3. **Stale indent never triggers**: candidate for removal
    or at minimum investigation of whether any real-world
@@ -110,13 +116,13 @@ moved them.
    be removed without alternative.
 
 5. **fix-source-2 and multiline-child-2 are nearly dead**:
-   The second fix-source pass (after unchecked forced
-   breaks) never triggers. multiline-child-2 triggers
-   exactly once. These could potentially be removed if the
-   unchecked forced breaks result is fed back differently.
+   (Resolved: multiline-child removed entirely, fix-source
+   handles these cases. Second fix/multiline passes
+   eliminated.)
 
 6. **Single-form-per-iteration pattern**: forced-breaks,
    pair-breaking, and multiline-child all find one form,
    edit it, re-parse the whole file, and repeat. Batching
    multiple non-overlapping edits per parse would reduce
-   iteration counts significantly.
+   iteration counts significantly. (Resolved: all inner
+   loops now batch non-overlapping edits.)
