@@ -93,6 +93,7 @@
 
 ;;; Indent rules
 
+;;; NOTE: Keep in sync with default-force-break-rules in reformat.clj
 (def ^:private default-indent-rules
   "Default mappings from form head symbols to indent rules.
   :defn - keep name on first line

@@ -44,6 +44,7 @@
 
 ;;; Forced line breaks
 
+;;; NOTE: Keep in sync with default-indent-rules in fix.clj
 (def ^:private default-force-break-rules
   "Rules for inserting forced line breaks in specific forms.
   Each entry maps a head symbol to a rule with :after-indices (0-based
@@ -77,10 +78,12 @@
    'doseq {:after-types #{:vec_lit}}
    'for {:after-types #{:vec_lit}}
    'with-open {:after-types #{:vec_lit}}
+   'with-local-vars {:after-types #{:vec_lit}}
    'when {:after-indices #{1}}
    'when-not {:after-indices #{1}}
    'if {:after-indices #{1}}
    'if-not {:after-indices #{1}}
+   'testing {:after-indices #{1}}
    'try {:after-indices #{0}}
    'do {:after-indices #{0}}
    'cond {:after-indices #{0}}
