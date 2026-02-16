@@ -1524,22 +1524,14 @@
         (is
          (=
           "(do\n  (a)\n  (b)\n  (c))"
-          (fix/apply-forced-breaks
-           "(do (a) (b) (c))" {})))))
+          (fix/apply-forced-breaks "(do (a) (b) (c))" {})))))
     (testing "given a do with two body forms"
       (testing "breaks between them"
         (is
-         (=
-          "(do\n  (a)\n  (b))"
-          (fix/apply-forced-breaks
-           "(do (a) (b))" {})))))
+         (= "(do\n  (a)\n  (b))" (fix/apply-forced-breaks "(do (a) (b))" {})))))
     (testing "given a do with one body form"
       (testing "only breaks after do keyword"
-        (is
-         (=
-          "(do\n  (a))"
-          (fix/apply-forced-breaks
-           "(do (a))" {})))))
+        (is (= "(do\n  (a))" (fix/apply-forced-breaks "(do (a))" {})))))
     (testing "with user config override"
       (testing "uses config :force-breaks over defaults"
         (is
@@ -1627,9 +1619,7 @@
       (is
        (=
         "(do\n  (a)\n  (b)\n  (c))"
-        (fix/reformat-source
-         "(do (a)\n  (b) (c))"
-         {:line-length 80}))))))
+        (fix/reformat-source "(do (a)\n  (b) (c))" {:line-length 80}))))))
 
 (deftest apply-pair-breaking-test
   ;; Verify that apply-pair-breaking forces pair-grouped forms onto
@@ -1836,11 +1826,12 @@
   (testing "fix-source"
     (testing "given nested testing forms on one line"
       (testing "breaks intermediate ancestor when outermost is broken"
-        (let [input (str "(deftest my-test\n"
-                         "  (testing \"outer\""
-                         " (testing \"inner\"\n"
-                         "    (let [x (long-fn a b)]"
-                         " (do-thing x)))))")
+        (let [input (str
+                     "(deftest my-test\n"
+                     "  (testing \"outer\""
+                     " (testing \"inner\"\n"
+                     "    (let [x (long-fn a b)]"
+                     " (do-thing x)))))")
               result (fix/fix-source input {:line-length 40})]
           (is
            (re-find #"(?m)^\s+\(testing \"inner\"" result)
@@ -1848,19 +1839,16 @@
   (testing "reformat-source"
     (testing "given nested testing forms on one line"
       (testing "separates at intermediate ancestor"
-        (let [input (str "(deftest my-test\n"
-                         "  (testing \"outer\""
-                         " (testing \"inner\"\n"
-                         "    (let [x (long-fn a b)]"
-                         " (do-thing x)))))")
-              result (fix/reformat-source
-                      input
-                      {:line-length 40})]
+        (let [input (str
+                     "(deftest my-test\n"
+                     "  (testing \"outer\""
+                     " (testing \"inner\"\n"
+                     "    (let [x (long-fn a b)]"
+                     " (do-thing x)))))")
+              result (fix/reformat-source input {:line-length 40})]
           (is
            (re-find #"(?m)^\s+\(testing \"inner\"" result)
            "inner testing on its own line")
           (is
-           (every?
-            #(<= (count %) 40)
-            (.split result "\n"))
+           (every? #(<= (count %) 40) (.split result "\n"))
            "no line exceeds limit"))))))

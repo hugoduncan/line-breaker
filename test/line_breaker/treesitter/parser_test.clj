@@ -24,7 +24,7 @@
          (not (.hasError (.getRootNode tree)))
          "valid source has no error nodes")))
     (testing "parses source with syntax errors"
-;; Tree-sitter still returns a tree, marking errors with ERROR nodes
+      ;; Tree-sitter still returns a tree, marking errors with ERROR nodes
       (let [source "(defn foo [x" ; unclosed brackets
             tree (parser/parse-source source)]
         (is
@@ -48,8 +48,9 @@
         [p]
         (is (some? (.getLanguage p)) "parser has language configured")))
     (testing "allows parsing within body"
-      (let [result (parser/with-parser
-                     [p]
-                     (let [optional-tree (.parse p "(+ 1 2)")]
-                       (when (.isPresent optional-tree) (.get optional-tree))))]
+      (let [result
+            (parser/with-parser
+              [p]
+              (let [optional-tree (.parse p "(+ 1 2)")]
+                (when (.isPresent optional-tree) (.get optional-tree))))]
         (is (instance? Tree result) "can parse within with-parser body")))))

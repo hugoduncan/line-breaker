@@ -101,9 +101,9 @@
                         {:file "b.clj"
                          :line 2
                          :length 90}]
-            err-output (with-out-str
-                         (binding [*err* *out*]
-                           (check/report-violations violations 80)))]
+            err-output
+            (with-out-str
+              (binding [*err* *out*] (check/report-violations violations 80)))]
         (is
          (=
           (str

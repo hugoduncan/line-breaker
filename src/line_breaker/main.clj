@@ -70,14 +70,15 @@ Exit codes:
   Checks each file for line length violations, respecting ignore directives.
   Reports to stderr. Returns exit code: 0 if no violations, 1 if violations."
   [files max-length quiet?]
-  (let [all-violations (into
-                        []
-                        (mapcat
-                         (fn [file]
-                           (map
-                            #(assoc % :file file)
-                            (check/check-file-with-ignore file max-length))))
-                        files)
+  (let [all-violations
+        (into
+         []
+         (mapcat
+          (fn [file]
+            (map
+             #(assoc % :file file)
+             (check/check-file-with-ignore file max-length))))
+         files)
         violation-count (check/report-violations all-violations max-length)]
     (when-not quiet?
       (when-let [summary (check/format-summary (count files) violation-count)]
@@ -146,8 +147,8 @@ Exit codes:
                             config/default-config)
               ;; Merge CLI overrides with config
               final-config (cond-> base-config
-                             (:line-length
-                              opts) (assoc :line-length (:line-length opts)))
+                             (:line-length opts)
+                             (assoc :line-length (:line-length opts)))
               ;; Validate: load-config validates, but when no config file exists
               ;; we use default-config directly with CLI overrides applied.
               _ (config/validate-config final-config)
