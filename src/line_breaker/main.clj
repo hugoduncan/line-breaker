@@ -5,7 +5,8 @@
    [line-breaker.check :as check]
    [line-breaker.cli :as cli]
    [line-breaker.config :as config]
-   [line-breaker.fix :as fix])
+   [line-breaker.fix :as fix]
+   [line-breaker.reformat :as reformat])
   (:gen-class))
 
 (def usage-text
@@ -111,7 +112,7 @@ Exit codes:
   [files config quiet?]
   (doseq [file files]
     (let [source (slurp file)
-          result (fix/reformat-source source config)]
+          result (reformat/reformat-source source config)]
       (when (not= source result)
         (spit file result)
         (when-not quiet?
