@@ -11,6 +11,7 @@
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [line-breaker.fix :as fix]
+   [line-breaker.rules :as rules]
    [line-breaker.treesitter.node :as node]
    [line-breaker.treesitter.parser :as parser]))
 
@@ -85,32 +86,32 @@
       (let [tree (parser/parse-source "(a b)")
             root (node/root-node tree)
             list-node (first (node/named-children root))]
-        (is (fix/breakable-node? list-node))))
+        (is (rules/breakable-node? list-node))))
     (testing "returns true for vec_lit"
       (let [tree (parser/parse-source "[a b]")
             root (node/root-node tree)
             vec-node (first (node/named-children root))]
-        (is (fix/breakable-node? vec-node))))
+        (is (rules/breakable-node? vec-node))))
     (testing "returns true for map_lit"
       (let [tree (parser/parse-source "{:a 1}")
             root (node/root-node tree)
             map-node (first (node/named-children root))]
-        (is (fix/breakable-node? map-node))))
+        (is (rules/breakable-node? map-node))))
     (testing "returns true for set_lit"
       (let [tree (parser/parse-source "#{a b}")
             root (node/root-node tree)
             set-node (first (node/named-children root))]
-        (is (fix/breakable-node? set-node))))
+        (is (rules/breakable-node? set-node))))
     (testing "returns false for sym_lit"
       (let [tree (parser/parse-source "foo")
             root (node/root-node tree)
             sym-node (first (node/named-children root))]
-        (is (not (fix/breakable-node? sym-node)))))
+        (is (not (rules/breakable-node? sym-node)))))
     (testing "returns false for str_lit"
       (let [tree (parser/parse-source "\"hello\"")
             root (node/root-node tree)
             str-node (first (node/named-children root))]
-        (is (not (fix/breakable-node? str-node)))))))
+        (is (not (rules/breakable-node? str-node)))))))
 
 (deftest find-breakable-form-test
   ;; Verify finding the outermost breakable form on a line.

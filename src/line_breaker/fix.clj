@@ -5,7 +5,7 @@
   and apply those edits to source code."
   (:require
    [line-breaker.check :as check]
-   [line-breaker.trace :as trace]
+   [line-breaker.rules :as rules]
    [line-breaker.treesitter.node :as node]
    [line-breaker.treesitter.parser :as parser]))
 
@@ -78,176 +78,6 @@
         (not= replacement (subs source start-char end-char))))
     edits)))
 
-;;; Breakable node detection
-
-(def ^:private breakable-types
-  "Node types that can be broken across multiple lines.
-  Includes anonymous functions and reader conditionals which have
-  list-like structure."
-  #{:list_lit
-    :vec_lit
-    :map_lit
-    :set_lit
-    :anon_fn_lit
-    :read_cond_lit
-    :splicing_read_cond_lit})
-
-;;; Indent rules
-
-;;; NOTE: Keep in sync with default-force-break-rules in reformat.clj
-(def ^:private default-indent-rules
-  "Default mappings from form head symbols to indent rules.
-  :defn - keep name on first line
-  :def - keep name on first line
-  :fn - keep arg vector on first line
-  :binding - keep binding vector on first line
-  :if - keep test on first line
-  :case - keep test-expr on first line, pair group remaining
-  :cond - pair group all clauses
-  :condp - keep pred+expr on first line, pair group remaining
-  :cond-> - keep initial expr on first line, pair group remaining
-  :try - body on next line
-  :do - body on next line"
-  {'defn :defn
-   'defn- :defn
-   'defmacro :defn
-   'defmethod :defn
-   'deftest :defn
-   'def :def
-   'defonce :def
-   'defmulti :def
-   'ns :def
-   'fn :fn
-   'bound-fn :fn
-   'let :binding
-   'when-let :binding
-   'if-let :binding
-   'binding :binding
-   'doseq :binding
-   'for :binding
-   'loop :binding
-   'with-open :binding
-   'with-local-vars :binding
-   'if :if
-   'if-not :if
-   'when :if
-   'when-not :if
-   'when-first :if
-   'testing :if
-   'case :case
-   'cond :cond
-   'condp :condp
-   'cond-> :cond->
-   'cond->> :cond->
-   'try :try
-   'do :do})
-
-(defn get-head-symbol
-  "Get the head symbol of a list_lit node as a symbol.
-  Returns nil if node is not a list_lit or has no sym_lit first child."
-  [node]
-  (when (= :list_lit (node/node-type node))
-    (let [first-child (first (node/named-children node))]
-      (when (= :sym_lit (node/node-type first-child))
-        (symbol (node/node-text first-child))))))
-
-(defn- get-indent-rule
-  "Look up the indent rule for a node.
-  Checks config's :indents map first, then falls back to defaults.
-  Returns nil if no rule applies (use default breaking)."
-  [node config]
-  (when-let [head-sym (get-head-symbol node)]
-    (or
-     (get-in config [:indents head-sym])
-     (get default-indent-rules head-sym))))
-
-(defn- binding-vector?
-  "Returns true if node is the binding vector of a :binding form.
-  A binding vector is a vec_lit that is the second child of a form
-  with the :binding indent rule (let, for, doseq, loop, etc.)."
-  [node config]
-  (and
-   (= :vec_lit (node/node-type node))
-   (when-let [parent (node/node-parent node)]
-     (and
-      (= :binding (get-indent-rule parent config))
-      (= node (second (node/named-children parent)))))))
-
-(defn- metadata-node?
-  "Returns true if node is a metadata (meta_lit) node."
-  [node]
-  (= :meta_lit (node/node-type node)))
-
-(defn- metadata-wrapped?
-  "Returns true if node's first named child is a meta_lit.
-  Such forms need special handling when breaking: keep metadata + first
-  content element together, indent to first content element's position."
-  [node]
-  (when-let [first-child (first (node/named-children node))]
-    (metadata-node? first-child)))
-
-(defn elements-to-keep-on-first-line
-  "Number of elements to keep on the first line based on indent rule.
-  :defn/:def keep 2 (head + name)
-  :fn keeps 2 (head + arg vector)
-  :binding keeps 2 (head + binding vector)
-  :if keeps 2 (head + test)
-  :case keeps 2 (head + test-expr)
-  :cond keeps 1 (head only, pair group remaining)
-  :condp keeps 3 (head + pred + expr, pair group remaining)
-  :cond-> keeps 2 (head + initial-expr, pair group remaining)
-  :try/:do keep 1 (body on next line)
-  :map keeps 2 (first key-value pair)
-  :binding-vector keeps 2 (first binding pair)
-  :metadata-wrapped keeps 2 (metadata + first content element)
-  Default keeps 1 (head only)."
-  [rule]
-  (case rule
-    (:defn
-     :def
-     :fn
-     :binding
-     :if
-     :case
-     :cond->
-     :map
-     :binding-vector
-     :metadata-wrapped)
-    2
-    :condp 3
-    (:cond :try :do) 1
-    1))
-
-(defn get-effective-rule
-  "Get the effective indent rule for a node, considering both head symbol
-  and node type. Maps use :map rule, binding vectors use :binding-vector.
-  Forms with metadata as first child use :metadata-wrapped rule."
-  [node config]
-  (or
-   (get-indent-rule node config)
-   (when (= :map_lit (node/node-type node))
-     :map)
-   (when (binding-vector? node config)
-     :binding-vector)
-   (when (metadata-wrapped? node)
-     :metadata-wrapped)))
-
-(defn uses-pair-grouping?
-  "Returns true if the node should use pair grouping when breaking.
-  Pair grouping keeps related pairs together (key-value, test-result, etc.)."
-  [node config]
-  (let [rule (get-effective-rule node config)]
-    (#{:cond :condp :case :cond-> :map :binding-vector} rule)))
-
-(def ^:private non-binding-pair-rules
-  "Pair-grouping rules for non-binding forms (cond, case, condp, cond->)."
-  #{:cond :condp :case :cond->})
-
-(defn breakable-node?
-  "Returns true if node is a breakable collection type."
-  [node]
-  (contains? breakable-types (node/node-type node)))
-
 ;;; Finding breakable forms
 
 (defn- node-contains-line?
@@ -301,17 +131,17 @@
   (when (and
          (node-contains-line? node line)
          (not (node-in-ignored-range? node ignored-ranges))
-         (not (metadata-node? node)))
-    (if (metadata-wrapped? node)
+         (not (rules/metadata-node? node)))
+    (if (rules/metadata-wrapped? node)
       ;; Metadata-wrapped form: breakable but don't descend into children
       (when (and
-             (breakable-node? node)
+             (rules/breakable-node? node)
              (form-needs-breaking-on-line? node line))
         [node])
       ;; Normal form: check self and recurse into children
       (let [self
             (when (and
-                   (breakable-node? node)
+                   (rules/breakable-node? node)
                    (form-needs-breaking-on-line? node line))
               [node])
             children-results
@@ -350,7 +180,9 @@
           (rseq results)
           (recur
            parent
-           (if (and (has-preceding-sibling-on-line? n) (breakable-node? parent))
+           (if (and
+                (has-preceding-sibling-on-line? n)
+                (rules/breakable-node? parent))
              (conj results parent)
              results)))))))
 
@@ -502,7 +334,7 @@
           non-comment (remove comment-node? children)
           prefix (if (#{:map :binding-vector} rule)
                    0
-                   (elements-to-keep-on-first-line rule))
+                   (rules/elements-to-keep-on-first-line rule))
           pairs (partition 2 (drop prefix non-comment))]
       (some
        (fn [[name-node value-node]]
@@ -546,7 +378,7 @@
   [node]
   (loop [n (node/node-parent node)]
     (when n
-      (if (and (breakable-node? n) (has-consecutive-children-on-line? n))
+      (if (and (rules/breakable-node? n) (has-consecutive-children-on-line? n))
         n
         (recur (node/node-parent n))))))
 
@@ -631,9 +463,10 @@
         (make-break-edit prev-child next-child indent-col)))
      all-pairs)))
 
-(defn- break-form-phase-3
-  "Phase 3 breaking: un-break a multi-line value, split name/value onto
-  separate lines, and generate inter-pair edits.
+(defn- break-exceeding-pair
+  "Split an exceeding pair onto separate lines and generate inter-pair edits.
+  When the value is multi-line, also collapses it to a single line first so
+  it gets properly re-broken at the new indent position.
   Returns a result map {:edits [...]} or nil."
   [exc-name exc-value children base-keep-count breakable-children
    indent-col]
@@ -654,25 +487,6 @@
          (if join-edits
            (cons split-edit join-edits)
            [split-edit]))]
-    (when (seq all-edits)
-      {:edits all-edits})))
-
-(defn- break-form-split-pair
-  "Split an exceeding pair onto separate lines and generate inter-pair edits.
-  Returns a result map {:edits [...]} or nil."
-  [exc-name exc-value children base-keep-count breakable-children
-   indent-col]
-  (let [indent-str (apply str (repeat indent-col \space))
-        split-edit {:start (element-end-offset exc-name)
-                    :end (element-start-offset exc-value)
-                    :replacement (str "\n" indent-str)}
-        pair-edits
-        (when (seq breakable-children)
-          (generate-paired-edits
-           (nth children (dec base-keep-count))
-           breakable-children
-           indent-col))
-        all-edits (into (vec pair-edits) [split-edit])]
     (when (seq all-edits)
       {:edits all-edits})))
 
@@ -709,12 +523,12 @@
   ([node config]
    (when node
      (let [children (node/named-children node)
-           rule (get-effective-rule node config)
+           rule (rules/get-effective-rule node config)
            indent-col (indent-column node rule)
-           base-keep-count (elements-to-keep-on-first-line rule)
+           base-keep-count (rules/elements-to-keep-on-first-line rule)
            max-length (get config :line-length)
            ;; For pair-grouped forms, check if any pair exceeds limit
-           exceeding-pair (when (uses-pair-grouping? node config)
+           exceeding-pair (when (rules/uses-pair-grouping? node config)
                             (find-exceeding-pair node rule max-length))
            [exc-name exc-value] exceeding-pair
            ;; Phase 3: multi-line breakable value — un-break and move
@@ -722,7 +536,7 @@
            ;; first line still exceeds.
            phase-3? (and
                      exceeding-pair
-                     (breakable-node? exc-value)
+                     (rules/breakable-node? exc-value)
                      (not (single-line-node? exc-value)))
            ;; Non-binding pair split: for cond/case/condp/cond->, split
            ;; the exceeding pair immediately rather than deferring via
@@ -732,19 +546,15 @@
            (and
             exceeding-pair
             (not phase-3?)
-            (contains? non-binding-pair-rules rule)
+            (contains? rules/non-binding-pair-rules rule)
             (let [pair-width (-
                               (first-line-end-column exc-value)
                               (form-start-column exc-name))]
               (> (+ indent-col pair-width) max-length)))
            breakable-children (drop base-keep-count children)]
        (cond
-         phase-3?
-         (break-form-phase-3
-          exc-name exc-value children base-keep-count
-          breakable-children indent-col)
-         split-pair?
-         (break-form-split-pair
+         (or phase-3? split-pair?)
+         (break-exceeding-pair
           exc-name exc-value children base-keep-count
           breakable-children indent-col)
          ;; Normal breaking (Phase 1 deferral is implicit — single-line
@@ -753,7 +563,7 @@
          (when (seq breakable-children)
            (let [last-kept (nth children (dec base-keep-count))
                  edits
-                 (if (uses-pair-grouping? node config)
+                 (if (rules/uses-pair-grouping? node config)
                    (generate-paired-edits
                     last-kept
                     breakable-children
@@ -765,7 +575,7 @@
              (when (seq edits)
                (if (and exceeding-pair
                         (single-line-node? exc-value)
-                        (breakable-node? exc-value))
+                        (rules/breakable-node? exc-value))
                  {:edits edits
                   :reason ::value-exceeds-limit}
                  {:edits edits})))))))))
@@ -884,9 +694,9 @@
 
 (defn- break-on-line
   "Try strategies to break forms on a single long line.
-  Tries ancestor forms first, then direct forms, then fallback paths.
-  Returns [updated-state result] or [state nil], where result is a
-  break-form result map or a collapse-edits vector (stale-indent path)."
+  Tries ancestor forms first, then direct forms, then the innermost
+  unbroken breakable ancestor of any node on the line.
+  Returns [updated-state result] or [state nil]."
   [state source tree line ignored-ranges config]
   (let [forms (find-breakable-forms tree line ignored-ranges)
         ancestor-forms
@@ -909,14 +719,9 @@
                             state source forms config)]
         (if result
           [state result]
-          (if-let [n (find-node-on-line tree line)]
-            (let [[state result]
-                  (if-let [anc (find-unbroken-breakable-ancestor n)]
-                    (try-guarded-break state source anc config)
-                    [state nil])]
-              (if result
-                [state result]
-                [state nil]))
+          (if-let [anc (some-> (find-node-on-line tree line)
+                               find-unbroken-breakable-ancestor)]
+            (try-guarded-break state source anc config)
             [state nil]))))))
 
 (defn- try-break-on-lines
@@ -972,11 +777,7 @@
         source
         (let [long-lines (find-long-lines source max-length)]
           (if (empty? long-lines)
-            (do
-              (trace/trace! {:level :fix-source
-                             :iterations iteration
-                             :outcome :stable})
-              source)
+            source
             (let [tree (parser/parse-source source)
                   ignored-ranges
                   (check/find-ignored-byte-ranges tree)
@@ -986,10 +787,6 @@
                               long-lines
                               ignored-ranges
                               config)]
-              (trace/trace! {:level :fix-source
-                             :iteration iteration
-                             :long-line-count
-                             (count long-lines)})
               (if new-source
                 (recur new-source (inc iteration))
                 source))))))))

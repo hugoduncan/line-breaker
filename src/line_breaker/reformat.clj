@@ -5,7 +5,7 @@
   lines, then apply forced breaks, pair breaking, and fix-source."
   (:require
    [line-breaker.fix :as fix]
-   [line-breaker.trace :as trace]
+   [line-breaker.rules :as rules]
    [line-breaker.treesitter.node :as node]
    [line-breaker.treesitter.parser :as parser]))
 
@@ -121,7 +121,7 @@
       (= :kwd_lit (node/node-type first-child))
       (contains? ns-require-import-kws (node/node-text first-child))))
    (when-let [parent (node/node-parent node)]
-     (= 'ns (fix/get-head-symbol parent)))))
+     (= 'ns (rules/get-head-symbol parent)))))
 
 (defn- ns-require-import-rule
   "Build a force-break rule for a require/import form.
@@ -140,7 +140,7 @@
    (let [first-child (first (node/named-children node))]
      (= :vec_lit (node/node-type first-child)))
    (when-let [parent (node/node-parent node)]
-     (contains? multi-arity-parent-syms (fix/get-head-symbol parent)))))
+     (contains? multi-arity-parent-syms (rules/get-head-symbol parent)))))
 
 (defn- arity-clause-indices
   "Return indices of arity-clause children (list_lit starting with vec_lit)."
@@ -164,7 +164,7 @@
   and :require/:import forms inside ns."
   [node config]
   (or
-   (when-let [head-sym (fix/get-head-symbol node)]
+   (when-let [head-sym (rules/get-head-symbol node)]
      (let [base-rule (or
                       (get-in config [:force-breaks head-sym])
                       (get default-force-break-rules head-sym))]
@@ -306,14 +306,14 @@
     (when rule
       (let [base-positions (forced-break-positions children rule)
             break-positions
-            (if (fix/uses-pair-grouping? node config)
+            (if (rules/uses-pair-grouping? node config)
               base-positions
               (into
                base-positions
                (body-separation-positions children base-positions)))
             indent-col (fix/indent-column
                         node
-                        (fix/get-effective-rule node config))]
+                        (rules/get-effective-rule node config))]
         (when (form-needs-forced-break? children break-positions indent-col)
           (into
            []
@@ -374,7 +374,7 @@
              positions (forced-break-positions children rule)
              indent-col (fix/indent-column
                          node
-                         (fix/get-effective-rule node config))]
+                         (rules/get-effective-rule node config))]
          (form-needs-forced-break? children positions indent-col))))))
 
 (defn apply-forced-breaks
@@ -398,12 +398,7 @@
                     #(needs-forced-breaking? % src-arg config)
                     root)]
          (if (empty? forms)
-           (do
-             (trace/trace! {:level :forced-breaks
-                            :check-position? check-position?
-                            :iterations iteration
-                            :outcome :stable})
-             s)
+           s
            (let [{:keys [collected]}
                  (reduce
                   (fn [state form]
@@ -420,10 +415,6 @@
                           new-state))))
                   {:seen #{} :collected []}
                   forms)]
-             (trace/trace! {:level :forced-breaks
-                            :check-position? check-position?
-                            :iteration iteration
-                            :edit-count (count collected)})
              (if (and (seq collected)
                       (fix/edits-change-source? s collected))
                (recur (fix/apply-edits s collected)
@@ -438,11 +429,11 @@
   condp/cond->, skips the non-pair prefix elements. Comments are
   excluded before counting."
   [node config]
-  (let [rule (fix/get-effective-rule node config)
+  (let [rule (rules/get-effective-rule node config)
         children (node/named-children node)
         prefix (if (#{:map :binding-vector} rule)
                  0
-                 (fix/elements-to-keep-on-first-line rule))
+                 (rules/elements-to-keep-on-first-line rule))
         non-comment (remove fix/comment-node? (drop prefix children))]
     (count (partition-all 2 non-comment))))
 
@@ -452,11 +443,11 @@
   pair grouping structure. If any pair's first element is on the same
   line as the previous pair's last element, breaking is needed."
   [node config]
-  (let [rule (fix/get-effective-rule node config)
+  (let [rule (rules/get-effective-rule node config)
         children (node/named-children node)
         prefix (if (#{:map :binding-vector} rule)
                  0
-                 (fix/elements-to-keep-on-first-line rule))
+                 (rules/elements-to-keep-on-first-line rule))
         non-comment (remove fix/comment-node? (drop prefix children))
         pairs (partition-all 2 non-comment)]
     (some
@@ -473,8 +464,8 @@
   inner forms are at their final position when reached."
   [node config]
   (and
-   (fix/breakable-node? node)
-   (fix/uses-pair-grouping? node config)
+   (rules/breakable-node? node)
+   (rules/uses-pair-grouping? node config)
    (> (pair-group-count node config) 1)
    (has-unseparated-pairs? node config)))
 
@@ -484,9 +475,9 @@
   re-broken at their new indent position by subsequent fix-source
   passes. Returns edits or nil."
   [node config]
-  (let [rule (fix/get-effective-rule node config)
+  (let [rule (rules/get-effective-rule node config)
         children (node/named-children node)
-        base-keep-count (fix/elements-to-keep-on-first-line rule)
+        base-keep-count (rules/elements-to-keep-on-first-line rule)
         indent-col (fix/indent-column node rule)
         breakable-children (drop base-keep-count children)]
     (when (seq breakable-children)
@@ -513,11 +504,7 @@
                    #(needs-pair-breaking? % config)
                    root)]
         (if (empty? forms)
-          (do
-            (trace/trace! {:level :pair-breaking
-                           :iterations iteration
-                           :outcome :stable})
-            s)
+          s
           (let [{:keys [collected]}
                 (reduce
                  (fn [state form]
@@ -534,9 +521,6 @@
                          new-state))))
                  {:seen #{} :collected []}
                  forms)]
-            (trace/trace! {:level :pair-breaking
-                           :iteration iteration
-                           :edit-count (count collected)})
             (if (seq collected)
               (recur (fix/apply-edits s collected)
                      (inc iteration))
@@ -562,14 +546,4 @@
         result (if (not= s3 s2)
                  (run-middle-steps s3 config)
                  s3)]
-    (trace/trace!
-     {:level :pipeline
-      :changed-steps
-      (cond-> []
-        (not= collapsed s1)
-        (conj :forced-breaks-checked)
-        (not= s1 s2) (conj :middle-steps)
-        (not= s2 s3)
-        (conj :forced-breaks-unchecked)
-        (not= s3 result) (conj :middle-steps-rerun))})
     result))
