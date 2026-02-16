@@ -9,6 +9,16 @@
    [line-breaker.treesitter.node :as node]
    [line-breaker.treesitter.parser :as parser]))
 
+;;; Tree walking
+
+(defn- find-first-preorder
+  "Pre-order walk returning the first node for which pred returns true."
+  [pred node]
+  (when node
+    (if (pred node)
+      node
+      (some #(find-first-preorder pred %) (node/named-children node)))))
+
 ;;; Collapse
 
 (defn collapse-top-level-forms
@@ -342,30 +352,22 @@
             (Character/isWhitespace c) (recur (dec i))
             :else false))))))
 
-(defn- find-first-forcible-form
-  "Pre-order walk returning the first list_lit that matches a force-break
-  rule and needs breaks inserted or re-indented.
-  When source is provided, only returns forms at the start of their line
-  to avoid applying forced breaks at transient column positions before
-  parent forms are broken. When source is nil, skips the position check
-  for use after the pipeline has stabilized."
+(defn- needs-forced-breaking?
+  "Returns true if node is a list_lit matching a force-break rule that
+  needs breaks inserted or re-indented.
+  When source is provided, only matches forms at the start of their line."
   [node source config]
-  (when node
-    (if (and
-         (= :list_lit (node/node-type node))
-         (or (nil? source) (at-line-start? node source))
-         (let [rule (get-force-break-rule node config)]
-           (when rule
-             (let [children (node/named-children node)
-                   positions (forced-break-positions children rule)
-                   indent-col (fix/indent-column
-                               node
-                               (fix/get-effective-rule node config))]
-               (form-needs-forced-break? children positions indent-col)))))
-      node
-      (some
-       #(find-first-forcible-form % source config)
-       (node/named-children node)))))
+  (and
+   (= :list_lit (node/node-type node))
+   (or (nil? source) (at-line-start? node source))
+   (let [rule (get-force-break-rule node config)]
+     (when rule
+       (let [children (node/named-children node)
+             positions (forced-break-positions children rule)
+             indent-col (fix/indent-column
+                         node
+                         (fix/get-effective-rule node config))]
+         (form-needs-forced-break? children positions indent-col))))))
 
 (defn apply-forced-breaks
   "Insert forced line breaks at structurally significant positions.
@@ -384,7 +386,9 @@
              root (node/root-node tree)
              src-arg (when check-position?
                        s)
-             form (find-first-forcible-form root src-arg config)]
+             form (find-first-preorder
+                   #(needs-forced-breaking? % src-arg config)
+                   root)]
          (if-not form
            s
            (let [edits (generate-forced-break-edits form config)]
@@ -476,21 +480,6 @@
         (when (seq break-edits)
           break-edits)))))
 
-(defn- find-first-pair-breakable-form
-  "Pre-order walk returning the first pair-grouped form that needs
-  pair breaking: single-line with >1 pair.
-  When rule-filter is provided, only matches forms whose effective rule
-  is in the filter set."
-  ([node config]
-   (find-first-pair-breakable-form node config nil))
-  ([node config rule-filter]
-   (when node
-     (if (needs-pair-breaking? node config rule-filter)
-       node
-       (some
-        #(find-first-pair-breakable-form % config rule-filter)
-        (node/named-children node))))))
-
 (defn apply-pair-breaking
   "Force pair-grouped forms to break so each pair is on its own line.
   Iteratively finds the first qualifying form, applies edits, and
@@ -506,7 +495,9 @@
        s
        (let [tree (parser/parse-source s)
              root (node/root-node tree)
-             form (find-first-pair-breakable-form root config rule-filter)]
+             form (find-first-preorder
+                   #(needs-pair-breaking? % config rule-filter)
+                   root)]
          (if-not form
            s
            (let [edits (generate-pair-break-edits form config)]
@@ -540,18 +531,6 @@
         (contiguous-line? a b))
       (partition 2 1 breakable-children)))))
 
-(defn- find-first-multiline-child-form
-  "Pre-order walk returning the first breakable form that has a
-  multi-line child and needs its children separated onto individual
-  lines."
-  [node config]
-  (when node
-    (if (needs-multiline-child-breaking? node config)
-      node
-      (some
-       #(find-first-multiline-child-form % config)
-       (node/named-children node)))))
-
 (defn apply-multiline-child-breaking
   "Break forms that contain multi-line children so every child is on
   its own line. Iteratively finds qualifying forms and applies break
@@ -563,7 +542,9 @@
       s
       (let [tree (parser/parse-source s)
             root (node/root-node tree)
-            form (find-first-multiline-child-form root config)]
+            form (find-first-preorder
+                  #(needs-multiline-child-breaking? % config)
+                  root)]
         (if-not form
           s
           (let [edits (fix/break-form form config)]
