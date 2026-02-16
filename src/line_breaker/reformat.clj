@@ -2,8 +2,7 @@
   "Reformat functions for collapsing and re-breaking Clojure code.
 
   Provides the reformat pipeline: collapse all top-level forms to single
-  lines, then iteratively apply forced breaks, pair breaking, fix-source,
-  and multiline child breaking until stable."
+  lines, then apply forced breaks, pair breaking, and fix-source."
   (:require
    [line-breaker.fix :as fix]
    [line-breaker.trace :as trace]
@@ -542,93 +541,19 @@
               (recur (fix/apply-edits s collected)
                      (inc iteration))
               s)))))))
-;;; Multiline child breaking
-
-(defn- has-multiline-child?
-  "Returns true if any named child of node spans multiple lines."
-  [node]
-  (some
-   (fn [child]
-     (not (fix/single-line-node? child)))
-   (node/named-children node)))
-
-(defn- needs-multiline-child-breaking?
-  "Returns true if a breakable form has a multi-line child and some
-  breakable children still share a line with a sibling."
-  [node config]
-  (and
-   (fix/breakable-node? node)
-   (has-multiline-child? node)
-   (let [children (node/named-children node)
-         rule (fix/get-effective-rule node config)
-         keep-n (fix/elements-to-keep-on-first-line rule)
-         breakable-children (drop keep-n children)]
-     (some
-      (fn [[a b]]
-        (contiguous-line? a b))
-      (partition 2 1 breakable-children)))))
-
-(defn apply-multiline-child-breaking
-  "Break forms that contain multi-line children so every child is on
-  its own line. Batches all qualifying forms per parse, skipping
-  children of already-broken parents and overlapping edits."
-  [source config]
-  (loop [s source
-         iteration 0]
-    (if (>= iteration fix/max-iterations)
-      s
-      (let [tree (parser/parse-source s)
-            root (node/root-node tree)
-            forms (find-all-preorder
-                   #(needs-multiline-child-breaking? % config)
-                   root)]
-        (if (empty? forms)
-          (do
-            (trace/trace! {:level :multiline-child
-                           :iterations iteration
-                           :outcome :stable})
-            s)
-          (let [{:keys [collected]}
-                (reduce
-                 (fn [state form]
-                   (let [range (node/node-range form)]
-                     (if (fix/inside-broken-form?
-                          (:seen state) range)
-                       state
-                       (let [result
-                             (fix/break-form form config)
-                             edits (:edits result)
-                             [new-state _]
-                             (fix/try-collect-edits
-                              state s form edits)]
-                         new-state))))
-                 {:seen #{} :collected []}
-                 forms)]
-            (trace/trace! {:level :multiline-child
-                           :iteration iteration
-                           :edit-count (count collected)})
-            (if (and (seq collected)
-                     (fix/edits-change-source? s collected))
-              (recur (fix/apply-edits s collected)
-                     (inc iteration))
-              s)))))))
-
 ;;; Reformat pipeline
 
 (defn- run-middle-steps
-  "Run the middle pipeline steps: pair breaking, fix-source, and
-  multiline child breaking."
+  "Run the middle pipeline steps: pair breaking and fix-source."
   [source config]
-  (let [s1 (apply-pair-breaking source config)
-        s2 (fix/fix-source s1 config)
-        s3 (apply-multiline-child-breaking s2 config)]
-    s3))
+  (let [s1 (apply-pair-breaking source config)]
+    (fix/fix-source s1 config)))
 
 (defn reformat-source
   "Reformat source by collapsing then applying a single-pass pipeline.
   Runs forced breaks (position-checked), middle steps (pair breaking,
-  fix-source, multiline child), then forced breaks (unchecked). If the
-  unchecked pass changed anything, re-runs middle steps once."
+  fix-source), then forced breaks (unchecked). If the unchecked pass
+  changed anything, re-runs middle steps once."
   [source config]
   (let [collapsed (collapse-top-level-forms source)
         s1 (apply-forced-breaks collapsed config)
