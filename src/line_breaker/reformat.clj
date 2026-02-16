@@ -555,34 +555,27 @@
 ;;; Reformat pipeline
 
 (defn reformat-source
-  "Reformat source by collapsing then iteratively applying forced breaks,
-  pair breaking, fix-source, and binding pair breaking until stable.
-  Non-binding pair-grouped forms (cond, case, condp, cond->) are pair-broken
-  before fix-source so pairs are separated before internal line breaking.
-  Binding and map forms are pair-broken after fix-source."
+  "Reformat source by collapsing then iteratively applying all passes
+  until stable. Each iteration runs forced breaks (position-checked),
+  non-binding pair breaking, fix-source, binding pair breaking, multiline
+  child breaking, then forced breaks again without position checking to
+  catch mid-line forms, followed by fix-source and multiline child
+  breaking for any changes from the unchecked forced breaks."
   [source config]
   (let [collapsed (collapse-top-level-forms source)]
     (loop [s collapsed
            iteration 0]
       (if (>= iteration fix/max-iterations)
         s
-        (let [result (->
-                      s
-                      (apply-forced-breaks config)
-                      (apply-pair-breaking config non-binding-pair-rules)
-                      (fix/fix-source config)
-                      (apply-pair-breaking config binding-pair-rules)
-                      (apply-multiline-child-breaking config))]
-          (if (= result s)
-            ;; Pipeline stabilized. Apply forced breaks without the
-            ;; at-line-start? guard to catch forms like `do` that appear
-            ;; mid-line (e.g. as map values). All positions are final now.
-            (let [final (->
-                         result
+        (let [result (-> s
+                         (apply-forced-breaks config)
+                         (apply-pair-breaking config non-binding-pair-rules)
+                         (fix/fix-source config)
+                         (apply-pair-breaking config binding-pair-rules)
+                         (apply-multiline-child-breaking config)
                          (apply-forced-breaks config false)
                          (fix/fix-source config)
                          (apply-multiline-child-breaking config))]
-              (if (= final result)
-                final
-                (recur final (inc iteration))))
+          (if (= result s)
+            result
             (recur result (inc iteration))))))))
