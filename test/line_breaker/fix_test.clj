@@ -1610,6 +1610,13 @@
                 "(def foo (defn bar [x] x))"
                 {})))))
 
+    (testing "given a defn with multiple body forms"
+      (testing "breaks between body siblings"
+        (is (= "(defn foo\n  [x]\n  (bar x)\n  (baz x))"
+               (fix/apply-forced-breaks
+                "(defn foo [x] (bar x) (baz x))"
+                {})))))
+
     (testing "given an already-broken form"
       (testing "returns unchanged"
         (let [s "(defn foo\n  [x]\n  (+ x 1))"]

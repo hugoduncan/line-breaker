@@ -954,6 +954,30 @@
   (let [[_ end-line] (node/node-line-range node1)]
     (= end-line (node-start-line node2))))
 
+(defn- body-separation-positions
+  "Indices for body children after the last forced break position that
+  share a line with their next sibling.  Skips comment nodes and the
+  comment chain from the max break position since the comment-following
+  loop already handles those."
+  [children break-positions]
+  (when (seq break-positions)
+    (let [n (count children)
+          ;; Skip past comment chain from the max break position
+          first-body-idx (loop [i (inc (apply max break-positions))]
+                           (if (and (< i n)
+                                    (comment-node? (nth children i)))
+                             (recur (inc i))
+                             i))]
+      (into #{}
+            (filter (fn [i]
+                      (let [ni (inc i)]
+                        (and (< ni n)
+                             (not (comment-node? (nth children i)))
+                             (contiguous-line?
+                              (nth children i)
+                              (nth children ni))))))
+            (range first-body-idx (dec n))))))
+
 (defn- needs-break-or-reindent?
   "Check if a (child, next-child) pair needs a break or re-indent edit."
   [child next-child indent-col]
@@ -991,7 +1015,12 @@
         rule (get-force-break-rule node config)
         n (count children)]
     (when rule
-      (let [break-positions (forced-break-positions children rule)
+      (let [base-positions (forced-break-positions children rule)
+            break-positions (if (uses-pair-grouping? node config)
+                              base-positions
+                              (into base-positions
+                                    (body-separation-positions
+                                     children base-positions)))
             indent-col (indent-column node (get-effective-rule node config))]
         (when (form-needs-forced-break? children break-positions indent-col)
           (into []
