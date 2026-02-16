@@ -341,25 +341,25 @@
           (= (second (node/node-line-range prev-child)) node-start)))
        (partition 2 1 (node/named-children parent))))))
 
-(defn- find-ancestor-needing-sibling-separation
-  "Walk up from node to find the outermost ancestor that shares its
-  start line with a preceding sibling. Returns that ancestor's parent
-  (the breakable form whose children need separating), or nil.
-  Returns the outermost match so it is not blocked by
-  inside-broken-form? when an inner ancestor has already been broken."
+(defn- find-ancestors-needing-sibling-separation
+  "Walk up from node collecting all ancestors that share their start
+  line with a preceding sibling. Returns a seq of ancestor parents
+  (breakable forms whose children need separating), outermost first.
+  Returns all matches so that if the outermost is already broken,
+  intermediate ancestors can be tried."
   [node]
   (loop [n node
-         result nil]
+         results []]
     (if-not n
-      result
+      (rseq results)
       (let [parent (node/node-parent n)]
         (if-not parent
-          result
+          (rseq results)
           (recur
            parent
            (if (and (has-preceding-sibling-on-line? n) (breakable-node? parent))
-             parent
-             result)))))))
+             (conj results parent)
+             results)))))))
 
 (defn find-breakable-forms
   "Find all breakable forms containing the given line.
@@ -825,9 +825,10 @@
                            (vswap! seen conj range)
                            (vswap! collected into edits)
                            edits)))))
-        all-edits (into
-                   []
-                   (mapcat
+        all-edits
+        (into
+         []
+         (mapcat
                     (fn [line]
                       (let [forms (find-breakable-forms
                                    tree
@@ -845,8 +846,8 @@
                              (into
                               []
                               (comp
-                               (map find-ancestor-needing-sibling-separation)
-                               (filter some?)
+                               (mapcat
+                                find-ancestors-needing-sibling-separation)
                                (filter
                                 #(not
                                   (node-in-ignored-range? % ignored-ranges)))
@@ -890,7 +891,7 @@
                                   (vswap! seen conj range)
                                   (vswap! collected into edits)
                                   edits)))))))))
-                   long-lines)]
+         long-lines)]
     (when (seq all-edits)
       (let [new-source (apply-edits source all-edits)]
         (when (not= new-source source) new-source)))))

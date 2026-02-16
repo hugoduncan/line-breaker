@@ -1800,3 +1800,39 @@
           (is
            (= result (fix/reformat-source result {:line-length 40}))
            "second reformat produces same output"))))))
+
+(deftest intermediate-ancestor-separation-test
+  ;; When nested forms share a line and the outermost ancestor is
+  ;; already broken, intermediate ancestors should be tried so inner
+  ;; forms get separated onto their own lines.
+  (testing "fix-source"
+    (testing "given nested testing forms on one line"
+      (testing "breaks intermediate ancestor when outermost is broken"
+        (let [input (str "(deftest my-test\n"
+                         "  (testing \"outer\""
+                         " (testing \"inner\"\n"
+                         "    (let [x (long-fn a b)]"
+                         " (do-thing x)))))")
+              result (fix/fix-source input {:line-length 40})]
+          (is
+           (re-find #"(?m)^\s+\(testing \"inner\"" result)
+           "inner testing on its own line")))))
+  (testing "reformat-source"
+    (testing "given nested testing forms on one line"
+      (testing "separates at intermediate ancestor"
+        (let [input (str "(deftest my-test\n"
+                         "  (testing \"outer\""
+                         " (testing \"inner\"\n"
+                         "    (let [x (long-fn a b)]"
+                         " (do-thing x)))))")
+              result (fix/reformat-source
+                      input
+                      {:line-length 40})]
+          (is
+           (re-find #"(?m)^\s+\(testing \"inner\"" result)
+           "inner testing on its own line")
+          (is
+           (every?
+            #(<= (count %) 40)
+            (.split result "\n"))
+           "no line exceeds limit"))))))
