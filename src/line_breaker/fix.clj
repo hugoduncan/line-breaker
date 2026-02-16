@@ -5,6 +5,7 @@
   and apply those edits to source code."
   (:require
    [line-breaker.check :as check]
+   [line-breaker.trace :as trace]
    [line-breaker.treesitter.node :as node]
    [line-breaker.treesitter.parser :as parser]))
 
@@ -927,8 +928,13 @@
                 ;; Collapse a stale-indent ancestor so
                 ;; fix-source re-breaks at the correct position.
                 (if-let [stale (find-stale-indent-ancestor n config)]
-                  (try-collect-edits
-                   state source stale (collect-collapse-edits stale))
+                  (do
+                    (trace/trace!
+                     {:level :stale-indent
+                      :form (trace/node-summary stale)})
+                    (try-collect-edits
+                     state source stale
+                     (collect-collapse-edits stale)))
                   [state nil])))
             [state nil]))))))
 
@@ -985,16 +991,24 @@
         source
         (let [long-lines (find-long-lines source max-length)]
           (if (empty? long-lines)
-            source
+            (do
+              (trace/trace! {:level :fix-source
+                             :iterations iteration
+                             :outcome :stable})
+              source)
             (let [tree (parser/parse-source source)
-                  ;; Re-collect ignored ranges (positions shift after edits)
-                  ignored-ranges (check/find-ignored-byte-ranges tree)
+                  ignored-ranges
+                  (check/find-ignored-byte-ranges tree)
                   new-source (try-break-on-lines
                               source
                               tree
                               long-lines
                               ignored-ranges
                               config)]
+              (trace/trace! {:level :fix-source
+                             :iteration iteration
+                             :long-line-count
+                             (count long-lines)})
               (if new-source
                 (recur new-source (inc iteration))
                 source))))))))

@@ -6,6 +6,7 @@
   and multiline child breaking until stable."
   (:require
    [line-breaker.fix :as fix]
+   [line-breaker.trace :as trace]
    [line-breaker.treesitter.node :as node]
    [line-breaker.treesitter.parser :as parser]))
 
@@ -393,8 +394,17 @@
                    #(needs-forced-breaking? % src-arg config)
                    root)]
          (if-not form
-           s
+           (do
+             (trace/trace! {:level :forced-breaks
+                            :check-position? check-position?
+                            :iterations iteration
+                            :outcome :stable})
+             s)
            (let [edits (generate-forced-break-edits form config)]
+             (trace/trace! {:level :forced-breaks
+                            :check-position? check-position?
+                            :iteration iteration
+                            :form (trace/node-summary form)})
              (if (and (seq edits) (fix/edits-change-source? s edits))
                (recur (fix/apply-edits s edits) (inc iteration))
                s))))))))
@@ -502,8 +512,17 @@
                    #(needs-pair-breaking? % config rule-filter)
                    root)]
          (if-not form
-           s
+           (do
+             (trace/trace! {:level :pair-breaking
+                            :rule-filter rule-filter
+                            :iterations iteration
+                            :outcome :stable})
+             s)
            (let [edits (generate-pair-break-edits form config)]
+             (trace/trace! {:level :pair-breaking
+                            :rule-filter rule-filter
+                            :iteration iteration
+                            :form (trace/node-summary form)})
              (if (seq edits)
                (recur (fix/apply-edits s edits) (inc iteration))
                s))))))))
@@ -549,8 +568,15 @@
                   #(needs-multiline-child-breaking? % config)
                   root)]
         (if-not form
-          s
+          (do
+            (trace/trace! {:level :multiline-child
+                           :iterations iteration
+                           :outcome :stable})
+            s)
           (let [edits (fix/break-form form config)]
+            (trace/trace! {:level :multiline-child
+                           :iteration iteration
+                           :form (trace/node-summary form)})
             (if (and (seq edits) (fix/edits-change-source? s edits))
               (recur (fix/apply-edits s edits) (inc iteration))
               s)))))))
@@ -570,15 +596,36 @@
            iteration 0]
       (if (>= iteration fix/max-iterations)
         s
-        (let [result (-> s
-                         (apply-forced-breaks config)
-                         (apply-pair-breaking config non-binding-pair-rules)
-                         (fix/fix-source config)
-                         (apply-pair-breaking config binding-pair-rules)
-                         (apply-multiline-child-breaking config)
-                         (apply-forced-breaks config false)
-                         (fix/fix-source config)
-                         (apply-multiline-child-breaking config))]
+        (let [s1 (apply-forced-breaks s config)
+              s2 (apply-pair-breaking
+                  s1 config non-binding-pair-rules)
+              s3 (fix/fix-source s2 config)
+              s4 (apply-pair-breaking
+                  s3 config binding-pair-rules)
+              s5 (apply-multiline-child-breaking s4 config)
+              s6 (apply-forced-breaks s5 config false)
+              s7 (fix/fix-source s6 config)
+              result (apply-multiline-child-breaking
+                      s7 config)]
+          (trace/trace!
+           {:level :pipeline
+            :iteration iteration
+            :changed-steps
+            (cond-> []
+              (not= s s1)
+              (conj :forced-breaks-checked)
+              (not= s1 s2)
+              (conj :non-binding-pair-breaking)
+              (not= s2 s3) (conj :fix-source-1)
+              (not= s3 s4)
+              (conj :binding-pair-breaking)
+              (not= s4 s5)
+              (conj :multiline-child-1)
+              (not= s5 s6)
+              (conj :forced-breaks-unchecked)
+              (not= s6 s7) (conj :fix-source-2)
+              (not= s7 result)
+              (conj :multiline-child-2))})
           (if (= result s)
             result
             (recur result (inc iteration))))))))
