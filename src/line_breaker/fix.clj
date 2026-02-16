@@ -1176,11 +1176,15 @@
        (range first-body-idx (dec n))))))
 
 (defn- needs-break-or-reindent?
-  "Check if a (child, next-child) pair needs a break or re-indent edit."
+  "Check if a (child, next-child) pair needs a break or re-indent edit.
+  When the prev child is a comment, its trailing newline already provides
+  line separation, so only the indent column is checked."
   [child next-child indent-col]
-  (or
-   (contiguous-line? child next-child)
-   (not= indent-col (form-start-column next-child))))
+  (if (comment-node? child)
+    (not= indent-col (form-start-column next-child))
+    (or
+     (contiguous-line? child next-child)
+     (not= indent-col (form-start-column next-child)))))
 
 (defn- form-needs-forced-break?
   "Returns true if any break position has consecutive children on the
@@ -1303,7 +1307,7 @@
          (if-not form
            s
            (let [edits (generate-forced-break-edits form config)]
-             (if (seq edits)
+             (if (and (seq edits) (edits-change-source? s edits))
                (recur (apply-edits s edits) (inc iteration))
                s))))))))
 

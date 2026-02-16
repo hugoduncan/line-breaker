@@ -1624,7 +1624,19 @@
       (is
        (=
         (str "{:task (do\n" "         (a)\n" "         (b))}")
-        (fix/reformat-source "{:task (do (a) (b))}" {:line-length 80}))))))
+        (fix/reformat-source "{:task (do (a) (b))}" {:line-length 80}))))
+    (testing "breaks when-not body in let with comment"
+      (is
+       (=
+        (str "(let [x 1]\n"
+             "  ;; check x\n"
+             "  (when-not x\n"
+             "    (throw (ex-info \"err\" {}))))")
+        (fix/reformat-source
+         (str "(let [x 1]\n"
+              "  ;; check x\n"
+              "  (when-not x (throw (ex-info \"err\" {}))))")
+         {:line-length 80}))))))
 
 (deftest apply-pair-breaking-test
   ;; Verify that apply-pair-breaking forces pair-grouped forms onto
