@@ -164,46 +164,62 @@
 (deftest break-form-test
   ;; Verify edit generation for breaking forms.
   (testing "break-form"
-    (testing "generates edits for simple list"
+    (testing "returns result map with :edits for simple list"
       (let [tree (parser/parse-source "(a b c)")
             form (fix/find-breakable-form tree 1)
-            edits (fix/break-form form)
-            result (fix/apply-edits "(a b c)" edits)]
-        (is (= "(a\n b\n c)" result))))
-    (testing "generates edits for vector"
+            result (fix/break-form form)]
+        (is (map? result))
+        (is (vector? (:edits result)))
+        (is (= "(a\n b\n c)"
+               (fix/apply-edits "(a b c)" (:edits result))))))
+    (testing "returns result map with :edits for vector"
       (let [tree (parser/parse-source "[a b c]")
             form (fix/find-breakable-form tree 1)
-            edits (fix/break-form form)
-            result (fix/apply-edits "[a b c]" edits)]
-        (is (= "[a\n b\n c]" result))))
-    (testing "generates edits for map with pair grouping"
+            result (fix/break-form form)]
+        (is (map? result))
+        (is (= "[a\n b\n c]"
+               (fix/apply-edits "[a b c]" (:edits result))))))
+    (testing "returns result map with :edits for map"
       (let [tree (parser/parse-source "{:a 1 :b 2}")
             form (fix/find-breakable-form tree 1)
-            edits (fix/break-form form)
-            result (fix/apply-edits "{:a 1 :b 2}" edits)]
-        (is (= "{:a 1\n :b 2}" result))))
+            result (fix/break-form form)]
+        (is (map? result))
+        (is (= "{:a 1\n :b 2}"
+               (fix/apply-edits "{:a 1 :b 2}" (:edits result))))))
     (testing "returns nil for single-element form"
       (let [tree (parser/parse-source "(a)")
-            form (fix/find-breakable-form tree 1)
-            edits (fix/break-form form)]
-        (is (nil? edits))))
-    (testing "returns nil for metadata-only form (no content element)"
+            form (fix/find-breakable-form tree 1)]
+        (is (nil? (fix/break-form form)))))
+    (testing "returns nil for metadata-only form"
       ;; Edge case: ^double [] has metadata but the inner vec is empty.
       ;; tree-sitter parses this as vec_lit with only meta_lit as a child.
       ;; break-form should return nil since there's no content to break.
       (let [tree (parser/parse-source "^double []")
-            form (fix/find-breakable-form tree 1)
-            edits (fix/break-form form)]
-        (is (nil? edits))))
+            form (fix/find-breakable-form tree 1)]
+        (is (nil? (fix/break-form form)))))
     (testing "preserves indentation based on form position"
       (let [source "  (a b c)"
             tree (parser/parse-source source)
             form (fix/find-breakable-form tree 1)
-            edits (fix/break-form form)
-            result (fix/apply-edits source edits)]
-        (is
-         (= "  (a\n   b\n   c)" result)
-         "indentation accounts for form's column position")))))
+            result (fix/break-form form)]
+        (is (= "  (a\n   b\n   c)"
+               (fix/apply-edits source (:edits result)))
+            "indentation accounts for form's column position")))
+    (testing "returns ::fix/value-exceeds-limit reason"
+      (testing "for Phase 1 deferral"
+        (let [source "{:a (b c d e) :x 1}"
+              tree (parser/parse-source source)
+              form (fix/find-breakable-form tree 1)
+              result (fix/break-form
+                      form {:line-length 10})]
+          (is (map? result))
+          (is (= :line-breaker.fix/value-exceeds-limit
+                 (:reason result)))))
+      (testing "not when no pair exceeds"
+        (let [tree (parser/parse-source "(a b c)")
+              form (fix/find-breakable-form tree 1)
+              result (fix/break-form form)]
+          (is (nil? (:reason result))))))))
 
 (deftest find-long-lines-test
   ;; Verify detection of lines exceeding max length.

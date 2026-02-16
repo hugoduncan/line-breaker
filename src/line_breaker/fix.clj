@@ -661,7 +661,8 @@
 
 (defn- break-form-phase-3
   "Phase 3 breaking: un-break a multi-line value, split name/value onto
-  separate lines, and generate inter-pair edits."
+  separate lines, and generate inter-pair edits.
+  Returns a result map {:edits [...]} or nil."
   [exc-name exc-value children base-keep-count breakable-children
    indent-col]
   (let [join-edits (join-form-edits exc-value)
@@ -682,10 +683,11 @@
            (cons split-edit join-edits)
            [split-edit]))]
     (when (seq all-edits)
-      all-edits)))
+      {:edits all-edits})))
 
 (defn- break-form-split-pair
-  "Split an exceeding pair onto separate lines and generate inter-pair edits."
+  "Split an exceeding pair onto separate lines and generate inter-pair edits.
+  Returns a result map {:edits [...]} or nil."
   [exc-name exc-value children base-keep-count breakable-children
    indent-col]
   (let [indent-str (apply str (repeat indent-col \space))
@@ -700,7 +702,7 @@
            indent-col))
         all-edits (into (vec pair-edits) [split-edit])]
     (when (seq all-edits)
-      all-edits)))
+      {:edits all-edits})))
 
 (defn break-form
   "Generate edits to break a form across multiple lines.
@@ -722,9 +724,14 @@
   Comments on the same line as the preceding element stay attached.
   Comments include their trailing newline, so no extra newline is added after.
 
-  Returns a vector of edits replacing whitespace between consecutive
-  elements with newline+indent. Each edit is {:start n :end m :replacement s}.
-  Returns nil if node is nil or has fewer than 2 children."
+  Returns a result map or nil:
+  - nil — nothing to break (nil node, fewer than 2 children, no edits)
+  - {:edits [...]} — normal break, no backtracking needed
+  - {:edits [...] :reason ::value-exceeds-limit} — Phase 1 deferral:
+    broke the form but a pair value still exceeds limit and needs
+    in-place breaking via iteration
+
+  Each edit is {:start n :end m :replacement s}."
   ([node]
    (break-form node {}))
   ([node config]
@@ -784,7 +791,12 @@
                     breakable-children
                     indent-col))]
              (when (seq edits)
-               edits))))))))
+               (if (and exceeding-pair
+                        (single-line-node? exc-value)
+                        (breakable-node? exc-value))
+                 {:edits edits
+                  :reason ::value-exceeds-limit}
+                 {:edits edits})))))))))
 
 ;;; Line length checking
 
@@ -869,25 +881,31 @@
 
 (defn- try-guarded-break
   "Try to break a form, guarding against inside-broken-form and already-seen.
-  Returns [updated-state edits] on success, [state nil] otherwise."
+  Returns [updated-state result-map] on success, [state nil] otherwise.
+  result-map is the break-form result with :edits and optional :reason."
   [state source form config]
   (let [range (node/node-range form)]
     (if (or (inside-broken-form? (:seen state) range)
             ((:seen state) range))
       [state nil]
-      (try-collect-edits
-       state source form (break-form form config)))))
+      (let [result (break-form form config)
+            edits (:edits result)
+            [new-state collected-edits]
+            (try-collect-edits state source form edits)]
+        (if collected-edits
+          [new-state result]
+          [new-state nil])))))
 
 (defn- try-first-guarded-break
   "Try to break forms in order, returning first success.
-  Returns [updated-state edits] or [state nil]."
+  Returns [updated-state result-map] or [state nil]."
   [state source forms config]
   (reduce
    (fn [[state _] form]
-     (let [[new-state edits] (try-guarded-break
-                              state source form config)]
-       (if edits
-         (reduced [new-state edits])
+     (let [[new-state result] (try-guarded-break
+                               state source form config)]
+       (if result
+         (reduced [new-state result])
          [new-state nil])))
    [state nil]
    forms))
@@ -895,7 +913,8 @@
 (defn- break-on-line
   "Try strategies to break forms on a single long line.
   Tries ancestor forms first, then direct forms, then fallback paths.
-  Returns [updated-state edits] or [state nil]."
+  Returns [updated-state result] or [state nil], where result is a
+  break-form result map or a collapse-edits vector (stale-indent path)."
   [state source tree line ignored-ranges config]
   (let [forms (find-breakable-forms tree line ignored-ranges)
         ancestor-forms
@@ -910,21 +929,21 @@
            (filter #(not (node-in-ignored-range? % ignored-ranges)))
            (distinct))
           forms))
-        [state edits] (try-first-guarded-break
-                       state source ancestor-forms config)]
-    (if edits
-      [state edits]
-      (let [[state edits] (try-first-guarded-break
-                           state source forms config)]
-        (if edits
-          [state edits]
+        [state result] (try-first-guarded-break
+                        state source ancestor-forms config)]
+    (if result
+      [state result]
+      (let [[state result] (try-first-guarded-break
+                            state source forms config)]
+        (if result
+          [state result]
           (if-let [n (find-node-on-line tree line)]
-            (let [[state edits]
+            (let [[state result]
                   (if-let [anc (find-unbroken-breakable-ancestor n)]
                     (try-guarded-break state source anc config)
                     [state nil])]
-              (if edits
-                [state edits]
+              (if result
+                [state result]
                 ;; Collapse a stale-indent ancestor so
                 ;; fix-source re-breaks at the correct position.
                 (if-let [stale (find-stale-indent-ancestor n config)]
@@ -932,9 +951,13 @@
                     (trace/trace!
                      {:level :stale-indent
                       :form (trace/node-summary stale)})
-                    (try-collect-edits
-                     state source stale
-                     (collect-collapse-edits stale)))
+                    (let [edits (collect-collapse-edits stale)
+                          [new-state collected]
+                          (try-collect-edits
+                           state source stale edits)]
+                      (if collected
+                        [new-state {:edits collected}]
+                        [new-state nil])))
                   [state nil])))
             [state nil]))))))
 
@@ -954,11 +977,11 @@
   (let [{:keys [all-edits]}
         (reduce
          (fn [state line]
-           (let [[state edits] (break-on-line
-                                state source tree line
-                                ignored-ranges config)]
-             (if edits
-               (update state :all-edits into edits)
+           (let [[state result] (break-on-line
+                                 state source tree line
+                                 ignored-ranges config)]
+             (if result
+               (update state :all-edits into (:edits result))
                state)))
          {:seen #{} :collected [] :all-edits []}
          long-lines)]

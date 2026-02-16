@@ -573,7 +573,8 @@
                            :iterations iteration
                            :outcome :stable})
             s)
-          (let [edits (fix/break-form form config)]
+          (let [result (fix/break-form form config)
+                edits (:edits result)]
             (trace/trace! {:level :multiline-child
                            :iteration iteration
                            :form (trace/node-summary form)})
