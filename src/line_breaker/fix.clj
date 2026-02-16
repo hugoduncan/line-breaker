@@ -1261,15 +1261,16 @@
 
 (defn- find-first-forcible-form
   "Pre-order walk returning the first list_lit that matches a force-break
-  rule and needs breaks inserted or re-indented. Only returns forms at
-  the start of their line (preceded only by whitespace) to avoid applying
-  forced breaks at transient column positions before parent forms are
-  broken."
+  rule and needs breaks inserted or re-indented.
+  When source is provided, only returns forms at the start of their line
+  to avoid applying forced breaks at transient column positions before
+  parent forms are broken. When source is nil, skips the position check
+  for use after the pipeline has stabilized."
   [node source config]
   (when node
     (if (and
          (= :list_lit (node/node-type node))
-         (at-line-start? node source)
+         (or (nil? source) (at-line-start? node source))
          (let [rule (get-force-break-rule node config)]
            (when rule
              (let [children (node/named-children node)
@@ -1287,22 +1288,24 @@
   "Insert forced line breaks at structurally significant positions.
   Iteratively finds forms matching force-break rules and inserts line
   breaks, re-parsing between each to maintain correct column positions.
-  Only breaks forms at the start of their line to avoid applying
-  forced breaks at transient column positions."
-  [source config]
-  (loop [s source
-         iteration 0]
-    (if (>= iteration max-iterations)
-      s
-      (let [tree (parser/parse-source s)
-            root (node/root-node tree)
-            form (find-first-forcible-form root s config)]
-        (if-not form
-          s
-          (let [edits (generate-forced-break-edits form config)]
-            (if (seq edits)
-              (recur (apply-edits s edits) (inc iteration))
-              s)))))))
+  When check-position? is false, skips the at-line-start? guard for use
+  after the pipeline has stabilized and all positions are final."
+  ([source config] (apply-forced-breaks source config true))
+  ([source config check-position?]
+   (loop [s source
+          iteration 0]
+     (if (>= iteration max-iterations)
+       s
+       (let [tree (parser/parse-source s)
+             root (node/root-node tree)
+             src-arg (when check-position? s)
+             form (find-first-forcible-form root src-arg config)]
+         (if-not form
+           s
+           (let [edits (generate-forced-break-edits form config)]
+             (if (seq edits)
+               (recur (apply-edits s edits) (inc iteration))
+               s))))))))
 
 ;;; Forced pair breaking (reformat only)
 
@@ -1431,4 +1434,13 @@
                       (apply-pair-breaking config non-binding-pair-rules)
                       (fix-source config)
                       (apply-pair-breaking config binding-pair-rules))]
-          (if (= result s) result (recur result (inc iteration))))))))
+          (if (= result s)
+            ;; Pipeline stabilized. Apply forced breaks without the
+            ;; at-line-start? guard to catch forms like `do` that appear
+            ;; mid-line (e.g. as map values). All positions are final now.
+            (let [final (->
+                         result
+                         (apply-forced-breaks config false)
+                         (fix-source config))]
+              (if (= final result) final (recur final (inc iteration))))
+            (recur result (inc iteration))))))))

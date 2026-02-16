@@ -1619,7 +1619,12 @@
       (is
        (=
         "(do\n  (a)\n  (b)\n  (c))"
-        (fix/reformat-source "(do (a)\n  (b) (c))" {:line-length 80}))))))
+        (fix/reformat-source "(do (a)\n  (b) (c))" {:line-length 80}))))
+    (testing "breaks do body forms in map values"
+      (is
+       (=
+        (str "{:task (do\n" "         (a)\n" "         (b))}")
+        (fix/reformat-source "{:task (do (a) (b))}" {:line-length 80}))))))
 
 (deftest apply-pair-breaking-test
   ;; Verify that apply-pair-breaking forces pair-grouped forms onto
