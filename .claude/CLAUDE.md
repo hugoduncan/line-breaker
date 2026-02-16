@@ -84,6 +84,12 @@ Install pre-commit hooks (auto-formats and lints):
 Always commit changes before testing --reformat on the projects own
 codebase, so you can revert without losing work.
 
+## Specifications
+
+- `doc/formatting-rules.allium` — Allium behavioural spec for the
+  formatting rules: indent calculation, pair grouping, forced breaks,
+  line-length fixing, and the reformat pipeline
+
 ## Conventions
 
 - Use semantic commit messages

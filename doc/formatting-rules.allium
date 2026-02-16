@@ -1,0 +1,484 @@
+-- formatting-rules.allium
+--
+-- Behavioural specification for Clojure code line-breaking.
+-- Describes the observable formatting rules: what gets broken,
+-- where breaks go, how indent is calculated, and what the
+-- pipeline guarantees.
+
+config {
+    line_length: Integer = 80
+    max_iterations: Integer = 100
+}
+
+------------------------------------------------------------
+-- External Entities
+------------------------------------------------------------
+
+-- Tree-sitter parse tree, managed externally
+external entity ParseTree {
+    root: Node
+}
+
+-- A node in the tree-sitter AST
+external entity Node {
+    node_type: sym_lit | kwd_lit | str_lit | num_lit | comment |
+               list_lit | vec_lit | map_lit | set_lit |
+               anon_fn_lit | read_cond_lit | splicing_read_cond_lit |
+               meta_lit | other
+    text: String
+    start_line: Integer        -- 1-indexed
+    end_line: Integer
+    start_column: Integer      -- 0-indexed
+    start_byte: Integer
+    end_byte: Integer
+    parent: Node?
+    children: List<Node>       -- named children only
+
+    -- Derived
+    is_single_line: start_line = end_line
+    head_symbol: first_named_child_symbol(this)    -- black box
+}
+
+------------------------------------------------------------
+-- Value Types
+------------------------------------------------------------
+
+value SourceText {
+    content: String
+    lines: List<String>
+}
+
+value Edit {
+    start: Integer             -- byte offset, inclusive
+    end: Integer               -- byte offset, exclusive
+    replacement: String
+}
+
+value LineRange {
+    start_byte: Integer
+    end_byte: Integer
+}
+
+------------------------------------------------------------
+-- Entities
+------------------------------------------------------------
+
+-- A breakable form: a collection node that can be split across lines
+entity BreakableForm {
+    node: Node
+    node_type: list_lit | vec_lit | map_lit | set_lit |
+               anon_fn_lit | read_cond_lit | splicing_read_cond_lit
+
+    -- Derived
+    is_breakable: node.node_type in [list_lit, vec_lit, map_lit, set_lit,
+                                      anon_fn_lit, read_cond_lit,
+                                      splicing_read_cond_lit]
+}
+
+-- Indent rules determine how broken children are indented
+enum IndentRule {
+    defn |            -- keep name on first line, +2 indent
+    def |             -- keep name on first line, +2 indent
+    fn |              -- keep arg vector on first line, +2 indent
+    binding |         -- keep binding vector on first line, +2 indent
+    if_rule |         -- keep test on first line, +2 indent
+    case_rule |       -- keep test-expr on first line, pair remaining
+    cond |            -- pair all clauses, +2 indent
+    condp |           -- keep pred+expr on first line, pair remaining
+    cond_thread |     -- keep initial expr on first line, pair remaining
+    try_rule |        -- body on next line, +2 indent
+    do_rule |         -- body on next line, +2 indent
+    map_rule |        -- +1 indent (align to first element)
+    binding_vector |  -- +1 indent (align to first element)
+    metadata_wrapped  -- align to content element after metadata
+}
+
+------------------------------------------------------------
+-- Config: Indent Rule Mappings
+------------------------------------------------------------
+
+-- Head symbol to indent rule mappings (configurable, with defaults)
+-- defn, defn-, defmacro, defmethod, deftest -> :defn
+-- def, defonce, defmulti, ns -> :def
+-- fn, bound-fn -> :fn
+-- let, when-let, if-let, binding, doseq, for, loop,
+--   with-open, with-local-vars -> :binding
+-- if, if-not, when, when-not, when-first, testing -> :if
+-- case -> :case
+-- cond -> :cond
+-- condp -> :condp
+-- cond->, cond->> -> :cond->
+-- try -> :try
+-- do -> :do
+
+------------------------------------------------------------
+-- Rules: Indent Calculation
+------------------------------------------------------------
+
+rule CalculateIndent {
+    when: CalculateIndent(form, rule)
+
+    ensures:
+        if rule in [binding_vector, map_rule]:
+            form.indent_column = form.node.start_column + 1
+        else if rule = metadata_wrapped:
+            form.indent_column = second_child_column(form.node)
+        else if rule != null:
+            form.indent_column = form.node.start_column + 2
+        else:
+            form.indent_column = form.node.start_column + 1
+}
+
+------------------------------------------------------------
+-- Rules: Elements Kept on First Line
+------------------------------------------------------------
+
+-- How many children stay on the opening line before breaking
+rule ElementsOnFirstLine {
+    when: DetermineFirstLineElements(form, rule)
+
+    ensures:
+        if rule in [defn, def, fn, binding, if_rule, case_rule,
+                    cond_thread, map_rule, binding_vector,
+                    metadata_wrapped]:
+            form.first_line_count = 2
+        else if rule = condp:
+            form.first_line_count = 3
+        else if rule in [cond, try_rule, do_rule]:
+            form.first_line_count = 1
+        else:
+            form.first_line_count = 1
+}
+
+------------------------------------------------------------
+-- Rules: Pair Grouping
+------------------------------------------------------------
+
+-- Which forms keep related pairs together when breaking
+rule UsesPairGrouping {
+    when: CheckPairGrouping(form, rule)
+
+    ensures:
+        form.uses_pairs =
+            rule in [cond, condp, case_rule, cond_thread,
+                     map_rule, binding_vector]
+}
+
+-- Pair grouping behaviour: consecutive pairs share lines,
+-- breaks go between pairs not within them
+rule PairBreaking {
+    when: BreakPairedForm(form)
+
+    requires: form.uses_pairs
+    requires: form.pair_count > 1
+    requires: form.has_unseparated_pairs
+
+    ensures: form.each_pair_on_own_line
+    ensures: form.children_indented_to(form.indent_column)
+}
+
+------------------------------------------------------------
+-- Rules: Forced Breaks
+------------------------------------------------------------
+
+-- Structural breaks required regardless of line length.
+-- These go after specific children based on the form type.
+
+rule ForcedBreakAfterIndex {
+    -- Break after the Nth named child (0-based)
+    -- defn: after index 1 (name) and after first vec/str
+    -- deftest: after index 1 (name)
+    -- when/when-not/if/if-not: after index 1 (test)
+    -- testing: after index 1 (description)
+    -- try/do: after index 0 (first element)
+    -- cond: after index 0 (first element)
+    -- condp: after index 2 (pred + expr)
+    -- cond->/cond->>: after index 1 (initial expr)
+    -- case: after index 1 (test expr)
+    -- ns: after index 1 (name) and after first str
+    when: ApplyForcedBreak(form, rule)
+
+    requires: form.node.node_type = list_lit
+    requires: rule != null
+
+    ensures: form.breaks_at_required_positions
+    ensures: form.children_after_break_indented_to(form.indent_column)
+}
+
+rule ForcedBreakAfterType {
+    -- Break after first occurrence of a node type
+    -- defn/defn-/defmacro: after first vec_lit or str_lit
+    -- defmethod: after first vec_lit
+    -- fn/bound-fn: after first vec_lit
+    -- let/when-let/if-let/binding/loop/doseq/for/
+    --   with-open/with-local-vars: after first vec_lit
+    -- ns/def/defonce/defmulti: after first str_lit
+    when: ApplyForcedBreakAfterType(form, rule)
+
+    requires: form.node.node_type = list_lit
+    requires: rule != null
+
+    ensures: form.breaks_after_first_matching_type
+}
+
+rule BodySeparation {
+    -- After the last forced-break position, body forms that
+    -- share a line with their next sibling also get separated.
+    -- Skipped for pair-grouped forms (pairs handle their own layout).
+    when: SeparateBodyForms(form)
+
+    requires: not form.uses_pairs
+    requires: form.has_body_forms_sharing_lines
+
+    ensures: form.body_forms_each_on_own_line
+}
+
+rule MultiArityBreaking {
+    -- defn-family forms with multiple arity clauses get breaks
+    -- between each arity clause
+    when: BreakMultiArity(form)
+
+    requires: form.head_symbol in [defn, defn-, defmacro, fn, bound-fn]
+    requires: form.arity_clause_count > 1
+
+    ensures: form.each_arity_on_own_line
+}
+
+rule NsClauseBreaking {
+    -- ns forms break between clause children (require, import, etc.)
+    -- require/import forms break after keyword and between every child
+    when: BreakNsClauses(form)
+
+    requires: form.head_symbol = ns
+
+    ensures: form.clause_children_each_on_own_line
+    ensures: form.require_import_forms_fully_broken
+}
+
+------------------------------------------------------------
+-- Rules: Line Length Fixing
+------------------------------------------------------------
+
+rule BreakLongLine {
+    -- When a line exceeds the limit, break the outermost
+    -- breakable form on that line
+    when: LineExceedsLimit(line, source)
+
+    requires: line.length > config.line_length
+    requires: line.has_breakable_form
+    requires: not line.in_ignored_range
+
+    ensures: line.outermost_form_broken
+    ensures: line.children_indented_correctly
+}
+
+-- Breadth-first breaking: all outermost forms across all
+-- long lines are broken before descending into sub-forms
+rule BreadthFirstBreaking {
+    when: FixSource(source)
+
+    let long_lines = source.lines_exceeding(config.line_length)
+
+    requires: long_lines.count > 0
+
+    ensures: long_lines.each(line =>
+        line.outermost_breakable_form_broken
+    )
+    -- Sub-forms are broken in subsequent iterations
+    -- after re-parsing provides correct column positions
+}
+
+------------------------------------------------------------
+-- Rules: Fallback Strategies
+------------------------------------------------------------
+
+-- When the outermost form on a line is already broken,
+-- try progressively deeper strategies
+
+rule AncestorSiblingBreaking {
+    -- If a form shares its start line with a preceding sibling,
+    -- break the ancestor to separate them
+    when: TryAncestorBreak(form, line)
+
+    requires: form.has_preceding_sibling_on_line
+    requires: form.parent.is_breakable
+
+    ensures: form.parent.children_separated
+}
+
+rule UnbrokenAncestorBreaking {
+    -- Find innermost breakable ancestor with consecutive
+    -- children on the same line
+    when: TryUnbrokenAncestor(node, line)
+
+    requires: node.has_unbroken_breakable_ancestor
+
+    ensures: node.unbroken_ancestor.children_separated
+}
+
+rule StaleIndentCollapse {
+    -- When a form was broken at one column then moved,
+    -- collapse it so it can be re-broken at the correct position
+    when: CollapseStaleForm(form)
+
+    requires: not form.node.is_single_line
+    requires: form.second_child_indent > form.expected_indent + 2
+
+    ensures: form.collapsed_to_single_line
+    -- Next iteration will re-break at correct indent
+}
+
+------------------------------------------------------------
+-- Rules: Pair Escalation
+------------------------------------------------------------
+
+-- Three-phase escalation for pair-grouped forms with
+-- values that exceed the line limit
+
+rule PairPhase1Defer {
+    -- Single-line breakable value: don't split the pair.
+    -- Let the iterative loop break the value in-place.
+    when: CheckExceedingPair(form, name_node, value_node)
+
+    requires: form.uses_pairs
+    requires: value_node.is_single_line
+    requires: value_node.is_breakable
+
+    ensures: form.pair_kept_together
+    -- Iteration will break value_node's children
+}
+
+rule PairPhase3Unbreak {
+    -- Multi-line breakable value still exceeds limit after
+    -- in-place breaking. Un-break value, move to own line,
+    -- let iteration re-break at reduced indent.
+    when: CheckExceedingPair(form, name_node, value_node)
+
+    requires: form.uses_pairs
+    requires: not value_node.is_single_line
+    requires: value_node.is_breakable
+    requires: value_node.any_line_exceeds(config.line_length)
+
+    ensures: value_node.collapsed_to_single_line
+    ensures: value_node.moved_to_own_line_at(form.indent_column)
+    -- Iteration will re-break at new (smaller) indent
+}
+
+rule NonBindingPairSplit {
+    -- For cond/case/condp/cond-> forms, split exceeding pairs
+    -- immediately when the pair would still exceed at indent position
+    when: CheckExceedingPair(form, name_node, value_node)
+
+    requires: form.rule in [cond, condp, case_rule, cond_thread]
+    requires: name_node.same_line_as(value_node)
+    requires: pair_width_at_indent_exceeds(form, name_node, value_node)
+
+    ensures: value_node.moved_to_own_line_at(form.indent_column)
+}
+
+------------------------------------------------------------
+-- Rules: Multiline Child Breaking
+------------------------------------------------------------
+
+rule MultilineChildBreaking {
+    -- When a form has a multi-line child and some breakable
+    -- children still share a line, separate them
+    when: CheckMultilineChildren(form)
+
+    requires: form.is_breakable
+    requires: form.has_multiline_child
+    requires: form.has_children_sharing_lines
+
+    ensures: form.breakable_children_each_on_own_line
+}
+
+------------------------------------------------------------
+-- Rules: Comment Handling
+------------------------------------------------------------
+
+rule CommentPreservation {
+    -- Comments require special handling throughout breaking:
+    -- - EOL comments stay attached to their preceding element
+    -- - Whole-line comments preserve their leading newline
+    -- - Comment trailing newlines provide line separation
+    --   (no extra newline added after comments)
+    -- - Comments are excluded before pair grouping to prevent
+    --   disrupting the pairing logic
+    when: HandleComment(comment, context)
+
+    requires: comment.node_type = comment
+
+    ensures:
+        if comment.on_same_line_as_preceding:
+            comment.stays_attached_to_preceding
+        else:
+            comment.preserves_leading_newline
+            comment.indented_to(context.indent_column)
+}
+
+------------------------------------------------------------
+-- Rules: Ignore Directives
+------------------------------------------------------------
+
+rule IgnoreDirective {
+    -- Forms preceded by #_:line-breaker/ignore are not modified
+    when: CheckIgnoreDirective(form)
+
+    requires: form.preceded_by_ignore_marker
+
+    ensures: form.not_modified
+}
+
+------------------------------------------------------------
+-- Rules: Reformat Pipeline
+------------------------------------------------------------
+
+rule ReformatSource {
+    -- The complete reformat pipeline:
+    -- 1. Collapse all top-level forms to single lines
+    -- 2. Iteratively apply passes until stable:
+    --    a. Forced breaks (position-checked)
+    --    b. Non-binding pair breaking (cond, case, condp, cond->)
+    --    c. Fix line length violations
+    --    d. Binding pair breaking (maps, binding vectors)
+    --    e. Multiline child breaking
+    --    f. Forced breaks (unchecked — catches mid-line forms)
+    --    g. Fix line length violations
+    --    h. Multiline child breaking
+    when: ReformatSource(source)
+
+    ensures: source.all_top_level_forms_collapsed_then_rebroken
+    ensures: source.forced_breaks_at_structural_positions
+    ensures: source.pairs_separated_in_grouped_forms
+    ensures: source.no_lines_exceed_limit_where_breakable
+    ensures: source.multiline_children_separated
+    ensures: source.pipeline_iterated_until_stable
+}
+
+------------------------------------------------------------
+-- Invariants
+------------------------------------------------------------
+
+-- The pipeline always terminates
+-- (max_iterations prevents infinite loops)
+
+-- Forced breaks are idempotent: applying them twice
+-- produces the same result
+
+-- Breaking never introduces new violations on already-
+-- conforming lines (monotonic progress)
+
+-- Collapsed forms are always valid single-line Clojure
+-- (comments preserve their newlines)
+
+------------------------------------------------------------
+-- Open Questions
+------------------------------------------------------------
+
+open_question "Can the pipeline passes be unified into a single recursive pass with backtracking?"
+
+open_question "Is the double forced-break pass (position-checked then unchecked) necessary, or can backtracking eliminate it?"
+
+open_question "Can stale-indent detection be subsumed by a backtracking result that signals 'indent position changed'?"
+
+open_question "Is breadth-first breaking optimal, or would depth-first with backtracking produce fewer iterations?"
