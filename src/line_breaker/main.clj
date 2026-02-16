@@ -18,7 +18,7 @@ Options:
   --check         Check files for violations (default mode)
   --fix           Fix files by reformatting long lines
   --reformat      Collapse and re-break every top-level form
-  --stdout        Output reformatted content to stdout
+  --stdout        Output to stdout (combines with --fix or --reformat)
   --line-length N Maximum line length (default: 80)
   -q, --quiet     Suppress summary output
   -h, --help      Show this help
@@ -55,16 +55,17 @@ Exit codes:
     "."))
 
 (defn- process-stdout
-  "Process files in stdout mode with fix applied.
-  Outputs reformatted content. Multiple files get ;;; path headers."
-  [files config]
+  "Process files in stdout mode.
+  Applies process-fn to each file's source and outputs to stdout.
+  Multiple files get ;;; path headers."
+  [files config process-fn]
   (let [multiple? (> (count files) 1)]
     (doseq [file files]
       (when multiple?
         (println (str ";;; " file)))
       (let [source (slurp file)
-            fixed (fix/fix-source source config)]
-        (print fixed)))))
+            result (process-fn source config)]
+        (print result)))))
 
 (defn- process-check
   "Process files in check mode.
@@ -124,12 +125,16 @@ Exit codes:
   "Process files according to mode.
   Returns exit code."
   [files opts config]
-  (cond
-    (:stdout opts) (do (process-stdout files config) 0)
-    (:fix opts) (process-fix files config (:quiet opts))
-    (:reformat opts) (process-reformat files config (:quiet opts))
-    (:check opts) (process-check files (:line-length config) (:quiet opts))
-    :else 0))
+  (let [stdout? (:stdout opts)]
+    (cond
+      (and stdout? (:reformat opts))
+      (do (process-stdout files config reformat/reformat-source) 0)
+      stdout?
+      (do (process-stdout files config fix/fix-source) 0)
+      (:fix opts) (process-fix files config (:quiet opts))
+      (:reformat opts) (process-reformat files config (:quiet opts))
+      (:check opts) (process-check files (:line-length config) (:quiet opts))
+      :else 0)))
 
 (defn run
   "Run line-breaker with given args. Returns exit code.

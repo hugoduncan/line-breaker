@@ -14,7 +14,7 @@
    :reformat {:coerce :boolean
               :desc "Collapse and re-break every top-level form"}
    :stdout {:coerce :boolean
-            :desc "Output reformatted content to stdout"}
+            :desc "Output to stdout (combines with --fix or --reformat)"}
    :line-length {:coerce :long
                  :desc "Maximum line length"}
    :quiet {:coerce :boolean
@@ -25,8 +25,9 @@
           :desc "Show help"}})
 
 (def ^:private mode-flags
-  "CLI flags that select the processing mode."
-  [:check :fix :reformat :stdout])
+  "CLI flags that select the processing mode.
+  :stdout is a modifier, not a mode — it combines with :fix or :reformat."
+  [:check :fix :reformat])
 
 (defn parse-args
   "Parse command-line arguments.

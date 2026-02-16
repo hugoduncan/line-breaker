@@ -27,6 +27,14 @@
     (testing "parses --stdout flag"
       (is (= {:opts {:stdout true}
               :args []} (cli/parse-args ["--stdout"]))))
+    (testing "parses --reformat --stdout combination"
+      (is (= {:opts {:reformat true :stdout true}
+              :args []}
+             (cli/parse-args ["--reformat" "--stdout"]))))
+    (testing "parses --fix --stdout combination"
+      (is (= {:opts {:fix true :stdout true}
+              :args []}
+             (cli/parse-args ["--fix" "--stdout"]))))
     (testing "parses --line-length as a number"
       (is
        (=
@@ -65,7 +73,7 @@
          (thrown-with-msg?
           clojure.lang.ExceptionInfo
           #"only one mode flag allowed"
-          (cli/parse-args ["--fix" "--stdout"]))))
+          (cli/parse-args ["--fix" "--check"]))))
       (testing "includes conflicting modes in ex-data"
         (try
           (cli/parse-args ["--check" "--reformat"])

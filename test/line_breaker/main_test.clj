@@ -239,6 +239,38 @@
               (is (str/includes? out "(ns b)"))
               (is (= 0 exit-code)))))))))
 
+(deftest reformat-stdout-mode-test
+  ;; Tests that --reformat --stdout outputs reformatted content to stdout
+  ;; without modifying the source file.
+  (testing "run in --reformat --stdout mode"
+    (testing "with poorly broken form"
+      (testing "outputs collapsed and re-broken content"
+        (with-temp-dir [root]
+          (let [file (fs/path root "test.clj")
+                input "(+ x\n    1 2)"]
+            (spit (str file) input)
+            (let [[out _err exit-code]
+                  (with-captured-output
+                    (main/run
+                     ["--reformat" "--stdout" (str file)]))]
+              (is (= 0 exit-code))
+              ;; Collapsed to single line
+              (is (= "(+ x 1 2)" out))
+              ;; File unchanged
+              (is (= input (slurp (str file)))))))))
+    (testing "with file within line limit"
+      (testing "outputs collapsed single-line form"
+        (with-temp-dir [root]
+          (let [file (fs/path root "test.clj")
+                input "(ns test)\n"]
+            (spit (str file) input)
+            (let [[out _err exit-code]
+                  (with-captured-output
+                    (main/run
+                     ["--reformat" "--stdout" (str file)]))]
+              (is (= 0 exit-code))
+              (is (= input out)))))))))
+
 (deftest reformat-mode-test
   ;; Tests that --reformat mode collapses and re-breaks forms in place.
   ;; Verifies file modification, quiet mode, line-length override,
@@ -340,12 +372,6 @@
       (testing "exits 2 with arg-error message"
         (let [[_out err exit-code] (with-captured-output
                                      (main/run ["--fix" "--reformat"]))]
-          (is (= 2 exit-code))
-          (is (str/includes? err "line-breaker: arg-error:")))))
-    (testing "given --reformat with --stdout"
-      (testing "exits 2 with arg-error message"
-        (let [[_out err exit-code] (with-captured-output
-                                     (main/run ["--reformat" "--stdout"]))]
           (is (= 2 exit-code))
           (is (str/includes? err "line-breaker: arg-error:")))))
     (testing "given invalid config"
