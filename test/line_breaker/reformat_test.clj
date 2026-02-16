@@ -716,3 +716,25 @@
           (is
            (every? #(<= (count %) 40) (.split result "\n"))
            "no line exceeds limit"))))))
+
+(deftest map-value-pair-splitting-test
+  ;; When a map value like (do ...) needs internal breaking, the
+  ;; key-value pair should stay on the same line (e.g. :task (do)
+  ;; rather than splitting :task onto its own line and (do onto
+  ;; the next. This triggers in multi-pair maps where the value
+  ;; is long enough that pair-splitting backtracks.
+  (testing "reformat-source"
+    (testing "given a multi-pair map with do value needing breaks"
+      (testing "keeps key and value head on the same line"
+        (let [input (str
+                     "{lint"
+                     " {:doc \"Run linting on src and test\""
+                     " :task (do"
+                     " (println \"Linting...\")"
+                     " (shell \"cmd\"))}}")
+              result (reformat/reformat-source
+                      input
+                      {:line-length 80})]
+          (is
+           (re-find #"(?m):task \(do$" result)
+           ":task and (do stay on the same line"))))))
