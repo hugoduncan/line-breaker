@@ -638,7 +638,8 @@
   "Returns true if range is contained within any range in broken-ranges.
   A child form whose parent was already broken in this pass should not
   be broken until the next pass, when it will have correct column
-  positions after re-parsing."
+  positions after re-parsing.
+  Public for use by reformat.clj batch edit collection."
   [broken-ranges [start end]]
   (some (fn [[s e]]
           (and (<= s start) (<= end e))) broken-ranges))
@@ -646,7 +647,8 @@
 (defn try-collect-edits
   "Collect edits for a form if they are new, change source, and don't overlap.
   Returns [updated-state edits] on success, [state nil] otherwise.
-  State is a map with :seen (set of byte ranges) and :collected (vec of edits)."
+  State is a map with :seen (set of byte ranges) and :collected (vec of edits).
+  Public for use by reformat.clj batch edit collection."
   [state source form edits]
   (let [{:keys [seen collected]} state
         range (node/node-range form)]
