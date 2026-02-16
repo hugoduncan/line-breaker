@@ -501,22 +501,16 @@
   For forms that use pair grouping (maps, cond, case), keeps related pairs
   together (key-value, test-result, etc.) and breaks only between pairs.
 
-  Three-phase escalation for pair-grouped forms with exceeding pairs:
-  - Phase 1: value is single-line and breakable — defer splitting, let the
-    iterative loop break the value in-place
-  - Phase 3: value is multi-line and breakable — un-break value (collapse to
-    single line), move to own line at indent-col, let iterative loop re-break
+  For pair-grouped forms with exceeding pairs:
+  - If a pair value would still exceed the limit at the indent position
+    (single-line, breakable), backtracks to split the pair onto its own line
+  - If the value is multi-line and breakable, collapses it to a single line
+    and moves to own line at indent-col for re-breaking
 
   Comments on the same line as the preceding element stay attached.
   Comments include their trailing newline, so no extra newline is added after.
 
-  Returns a result map or nil:
-  - nil — nothing to break (nil node, fewer than 2 children, no edits)
-  - {:edits [...]} — normal break, no backtracking needed
-  - {:edits [...] :reason ::value-exceeds-limit} — Phase 1 deferral:
-    broke the form but a pair value still exceeds limit and needs
-    in-place breaking via iteration
-
+  Returns a result map {:edits [...]} or nil.
   Each edit is {:start n :end m :replacement s}."
   ([node]
    (break-form node {}))
@@ -557,8 +551,8 @@
          (break-exceeding-pair
           exc-name exc-value children base-keep-count
           breakable-children indent-col)
-         ;; Normal breaking (Phase 1 deferral is implicit — single-line
-         ;; breakable values are kept together by generate-paired-edits)
+         ;; Normal breaking — if a pair value would still exceed at
+         ;; the indent position, backtrack to split the pair.
          :else
          (when (seq breakable-children)
            (let [last-kept (nth children (dec base-keep-count))
@@ -575,9 +569,14 @@
              (when (seq edits)
                (if (and exceeding-pair
                         (single-line-node? exc-value)
-                        (rules/breakable-node? exc-value))
-                 {:edits edits
-                  :reason ::value-exceeds-limit}
+                        (rules/breakable-node? exc-value)
+                        (let [pair-width
+                              (- (first-line-end-column exc-value)
+                                 (form-start-column exc-name))]
+                          (> (+ indent-col pair-width) max-length)))
+                 (break-exceeding-pair
+                  exc-name exc-value children base-keep-count
+                  breakable-children indent-col)
                  {:edits edits})))))))))
 
 ;;; Line length checking
@@ -663,8 +662,7 @@
 
 (defn- try-guarded-break
   "Try to break a form, guarding against inside-broken-form and already-seen.
-  Returns [updated-state result-map] on success, [state nil] otherwise.
-  result-map is the break-form result with :edits and optional :reason."
+  Returns [updated-state result-map] on success, [state nil] otherwise."
   [state source form config]
   (let [range (node/node-range form)]
     (if (or (inside-broken-form? (:seen state) range)

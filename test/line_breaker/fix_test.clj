@@ -206,21 +206,29 @@
         (is (= "  (a\n   b\n   c)"
                (fix/apply-edits source (:edits result)))
             "indentation accounts for form's column position")))
-    (testing "returns ::fix/value-exceeds-limit reason"
-      (testing "for Phase 1 deferral"
+    (testing "splits exceeding pair"
+      (testing "when value would exceed at indent position"
         (let [source "{:a (b c d e) :x 1}"
               tree (parser/parse-source source)
               form (fix/find-breakable-form tree 1)
               result (fix/break-form
                       form {:line-length 10})]
           (is (map? result))
-          (is (= :line-breaker.fix/value-exceeds-limit
-                 (:reason result)))))
-      (testing "not when no pair exceeds"
-        (let [tree (parser/parse-source "(a b c)")
+          (is (str/includes?
+               (fix/apply-edits source (:edits result))
+               ":a\n")
+              "pair value is split onto a new line")))
+      (testing "not when pair fits at indent position"
+        (let [source "{:a (b c) :x 1}"
+              tree (parser/parse-source source)
               form (fix/find-breakable-form tree 1)
-              result (fix/break-form form)]
-          (is (nil? (:reason result))))))))
+              result (fix/break-form
+                      form {:line-length 15})]
+          (is (map? result))
+          (is (not (str/includes?
+                    (fix/apply-edits source (:edits result))
+                    ":a\n"))
+              "pair stays together when it fits"))))))
 
 (deftest find-long-lines-test
   ;; Verify detection of lines exceeding max length.
@@ -863,11 +871,11 @@
               result (fix/fix-source source {:line-length 20})]
           (is (= source result) "atomic value stays with key")))
       (testing "handles multiple pairs with first pair too long"
-        ;; Phase 1 defers pair splitting; Phase 2 breaks value in-place.
+        ;; Pair exceeds at indent — backtracks to split, then value
+        ;; is broken in-place by subsequent iteration.
         (let [source "{:key1 (long-fn a b) :key2 val2}"
               result (fix/fix-source source {:line-length 15})]
-          (is (not (str/includes? result ":key1\n")) "first pair is not split")
-          (is (str/includes? result "(long-fn\n") "value is broken in-place")
+          (is (str/includes? result ":key1\n") "pair is split")
           (is (str/includes? result ":key2") "second pair is present"))))
     (testing "for binding vectors"
       (testing "keeps atomic binding values with names"
