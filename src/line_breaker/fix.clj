@@ -657,6 +657,49 @@
         (make-break-edit prev-child next-child indent-col)))
      all-pairs)))
 
+(defn- break-form-phase-3
+  "Phase 3 breaking: un-break a multi-line value, split name/value onto
+  separate lines, and generate inter-pair edits."
+  [exc-name exc-value children base-keep-count breakable-children
+   indent-col]
+  (let [join-edits (join-form-edits exc-value)
+        indent-str (apply str (repeat indent-col \space))
+        split-edit {:start (element-end-offset exc-name)
+                    :end (element-start-offset exc-value)
+                    :replacement (str "\n" indent-str)}
+        pair-edits
+        (when (seq breakable-children)
+          (generate-paired-edits
+           (nth children (dec base-keep-count))
+           breakable-children
+           indent-col))
+        all-edits
+        (into
+         (vec pair-edits)
+         (if join-edits
+           (cons split-edit join-edits)
+           [split-edit]))]
+    (when (seq all-edits)
+      all-edits)))
+
+(defn- break-form-split-pair
+  "Split an exceeding pair onto separate lines and generate inter-pair edits."
+  [exc-name exc-value children base-keep-count breakable-children
+   indent-col]
+  (let [indent-str (apply str (repeat indent-col \space))
+        split-edit {:start (element-end-offset exc-name)
+                    :end (element-start-offset exc-value)
+                    :replacement (str "\n" indent-str)}
+        pair-edits
+        (when (seq breakable-children)
+          (generate-paired-edits
+           (nth children (dec base-keep-count))
+           breakable-children
+           indent-col))
+        all-edits (into (vec pair-edits) [split-edit])]
+    (when (seq all-edits)
+      all-edits)))
+
 (defn break-form
   "Generate edits to break a form across multiple lines.
 
@@ -716,41 +759,13 @@
            breakable-children (drop base-keep-count children)]
        (cond
          phase-3?
-         ;; Phase 3: un-break value + split name/value + inter-pair edits
-         (let [join-edits (join-form-edits exc-value)
-               indent-str (apply str (repeat indent-col \space))
-               split-edit {:start (element-end-offset exc-name)
-                           :end (element-start-offset exc-value)
-                           :replacement (str "\n" indent-str)}
-               pair-edits
-               (when (seq breakable-children)
-                 (generate-paired-edits
-                  (nth children (dec base-keep-count))
-                  breakable-children
-                  indent-col))
-               all-edits
-               (into
-                (vec pair-edits)
-                (if join-edits
-                  (cons split-edit join-edits)
-                  [split-edit]))]
-           (when (seq all-edits)
-             all-edits))
+         (break-form-phase-3
+          exc-name exc-value children base-keep-count
+          breakable-children indent-col)
          split-pair?
-         ;; Split the exceeding pair + inter-pair edits
-         (let [indent-str (apply str (repeat indent-col \space))
-               split-edit {:start (element-end-offset exc-name)
-                           :end (element-start-offset exc-value)
-                           :replacement (str "\n" indent-str)}
-               pair-edits
-               (when (seq breakable-children)
-                 (generate-paired-edits
-                  (nth children (dec base-keep-count))
-                  breakable-children
-                  indent-col))
-               all-edits (into (vec pair-edits) [split-edit])]
-           (when (seq all-edits)
-             all-edits))
+         (break-form-split-pair
+          exc-name exc-value children base-keep-count
+          breakable-children indent-col)
          ;; Normal breaking (Phase 1 deferral is implicit — single-line
          ;; breakable values are kept together by generate-paired-edits)
          :else
