@@ -15,14 +15,15 @@
   "Pre-order walk collecting all nodes for which pred returns true.
   Returns a vector of matching nodes, outermost first."
   [pred node]
-  (when node
+  (if node
     (let [self (when (pred node) [node])
           children-results
           (into
            []
            (mapcat #(find-all-preorder pred %))
            (node/named-children node))]
-      (into (or self []) children-results))))
+      (into (or self []) children-results))
+    []))
 
 ;;; Collapse
 
