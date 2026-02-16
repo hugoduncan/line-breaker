@@ -366,7 +366,8 @@
   ignored ranges. Returns a vector of breakable nodes from outermost to
   innermost that span that line and have consecutive children on that line.
   Forms within ignored ranges are skipped."
-  ([tree line] (find-breakable-forms tree line #{}))
+  ([tree line]
+   (find-breakable-forms tree line #{}))
   ([tree line ignored-ranges]
    (find-breakable-forms-on-line (node/root-node tree) line ignored-ranges)))
 
@@ -378,7 +379,8 @@
   map_lit, set_lit) that spans that line and has consecutive children on
   that line, or nil if no breakable form is found. Forms within ignored
   ranges are skipped."
-  ([tree line] (find-breakable-form tree line #{}))
+  ([tree line]
+   (find-breakable-form tree line #{}))
   ([tree line ignored-ranges]
    (first (find-breakable-forms tree line ignored-ranges))))
 
@@ -433,7 +435,8 @@
                          "\n"
                          " ")}))))
                (partition 2 1 children))]
-          (when (seq edits) edits))))))
+          (when (seq edits)
+            edits))))))
 
 ;;; Form breaking
 
@@ -524,7 +527,8 @@
         p1 (io.github.treesitter.jtreesitter.Point. row 0)
         p2 (io.github.treesitter.jtreesitter.Point. row 1)
         result (.getNamedDescendant root p1 p2)]
-    (when (.isPresent result) (.get result))))
+    (when (.isPresent result)
+      (.get result))))
 
 (defn- has-consecutive-children-on-line?
   "Returns true if node has at least two consecutive named children
@@ -574,7 +578,10 @@
   the form's current position."
   [node config]
   (loop [n (node/node-parent node)]
-    (when n (if (has-stale-indent? n config) n (recur (node/node-parent n))))))
+    (when n
+      (if (has-stale-indent? n config)
+        n
+        (recur (node/node-parent n))))))
 
 (defn- make-break-edit
   "Create a break edit between two children.
@@ -680,7 +687,8 @@
   Returns a vector of edits replacing whitespace between consecutive
   elements with newline+indent. Each edit is {:start n :end m :replacement s}.
   Returns nil if node is nil or has fewer than 2 children."
-  ([node] (break-form node {}))
+  ([node]
+   (break-form node {}))
   ([node config]
    (when node
      (let [children (node/named-children node)
@@ -730,8 +738,11 @@
                all-edits
                (into
                 (vec pair-edits)
-                (if join-edits (cons split-edit join-edits) [split-edit]))]
-           (when (seq all-edits) all-edits))
+                (if join-edits
+                  (cons split-edit join-edits)
+                  [split-edit]))]
+           (when (seq all-edits)
+             all-edits))
          split-pair?
          ;; Split the exceeding pair + inter-pair edits
          (let [indent-str (apply str (repeat indent-col \space))
@@ -745,7 +756,8 @@
                   breakable-children
                   indent-col))
                all-edits (into (vec pair-edits) [split-edit])]
-           (when (seq all-edits) all-edits))
+           (when (seq all-edits)
+             all-edits))
          ;; Normal breaking (Phase 1 deferral is implicit — single-line
          ;; breakable values are kept together by generate-paired-edits)
          :else
@@ -761,7 +773,8 @@
                     last-kept
                     breakable-children
                     indent-col))]
-             (when (seq edits) edits))))))))
+             (when (seq edits)
+               edits))))))))
 
 ;;; Line length checking
 
@@ -799,7 +812,8 @@
   be broken until the next pass, when it will have correct column
   positions after re-parsing."
   [broken-ranges [start end]]
-  (some (fn [[s e]] (and (<= s start) (<= end e))) broken-ranges))
+  (some (fn [[s e]]
+          (and (<= s start) (<= end e))) broken-ranges))
 
 (defn- try-break-on-lines
   "Break the outermost form on every long line in a single pass.
@@ -840,7 +854,9 @@
                   ;; reduces indentation for all descendants.
                   ancestor-forms
                   (sort-by
-                   (fn [f] (let [[s e] (node/node-range f)] (- s e)))
+                   (fn [f]
+                     (let [[s e] (node/node-range f)]
+                       (- s e)))
                    (into
                     []
                     (comp
@@ -886,7 +902,8 @@
          long-lines)]
     (when (seq all-edits)
       (let [new-source (apply-edits source all-edits)]
-        (when (not= new-source source) new-source)))))
+        (when (not= new-source source)
+          new-source)))))
 
 (defn fix-source
   "Fix line length violations in source code.
@@ -922,7 +939,9 @@
                               long-lines
                               ignored-ranges
                               config)]
-              (if new-source (recur new-source (inc iteration)) source))))))))
+              (if new-source
+                (recur new-source (inc iteration))
+                source))))))))
 
 ;;; Reformat
 
@@ -964,7 +983,9 @@
     (reduce
      (fn [s form]
        (let [edits (collect-collapse-edits form)]
-         (if (seq edits) (apply-edits s edits) s)))
+         (if (seq edits)
+           (apply-edits s edits)
+           s)))
      source
      (rseq top-level-forms))))
 
@@ -1112,17 +1133,22 @@
                (into
                 []
                 (keep-indexed
-                 (fn [i c] (when (= :list_lit (node/node-type c)) i)))
+                 (fn [i c]
+                   (when (= :list_lit (node/node-type c))
+                     i)))
                 children)]
            (if (> (count clause-idxs) 1)
              (update
               base-rule
               :after-indices
-              (fn [idxs] (into (or idxs #{}) (butlast clause-idxs))))
+              (fn [idxs]
+                (into (or idxs #{}) (butlast clause-idxs))))
              base-rule))
          :else base-rule)))
-   (when (arity-clause? node) arity-clause-rule)
-   (when (ns-require-import? node) (ns-require-import-rule node))))
+   (when (arity-clause? node)
+     arity-clause-rule)
+   (when (ns-require-import? node)
+     (ns-require-import-rule node))))
 
 (defn- forced-break-positions
   "Compute the set of named-child indices after which to insert breaks.
@@ -1137,7 +1163,9 @@
            (keep
             (fn [type-kw]
               (some
-               (fn [i] (when (= type-kw (node/node-type (nth children i))) i))
+               (fn [i]
+                 (when (= type-kw (node/node-type (nth children i)))
+                   i))
                (range (count children)))))
            types))]
     (into base type-indices)))
@@ -1202,7 +1230,8 @@
                (or (needs-break-or-reindent? child next-child indent-col)
 ;; Follow through comments to check elements
  ;; after them
-                   (when (comment-node? next-child) (recur ni))))))))
+                   (when (comment-node? next-child)
+                     (recur ni))))))))
      break-positions)))
 
 (defn- generate-forced-break-edits
@@ -1243,8 +1272,12 @@
                                  indent-col)
                             (make-break-edit child next-child indent-col))]
                       (if (comment-node? next-child)
-                        (recur ni (if edit (conj edits edit) edits))
-                        (if edit (conj edits edit) edits))))))))
+                        (recur ni (if edit
+                                    (conj edits edit)
+                                    edits))
+                        (if edit
+                          (conj edits edit)
+                          edits))))))))
            break-positions))))))
 
 (defn- at-line-start?
@@ -1294,7 +1327,8 @@
   breaks, re-parsing between each to maintain correct column positions.
   When check-position? is false, skips the at-line-start? guard for use
   after the pipeline has stabilized and all positions are final."
-  ([source config] (apply-forced-breaks source config true))
+  ([source config]
+   (apply-forced-breaks source config true))
   ([source config check-position?]
    (loop [s source
           iteration 0]
@@ -1302,7 +1336,8 @@
        s
        (let [tree (parser/parse-source s)
              root (node/root-node tree)
-             src-arg (when check-position? s)
+             src-arg (when check-position?
+                       s)
              form (find-first-forcible-form root src-arg config)]
          (if-not form
            s
@@ -1354,7 +1389,8 @@
   inner forms are at their final position when reached.
   When rule-filter is provided, only matches nodes whose effective rule
   is in the filter set."
-  ([node config] (needs-pair-breaking? node config nil))
+  ([node config]
+   (needs-pair-breaking? node config nil))
   ([node config rule-filter]
    (and
     (breakable-node? node)
@@ -1382,14 +1418,16 @@
                          last-kept
                          breakable-children
                          indent-col)]
-        (when (seq break-edits) break-edits)))))
+        (when (seq break-edits)
+          break-edits)))))
 
 (defn- find-first-pair-breakable-form
   "Pre-order walk returning the first pair-grouped form that needs
   pair breaking: single-line with >1 pair.
   When rule-filter is provided, only matches forms whose effective rule
   is in the filter set."
-  ([node config] (find-first-pair-breakable-form node config nil))
+  ([node config]
+   (find-first-pair-breakable-form node config nil))
   ([node config rule-filter]
    (when node
      (if (needs-pair-breaking? node config rule-filter)
@@ -1404,7 +1442,8 @@
   re-parses until no more forms need breaking.
   When rule-filter is provided, only processes forms whose effective rule
   is in the filter set."
-  ([source config] (apply-pair-breaking source config nil))
+  ([source config]
+   (apply-pair-breaking source config nil))
   ([source config rule-filter]
    (loop [s source
           iteration 0]
@@ -1419,6 +1458,63 @@
              (if (seq edits)
                (recur (apply-edits s edits) (inc iteration))
                s))))))))
+
+;;; Multiline child breaking (reformat only)
+
+(defn- has-multiline-child?
+  "Returns true if any named child of node spans multiple lines."
+  [node]
+  (some
+   (fn [child]
+     (not (single-line-node? child)))
+   (node/named-children node)))
+
+(defn- needs-multiline-child-breaking?
+  "Returns true if a breakable form has a multi-line child and some
+  breakable children still share a line with a sibling."
+  [node config]
+  (and
+   (breakable-node? node)
+   (has-multiline-child? node)
+   (let [children (node/named-children node)
+         rule (get-effective-rule node config)
+         keep-n (elements-to-keep-on-first-line rule)
+         breakable-children (drop keep-n children)]
+     (some
+      (fn [[a b]]
+        (contiguous-line? a b))
+      (partition 2 1 breakable-children)))))
+
+(defn- find-first-multiline-child-form
+  "Pre-order walk returning the first breakable form that has a
+  multi-line child and needs its children separated onto individual
+  lines."
+  [node config]
+  (when node
+    (if (needs-multiline-child-breaking? node config)
+      node
+      (some
+       #(find-first-multiline-child-form % config)
+       (node/named-children node)))))
+
+(defn apply-multiline-child-breaking
+  "Break forms that contain multi-line children so every child is on
+  its own line. Iteratively finds qualifying forms and applies break
+  edits, re-parsing between each."
+  [source config]
+  (loop [s source
+         iteration 0]
+    (if (>= iteration max-iterations)
+      s
+      (let [tree (parser/parse-source s)
+            root (node/root-node tree)
+            form (find-first-multiline-child-form root config)]
+        (if-not form
+          s
+          (let [edits (break-form form config)]
+            (if (and (seq edits) (edits-change-source? s edits))
+              (recur (apply-edits s edits) (inc iteration))
+              s)))))))
 
 (defn reformat-source
   "Reformat source by collapsing then iteratively applying forced breaks,
@@ -1437,7 +1533,8 @@
                       (apply-forced-breaks config)
                       (apply-pair-breaking config non-binding-pair-rules)
                       (fix-source config)
-                      (apply-pair-breaking config binding-pair-rules))]
+                      (apply-pair-breaking config binding-pair-rules)
+                      (apply-multiline-child-breaking config))]
           (if (= result s)
             ;; Pipeline stabilized. Apply forced breaks without the
             ;; at-line-start? guard to catch forms like `do` that appear
@@ -1445,6 +1542,9 @@
             (let [final (->
                          result
                          (apply-forced-breaks config false)
-                         (fix-source config))]
-              (if (= final result) final (recur final (inc iteration))))
+                         (fix-source config)
+                         (apply-multiline-child-breaking config))]
+              (if (= final result)
+                final
+                (recur final (inc iteration))))
             (recur result (inc iteration))))))))
