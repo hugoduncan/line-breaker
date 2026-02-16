@@ -848,6 +848,89 @@
   (some (fn [[s e]]
           (and (<= s start) (<= end e))) broken-ranges))
 
+(defn- try-collect-edits
+  "Collect edits for a form if they are new, change source, and don't overlap.
+  Returns [updated-state edits] on success, [state nil] otherwise.
+  State is a map with :seen (set of byte ranges) and :collected (vec of edits)."
+  [state source form edits]
+  (let [{:keys [seen collected]} state
+        range (node/node-range form)]
+    (if (or (seen range)
+            (not (seq edits))
+            (not (edits-change-source? source edits))
+            (edits-overlap? collected edits))
+      [state nil]
+      [(-> state
+           (update :seen conj range)
+           (update :collected into edits))
+       edits])))
+
+(defn- try-guarded-break
+  "Try to break a form, guarding against inside-broken-form and already-seen.
+  Returns [updated-state edits] on success, [state nil] otherwise."
+  [state source form config]
+  (let [range (node/node-range form)]
+    (if (or (inside-broken-form? (:seen state) range)
+            ((:seen state) range))
+      [state nil]
+      (try-collect-edits
+       state source form (break-form form config)))))
+
+(defn- try-first-guarded-break
+  "Try to break forms in order, returning first success.
+  Returns [updated-state edits] or [state nil]."
+  [state source forms config]
+  (reduce
+   (fn [[state _] form]
+     (let [[new-state edits] (try-guarded-break
+                              state source form config)]
+       (if edits
+         (reduced [new-state edits])
+         [new-state nil])))
+   [state nil]
+   forms))
+
+(defn- break-on-line
+  "Try strategies to break forms on a single long line.
+  Tries ancestor forms first, then direct forms, then fallback paths.
+  Returns [updated-state edits] or [state nil]."
+  [state source tree line ignored-ranges config]
+  (let [forms (find-breakable-forms tree line ignored-ranges)
+        ancestor-forms
+        (sort-by
+         (fn [f]
+           (let [[s e] (node/node-range f)]
+             (- s e)))
+         (into
+          []
+          (comp
+           (mapcat find-ancestors-needing-sibling-separation)
+           (filter #(not (node-in-ignored-range? % ignored-ranges)))
+           (distinct))
+          forms))
+        [state edits] (try-first-guarded-break
+                       state source ancestor-forms config)]
+    (if edits
+      [state edits]
+      (let [[state edits] (try-first-guarded-break
+                           state source forms config)]
+        (if edits
+          [state edits]
+          (if-let [n (find-node-on-line tree line)]
+            (let [[state edits]
+                  (if-let [anc (find-unbroken-breakable-ancestor n)]
+                    (try-guarded-break state source anc config)
+                    [state nil])]
+              (if edits
+                [state edits]
+                ;; Collapse a stale-indent ancestor so
+                ;; fix-source re-breaks at the correct position.
+                (if-let [stale (find-stale-indent-ancestor n config)]
+                  (try-collect-edits
+                   state source stale (collect-collapse-edits stale))
+                  [state nil])))
+            [state nil]))))))
+
 (defn- try-break-on-lines
   "Break the outermost form on every long line in a single pass.
 
@@ -861,77 +944,16 @@
   no change.
   Returns the new source if any forms were broken, nil otherwise."
   [source tree long-lines ignored-ranges config]
-  (let [seen (volatile! #{})
-        collected (volatile! [])
-        try-form
-        (fn [form]
-          (let [range (node/node-range form)]
-            (when-not (@seen range)
-              (let [edits (break-form form config)]
-                (when (and
-                       (seq edits)
-                       (edits-change-source? source edits)
-                       (not (edits-overlap? @collected edits)))
-                  (vswap! seen conj range)
-                  (vswap! collected into edits)
-                  edits)))))
-        all-edits
-        (into
-         []
-         (mapcat
-          (fn [line]
-            (let [forms (find-breakable-forms tree line ignored-ranges)
-                  ;; Check if any form has an ancestor with a
-                  ;; preceding sibling on its line. Breaking the
-                  ;; ancestor's parent separates siblings and
-                  ;; reduces indentation for all descendants.
-                  ancestor-forms
-                  (sort-by
-                   (fn [f]
-                     (let [[s e] (node/node-range f)]
-                       (- s e)))
-                   (into
-                    []
-                    (comp
-                     (mapcat find-ancestors-needing-sibling-separation)
-                     (filter #(not (node-in-ignored-range? % ignored-ranges)))
-                     (distinct))
-                    forms))
-                  ;; Try ancestor forms first, outermost
-                  ;; first. Both respect
-                  ;; inside-broken-form? to avoid stale
-                  ;; column positions.
-                  guard
-                  (fn [form]
-                    (let [range (node/node-range form)]
-                      (when-not (inside-broken-form? @seen range)
-                        (try-form form))))]
-              (or
-               (some guard ancestor-forms)
-               (some guard forms)
-               ;; Fallback: when no breakable forms found
-               ;; (e.g. line has only an unbreakable atom),
-               ;; find an ancestor that still has children
-               ;; on the same line. Breaking it separates
-               ;; children and reduces descendant indent.
-               (when-let [n (find-node-on-line tree line)]
-                 (or
-                  (when-let [anc (find-unbroken-breakable-ancestor n)]
-                    (guard anc))
-                  ;; Collapse a stale-indent ancestor so
-                  ;; fix-source re-breaks at the correct
-                  ;; position.
-                  (when-let [stale (find-stale-indent-ancestor n config)]
-                    (let [range (node/node-range stale)
-                          edits (collect-collapse-edits stale)]
-                      (when (and
-                             (seq edits)
-                             (not (@seen range))
-                             (edits-change-source? source edits)
-                             (not (edits-overlap? @collected edits)))
-                        (vswap! seen conj range)
-                        (vswap! collected into edits)
-                        edits)))))))))
+  (let [{:keys [all-edits]}
+        (reduce
+         (fn [state line]
+           (let [[state edits] (break-on-line
+                                state source tree line
+                                ignored-ranges config)]
+             (if edits
+               (update state :all-edits into edits)
+               state)))
+         {:seen #{} :collected [] :all-edits []}
          long-lines)]
     (when (seq all-edits)
       (let [new-source (apply-edits source all-edits)]
