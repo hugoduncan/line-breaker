@@ -49,7 +49,7 @@
 
 ;;; Forced line breaks
 
-;;; NOTE: Keep in sync with default-indent-rules in fix.clj
+;;; NOTE: Keep in sync with default-indent-rules in rules.clj
 (def ^:private default-force-break-rules
   "Rules for inserting forced line breaks in specific forms.
   Each entry maps a head symbol to a rule with :after-indices (0-based
