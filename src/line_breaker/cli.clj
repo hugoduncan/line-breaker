@@ -11,8 +11,10 @@
            :desc "Check files for line length violations (default mode)"}
    :fix {:coerce :boolean
          :desc "Fix files by reformatting long lines"}
+   :reformat {:coerce :boolean
+              :desc "Collapse and re-break every top-level form"}
    :stdout {:coerce :boolean
-            :desc "Output reformatted content to stdout"}
+            :desc "Output to stdout (combines with --fix or --reformat)"}
    :line-length {:coerce :long
                  :desc "Maximum line length"}
    :quiet {:coerce :boolean
@@ -22,15 +24,30 @@
           :alias :h
           :desc "Show help"}})
 
+(def ^:private mode-flags
+  "CLI flags that select the processing mode.
+  :stdout is a modifier, not a mode — it combines with :fix or :reformat."
+  [:check :fix :reformat])
+
 (defn parse-args
   "Parse command-line arguments.
   Returns {:opts {...} :args [...]} where :opts contains the parsed options
-  and :args contains positional file/directory arguments."
+  and :args contains positional file/directory arguments.
+  Throws ex-info with :type :arg-error when multiple mode flags are given."
   [args]
   (let [result (cli/parse-args args {:spec cli-spec})
         opts (:opts result)
-        positional-args (:args result)]
-    {:opts (if (or (:fix opts) (:stdout opts) (:help opts))
+        positional-args (:args result)
+        active-modes (filterv #(get opts %) mode-flags)]
+    (when (> (count active-modes) 1)
+      (throw
+       (ex-info
+        (str
+         "only one mode flag allowed, got: "
+         (str/join ", " (map #(str "--" (name %)) active-modes)))
+        {:type :arg-error
+         :modes active-modes})))
+    {:opts (if (or (:fix opts) (:reformat opts) (:stdout opts) (:help opts))
              opts
              (assoc opts :check true))
      :args (vec positional-args)}))
@@ -60,24 +77,23 @@
   Returns [\".\"] contents when paths is empty."
   [paths extensions]
   (let [paths (if (seq paths) paths ["."])]
-    (->> paths
-         (mapcat (fn [path]
-                   (cond
-                     (not (fs/exists? path))
-                     (throw (ex-info (str "Path does not exist: " path)
-                                     {:type :file-error
-                                      :path path}))
-
-                     (fs/directory? path)
-                     (let [pattern (glob-pattern-for-extensions extensions)]
-                       (fs/glob path pattern))
-
-                     (matches-extension? path extensions)
-                     [(fs/absolutize path)]
-
-                     :else
-                     [])))
-         (map (comp str fs/normalize fs/absolutize))
-         sort
-         vec)))
+    (->>
+     paths
+     (mapcat
+      (fn [path]
+        (cond
+          (not (fs/exists? path))
+          (throw
+           (ex-info
+            (str "Path does not exist: " path)
+            {:type :file-error
+             :path path}))
+          (fs/directory? path)
+          (let [pattern (glob-pattern-for-extensions extensions)]
+            (fs/glob path pattern))
+          (matches-extension? path extensions) [(fs/absolutize path)]
+          :else [])))
+     (map (comp str fs/normalize fs/absolutize))
+     sort
+     vec)))
 

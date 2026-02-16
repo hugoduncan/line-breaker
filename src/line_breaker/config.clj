@@ -10,7 +10,8 @@
    :extensions [".clj" ".cljs" ".cljc" ".edn"]
    :indents {}})
 
-(def config-filename ".line-breaker.edn")
+(def config-filename
+  ".line-breaker.edn")
 
 (defn find-config-file
   "Walk up from `dir` looking for `.line-breaker.edn`.
@@ -47,21 +48,26 @@
   [config]
   (let [{:keys [line-length extensions indents]} config]
     (when-not (pos-int? line-length)
-      (throw (ex-info "Invalid config: :line-length must be a positive integer"
-                      {:type :config-error
-                       :key :line-length
-                       :value line-length})))
-    (when-not (and (vector? extensions)
-                   (every? string? extensions))
-      (throw (ex-info "Invalid config: :extensions must be a vector of strings"
-                      {:type :config-error
-                       :key :extensions
-                       :value extensions})))
+      (throw
+       (ex-info
+        "Invalid config: :line-length must be a positive integer"
+        {:type :config-error
+         :key :line-length
+         :value line-length})))
+    (when-not (and (vector? extensions) (every? string? extensions))
+      (throw
+       (ex-info
+        "Invalid config: :extensions must be a vector of strings"
+        {:type :config-error
+         :key :extensions
+         :value extensions})))
     (when-not (map? indents)
-      (throw (ex-info "Invalid config: :indents must be a map"
-                      {:type :config-error
-                       :key :indents
-                       :value indents})))
+      (throw
+       (ex-info
+        "Invalid config: :indents must be a map"
+        {:type :config-error
+         :key :indents
+         :value indents})))
     config))
 
 (defn load-config
@@ -69,17 +75,22 @@
   Returns merged and validated config.
   Throws ex-info on read or validation error."
   [config-path]
-  (let [file-config (try
-                      (edn/read-string (slurp config-path))
-                      (catch Exception e
-                        (throw
-                         (ex-info
-                          (str "Failed to read config: " (.getMessage e))
-                          {:type :config-error :path config-path}
-                          e))))]
+  (let [file-config
+        (try
+          (edn/read-string (slurp config-path))
+          (catch
+           Exception
+           e
+            (throw
+             (ex-info
+              (str "Failed to read config: " (.getMessage e))
+              {:type :config-error
+               :path config-path}
+              e))))]
     (when-not (map? file-config)
-      (throw (ex-info "Invalid config: file must contain a map"
-                      {:type :config-error
-                       :path config-path})))
-    (-> (deep-merge default-config file-config)
-        validate-config)))
+      (throw
+       (ex-info
+        "Invalid config: file must contain a map"
+        {:type :config-error
+         :path config-path})))
+    (-> (deep-merge default-config file-config) validate-config)))

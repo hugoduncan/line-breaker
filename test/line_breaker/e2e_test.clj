@@ -92,8 +92,7 @@
   (testing "run with --line-length override"
     (testing "accepts the override"
       ;; Config has :line-length 100, override to 120
-      (let [[_out _err exit-code]
-            (with-captured-output
-              (main/run ["--line-length" "120"
-                         "test-resources/cli-test/sample.clj"]))]
+      (let [path "test-resources/cli-test/sample.clj"
+            [_out _err exit-code] (with-captured-output
+                                    (main/run ["--line-length" "120" path]))]
         (is (= 0 exit-code))))))

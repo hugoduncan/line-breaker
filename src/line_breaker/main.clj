@@ -5,7 +5,8 @@
    [line-breaker.check :as check]
    [line-breaker.cli :as cli]
    [line-breaker.config :as config]
-   [line-breaker.fix :as fix])
+   [line-breaker.fix :as fix]
+   [line-breaker.reformat :as reformat])
   (:gen-class))
 
 (def usage-text
@@ -16,7 +17,8 @@ Reformat Clojure code to enforce maximum line length.
 Options:
   --check         Check files for violations (default mode)
   --fix           Fix files by reformatting long lines
-  --stdout        Output reformatted content to stdout
+  --reformat      Collapse and re-break every top-level form
+  --stdout        Output to stdout (combines with --fix or --reformat)
   --line-length N Maximum line length (default: 80)
   -q, --quiet     Suppress summary output
   -h, --help      Show this help
@@ -28,6 +30,7 @@ Examples:
   line-breaker                     Check all files in current directory
   line-breaker src                 Check all files in src directory
   line-breaker --fix src/foo.clj   Fix a specific file
+  line-breaker --reformat src      Reformat all files in src
   line-breaker --line-length 100   Check with custom line length
 
 Exit codes:
@@ -52,34 +55,40 @@ Exit codes:
     "."))
 
 (defn- process-stdout
-  "Process files in stdout mode with fix applied.
-  Outputs reformatted content. Multiple files get ;;; path headers."
-  [files config]
+  "Process files in stdout mode.
+  Applies process-fn to each file's source and outputs to stdout.
+  Multiple files get ;;; path headers."
+  [files config process-fn]
   (let [multiple? (> (count files) 1)]
     (doseq [file files]
       (when multiple?
         (println (str ";;; " file)))
       (let [source (slurp file)
-            fixed (fix/fix-source source config)]
-        (print fixed)))))
+            result (process-fn source config)]
+        (print result)))))
 
 (defn- process-check
   "Process files in check mode.
   Checks each file for line length violations, respecting ignore directives.
   Reports to stderr. Returns exit code: 0 if no violations, 1 if violations."
   [files max-length quiet?]
-  (let [all-violations (into []
-                             (mapcat (fn [file]
-                                       (map #(assoc % :file file)
-                                            (check/check-file-with-ignore
-                                             file max-length))))
-                             files)
+  (let [all-violations
+        (into
+         []
+         (mapcat
+          (fn [file]
+            (map
+             #(assoc % :file file)
+             (check/check-file-with-ignore file max-length))))
+         files)
         violation-count (check/report-violations all-violations max-length)]
     (when-not quiet?
       (when-let [summary (check/format-summary (count files) violation-count)]
         (binding [*out* *err*]
           (println summary))))
-    (if (seq all-violations) 1 0)))
+    (if (seq all-violations)
+      1
+      0)))
 
 (defn- process-fix
   "Process files in fix mode.
@@ -96,24 +105,36 @@ Exit codes:
             (println (str "Fixed: " file)))))))
   0)
 
+(defn- process-reformat
+  "Process files in reformat mode.
+  Reads each file, collapses and re-breaks all top-level forms, writes
+  back in place. Reports reformatted files to stderr unless quiet.
+  Returns 0 on success."
+  [files config quiet?]
+  (doseq [file files]
+    (let [source (slurp file)
+          result (reformat/reformat-source source config)]
+      (when (not= source result)
+        (spit file result)
+        (when-not quiet?
+          (binding [*out* *err*]
+            (println (str "Reformatted: " file)))))))
+  0)
+
 (defn- process-files
   "Process files according to mode.
   Returns exit code."
   [files opts config]
-  (cond
-    (:stdout opts)
-    (do
-      (process-stdout files config)
-      0)
-
-    (:fix opts)
-    (process-fix files config (:quiet opts))
-
-    (:check opts)
-    (process-check files (:line-length config) (:quiet opts))
-
-    :else
-    0))
+  (let [stdout? (:stdout opts)]
+    (cond
+      (and stdout? (:reformat opts))
+      (do (process-stdout files config reformat/reformat-source) 0)
+      stdout?
+      (do (process-stdout files config fix/fix-source) 0)
+      (:fix opts) (process-fix files config (:quiet opts))
+      (:reformat opts) (process-reformat files config (:quiet opts))
+      (:check opts) (process-check files (:line-length config) (:quiet opts))
+      :else 0)))
 
 (defn run
   "Run line-breaker with given args. Returns exit code.
@@ -139,13 +160,17 @@ Exit codes:
               _ (config/validate-config final-config)
               files (cli/resolve-files args (:extensions final-config))]
           (process-files files opts final-config))))
-    (catch clojure.lang.ExceptionInfo e
+    (catch
+     clojure.lang.ExceptionInfo
+     e
       (let [data (ex-data e)
             error-type (name (or (:type data) :error))]
         (binding [*out* *err*]
           (println (format-error error-type (ex-message e))))
         2))
-    (catch Exception e
+    (catch
+     Exception
+     e
       (binding [*out* *err*]
         (println (format-error "error" (ex-message e))))
       2)))

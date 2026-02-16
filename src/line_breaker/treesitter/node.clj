@@ -3,7 +3,8 @@
 
   Provides convenient accessors that return Clojure-native data structures,
   hiding Java interop details."
-  (:import [io.github.treesitter.jtreesitter Tree Node]))
+  (:import
+   [io.github.treesitter.jtreesitter Tree Node]))
 
 (defn root-node
   "Get the root node from a Tree.
@@ -94,8 +95,7 @@
   Returns nil if node is nil."
   [^Node node]
   (when node
-    [(inc (.row (.getStartPoint node)))
-     (inc (.row (.getEndPoint node)))]))
+    [(inc (.row (.getStartPoint node))) (inc (.row (.getEndPoint node)))]))
 
 (defn node-parent
   "Get the parent node.

@@ -10,13 +10,13 @@
   Returns vector of violations [{:line n :length len}] where :line is 1-indexed
   and :length is the actual character count of violating lines."
   [source max-length]
-  (into []
-        (comp
-         (map-indexed (fn [idx line]
-                        {:line (inc idx) :length (count line)}))
-         (filter (fn [{:keys [length]}]
-                   (> length max-length))))
-        (str/split-lines source)))
+  (into
+   []
+   (comp
+    (map-indexed (fn [idx line] {:line (inc idx)
+                                 :length (count line)}))
+    (filter (fn [{:keys [length]}] (> length max-length))))
+   (str/split-lines source)))
 
 (defn check-line-lengths
   "Check a file for lines exceeding max-length.
@@ -30,8 +30,15 @@
   "Format a single violation for display.
   Format: path/to/file.clj:42: line exceeds 80 characters (actual: 95)"
   [{:keys [file line length]} max-length]
-  (str file ":" line ": line exceeds " max-length
-       " characters (actual: " length ")"))
+  (str
+   file
+   ":"
+   line
+   ": line exceeds "
+   max-length
+   " characters (actual: "
+   length
+   ")"))
 
 (defn report-violations
   "Write formatted violations to stderr.
@@ -48,8 +55,15 @@
   [file-count violation-count]
   (when (> file-count 1)
     (if (pos? violation-count)
-      (str "Checked " file-count " files, " violation-count
-           (if (= 1 violation-count) " violation" " violations") " found")
+      (str
+       "Checked "
+       file-count
+       " files, "
+       violation-count
+       (if (= 1 violation-count)
+         " violation"
+         " violations")
+       " found")
       (str "Checked " file-count " files, all lines within limit"))))
 
 ;;; Ignore directive support
@@ -57,11 +71,14 @@
 (defn- ignore-marker?
   "Check if node is a dis_expr containing :line-breaker/ignore."
   [node]
-  (and (= :dis_expr (node/node-type node))
-       (some (fn [child]
-               (and (= :kwd_lit (node/node-type child))
-                    (= ":line-breaker/ignore" (node/node-text child))))
-             (node/named-children node))))
+  (and
+   (= :dis_expr (node/node-type node))
+   (some
+    (fn [child]
+      (and
+       (= :kwd_lit (node/node-type child))
+       (= ":line-breaker/ignore" (node/node-text child))))
+    (node/named-children node))))
 
 (defn- collect-ignored-ranges
   "Recursively collect ignored line ranges from tree.
@@ -70,13 +87,15 @@
   (if-not node
     []
     (let [children (node/named-children node)]
-      (into []
-            (mapcat (fn [child]
-                      (if (ignore-marker? child)
-                        (when-let [sibling (node/next-named-sibling child)]
-                          [(node/node-line-range sibling)])
-                        (collect-ignored-ranges child))))
-            children))))
+      (into
+       []
+       (mapcat
+        (fn [child]
+          (if (ignore-marker? child)
+            (when-let [sibling (node/next-named-sibling child)]
+              [(node/node-line-range sibling)])
+            (collect-ignored-ranges child))))
+       children))))
 
 (defn find-ignored-ranges
   "Find all line ranges covered by #_:line-breaker/ignore markers.
@@ -92,13 +111,15 @@
   (if-not node
     []
     (let [children (node/named-children node)]
-      (into []
-            (mapcat (fn [child]
-                      (if (ignore-marker? child)
-                        (when-let [sibling (node/next-named-sibling child)]
-                          [(node/node-range sibling)])
-                        (collect-ignored-byte-ranges child))))
-            children))))
+      (into
+       []
+       (mapcat
+        (fn [child]
+          (if (ignore-marker? child)
+            (when-let [sibling (node/next-named-sibling child)]
+              [(node/node-range sibling)])
+            (collect-ignored-byte-ranges child))))
+       children))))
 
 (defn find-ignored-byte-ranges
   "Find all byte ranges covered by #_:line-breaker/ignore markers.
@@ -112,12 +133,12 @@
   [violations ignored-ranges]
   (if (empty? ignored-ranges)
     violations
-    (into []
-          (remove (fn [{:keys [line]}]
-                    (some (fn [[start end]]
-                            (<= start line end))
-                          ignored-ranges)))
-          violations)))
+    (into
+     []
+     (remove
+      (fn [{:keys [line]}]
+        (some (fn [[start end]] (<= start line end)) ignored-ranges)))
+     violations)))
 
 (defn check-file-with-ignore
   "Check a file for line length violations, respecting ignore directives.

@@ -10,8 +10,7 @@
     (cond
       (re-find #"(?i)mac" os-name) "darwin"
       (re-find #"(?i)linux" os-name) "linux"
-      :else (throw (ex-info (str "Unsupported OS: " os-name)
-                            {:os os-name})))))
+      :else (throw (ex-info (str "Unsupported OS: " os-name) {:os os-name})))))
 
 (defn detect-arch
   "Detect architecture.
@@ -22,8 +21,7 @@
     (case arch
       ("aarch64" "arm64") "aarch64"
       ("amd64" "x86_64") "x86_64"
-      (throw (ex-info (str "Unsupported architecture: " arch)
-                      {:arch arch})))))
+      (throw (ex-info (str "Unsupported architecture: " arch) {:arch arch})))))
 
 (defn library-extension
   "Get platform-specific library file extension.

@@ -6,14 +6,16 @@
   2. LINE_BREAKER_NATIVE_LIB environment variable (explicit path)
   3. native/<os>-<arch>/ on classpath resources
   4. java.library.path"
-  (:require [babashka.fs :as fs]
-            [clojure.java.io :as io]
-            [clojure.string :as str]
-            [line-breaker.platform :as platform])
-  (:import [java.lang.foreign Arena SymbolLookup]
-           [java.nio.file Files Path]
-           [io.github.treesitter.jtreesitter Language]
-           [line_breaker.treesitter NativeLoader]))
+  (:require
+   [babashka.fs :as fs]
+   [clojure.java.io :as io]
+   [clojure.string :as str]
+   [line-breaker.platform :as platform])
+  (:import
+   [java.lang.foreign Arena SymbolLookup]
+   [java.nio.file Files Path]
+   [io.github.treesitter.jtreesitter Language]
+   [line_breaker.treesitter NativeLoader]))
 
 (defn- library-name
   "Get platform-specific library filename."
@@ -42,12 +44,14 @@
   [lib-name]
   (let [lib-path (System/getProperty "java.library.path")]
     (when lib-path
-      (some (fn [dir]
-              (let [candidate (fs/path dir lib-name)]
-                (when (fs/exists? candidate)
-                  candidate)))
-            (str/split lib-path
-                       (re-pattern (System/getProperty "path.separator")))))))
+      (some
+       (fn [dir]
+         (let [candidate (fs/path dir lib-name)]
+           (when (fs/exists? candidate)
+             candidate)))
+       (str/split
+        lib-path
+        (re-pattern (System/getProperty "path.separator")))))))
 
 (defn- get-env-lib-path
   "Get the native library path from environment variable.
@@ -77,13 +81,9 @@
         loader-path (get-native-loader-path)]
     (cond
       ;; 1. NativeLoader extracted path (used by native-image)
-      loader-path
-      [loader-path :native-loader]
-
+      loader-path [loader-path :native-loader]
       ;; 2. Explicit path via environment variable
-      (and env-path (fs/exists? env-path))
-      [(fs/path env-path) :env-var]
-
+      (and env-path (fs/exists? env-path)) [(fs/path env-path) :env-var]
       ;; 3. Classpath resource (extract to temp)
       :else
       (if-let [extracted (extract-resource-to-temp resource-path)]
@@ -92,14 +92,15 @@
         (if-let [lib-path-result (find-in-library-path lib-name)]
           [lib-path-result :library-path]
           ;; Not found
-          (throw (ex-info (str "Could not find native library: " lib-name)
-                          {:library lib-name
-                           :os os
-                           :arch arch
-                           :env-var-checked (boolean env-path)
-                           :resource-path resource-path
-                           :library-path
-                           (System/getProperty "java.library.path")})))))))
+          (throw
+           (ex-info
+            (str "Could not find native library: " lib-name)
+            {:library lib-name
+             :os os
+             :arch arch
+             :env-var-checked (boolean env-path)
+             :resource-path resource-path
+             :library-path (System/getProperty "java.library.path")})))))))
 
 (defn- load-clojure-language*
   "Internal: load the Clojure language grammar from a native library."

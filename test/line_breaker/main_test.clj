@@ -14,18 +14,16 @@
 (deftest help-test
   (testing "run with --help"
     (testing "prints usage text to stdout"
-      (let [[out _err exit-code] (with-captured-output
-                                   (main/run ["--help"]))]
+      (let [[out _err exit-code] (with-captured-output (main/run ["--help"]))]
         (is (str/includes? out "Usage: line-breaker"))
         (is (str/includes? out "--check"))
         (is (str/includes? out "--fix"))
+        (is (str/includes? out "--reformat"))
         (is (str/includes? out "--stdout"))
         (is (str/includes? out "--line-length"))
         (is (= 0 exit-code))))
-
     (testing "with -h alias prints usage"
-      (let [[out _err exit-code] (with-captured-output
-                                   (main/run ["-h"]))]
+      (let [[out _err exit-code] (with-captured-output (main/run ["-h"]))]
         (is (str/includes? out "Usage: line-breaker"))
         (is (= 0 exit-code))))))
 
@@ -39,7 +37,6 @@
             (let [[_out _err exit-code] (with-captured-output
                                           (main/run ["--check" (str file)]))]
               (is (= 0 exit-code)))))))
-
     (testing "given directory with no violations"
       (testing "exits 0"
         (with-temp-dir [root]
@@ -48,7 +45,6 @@
             (let [[_out _err exit-code] (with-captured-output
                                           (main/run ["--check" (str root)]))]
               (is (= 0 exit-code)))))))
-
     (testing "without explicit --check flag"
       (testing "defaults to check mode"
         (with-temp-dir [root]
@@ -57,7 +53,6 @@
             (let [[_out _err exit-code] (with-captured-output
                                           (main/run [(str file)]))]
               (is (= 0 exit-code)))))))
-
     (testing "given file with violations"
       (testing "exits 1 and reports to stderr"
         (with-temp-dir [root]
@@ -69,7 +64,6 @@
               (is (= 1 exit-code))
               (is (str/includes? err "line exceeds 80 characters"))
               (is (str/includes? err ":2:")))))))
-
     (testing "given mixed files"
       (testing "exits 1 and reports only violations"
         (with-temp-dir [root]
@@ -83,7 +77,6 @@
               (is (= 1 exit-code))
               (is (str/includes? err "bad.clj"))
               (is (not (str/includes? err "good.clj"))))))))
-
     (testing "given empty file list"
       (testing "exits 0"
         (with-temp-dir [root]
@@ -91,19 +84,17 @@
           (let [[_out _err exit-code] (with-captured-output
                                         (main/run ["--check" (str root)]))]
             (is (= 0 exit-code))))))
-
     (testing "with --line-length override"
       (testing "uses CLI value over default"
         (with-temp-dir [root]
           (let [file (fs/path root "test.clj")
-                ;; 50 chars - would violate default 80, but not 60
+;; 50 chars - would violate default 80, but not 60
                 line (apply str (repeat 50 "z"))]
             (spit (str file) line)
-            (let [[_out _err exit-code] (with-captured-output
-                                          (main/run ["--line-length" "60"
-                                                     "--check" (str file)]))]
+            (let [[_out _err exit-code]
+                  (with-captured-output
+                    (main/run ["--line-length" "60" "--check" (str file)]))]
               (is (= 0 exit-code)))))))
-
     (testing "summary output"
       (testing "given multiple files with no violations"
         (testing "prints summary to stderr"
@@ -117,7 +108,6 @@
                 (is (= 0 exit-code))
                 (is (str/includes? err "Checked 2 files"))
                 (is (str/includes? err "all lines within limit")))))))
-
       (testing "given multiple files with violations"
         (testing "prints summary with count"
           (with-temp-dir [root]
@@ -131,7 +121,6 @@
                 (is (= 1 exit-code))
                 (is (str/includes? err "Checked 2 files"))
                 (is (str/includes? err "1 violation found")))))))
-
       (testing "given single file"
         (testing "does not print summary"
           (with-temp-dir [root]
@@ -141,7 +130,6 @@
                                            (main/run ["--check" (str file)]))]
                 (is (= 0 exit-code))
                 (is (not (str/includes? err "Checked")))))))))
-
     (testing "with --quiet flag"
       (testing "suppresses summary output"
         (with-temp-dir [root]
@@ -149,12 +137,11 @@
                 file2 (fs/path root "b.clj")]
             (spit (str file1) "(ns a)")
             (spit (str file2) "(ns b)")
-            (let [[_out err exit-code] (with-captured-output
-                                         (main/run ["--check" "--quiet"
-                                                    (str root)]))]
+            (let [[_out err exit-code]
+                  (with-captured-output
+                    (main/run ["--check" "--quiet" (str root)]))]
               (is (= 0 exit-code))
               (is (not (str/includes? err "Checked")))))))
-
       (testing "with -q alias"
         (testing "suppresses summary output"
           (with-temp-dir [root]
@@ -162,9 +149,9 @@
                   file2 (fs/path root "b.clj")]
               (spit (str file1) "(ns a)")
               (spit (str file2) "(ns b)")
-              (let [[_out err exit-code] (with-captured-output
-                                           (main/run ["--check" "-q"
-                                                      (str root)]))]
+              (let [[_out err exit-code]
+                    (with-captured-output
+                      (main/run ["--check" "-q" (str root)]))]
                 (is (= 0 exit-code))
                 (is (not (str/includes? err "Checked")))))))))))
 
@@ -182,12 +169,11 @@
                                           (main/run ["--fix" (str file)]))]
               (is (= 0 exit-code))
               (is (= content (slurp (str file)))))))))
-
     (testing "given file with long line"
       (testing "rewrites file with breaking applied"
         (with-temp-dir [root]
           (let [file (fs/path root "long.clj")
-                ;; Construct 90-char list (exceeds 80)
+;; Construct 90-char list (exceeds 80)
                 long-form (str "(foo " (str/join " " (repeat 20 "arg")) ")")]
             (spit (str file) long-form)
             (let [[_out err exit-code] (with-captured-output
@@ -200,16 +186,15 @@
                 ;; Verify elements present
                 (is (str/includes? result "foo"))
                 (is (str/includes? result "arg"))))))))
-
     (testing "with --quiet flag"
       (testing "suppresses Fixed: output"
         (with-temp-dir [root]
           (let [file (fs/path root "long.clj")
                 long-form (str "(foo " (str/join " " (repeat 20 "arg")) ")")]
             (spit (str file) long-form)
-            (let [[_out err exit-code] (with-captured-output
-                                         (main/run ["--fix" "--quiet"
-                                                    (str file)]))]
+            (let [[_out err exit-code]
+                  (with-captured-output
+                    (main/run ["--fix" "--quiet" (str file)]))]
               (is (= 0 exit-code))
               (is (not (str/includes? err "Fixed:"))))))))))
 
@@ -227,7 +212,6 @@
                                          (main/run ["--stdout" (str file)]))]
               (is (= content out))
               (is (= 0 exit-code)))))))
-
     (testing "with long line"
       (testing "outputs fixed content without modifying file"
         (with-temp-dir [root]
@@ -241,7 +225,6 @@
               (is (str/includes? out "\n"))
               ;; File should be unchanged
               (is (= long-form (slurp (str file)))))))))
-
     (testing "with multiple files"
       (testing "prefixes each with ;;; path header"
         (with-temp-dir [root]
@@ -256,6 +239,103 @@
               (is (str/includes? out "(ns b)"))
               (is (= 0 exit-code)))))))))
 
+(deftest reformat-stdout-mode-test
+  ;; Tests that --reformat --stdout outputs reformatted content to stdout
+  ;; without modifying the source file.
+  (testing "run in --reformat --stdout mode"
+    (testing "with poorly broken form"
+      (testing "outputs collapsed and re-broken content"
+        (with-temp-dir [root]
+          (let [file (fs/path root "test.clj")
+                input "(+ x\n    1 2)"]
+            (spit (str file) input)
+            (let [[out _err exit-code]
+                  (with-captured-output
+                    (main/run
+                     ["--reformat" "--stdout" (str file)]))]
+              (is (= 0 exit-code))
+              ;; Collapsed to single line
+              (is (= "(+ x 1 2)" out))
+              ;; File unchanged
+              (is (= input (slurp (str file)))))))))
+    (testing "with file within line limit"
+      (testing "outputs collapsed single-line form"
+        (with-temp-dir [root]
+          (let [file (fs/path root "test.clj")
+                input "(ns test)\n"]
+            (spit (str file) input)
+            (let [[out _err exit-code]
+                  (with-captured-output
+                    (main/run
+                     ["--reformat" "--stdout" (str file)]))]
+              (is (= 0 exit-code))
+              (is (= input out)))))))))
+
+(deftest reformat-mode-test
+  ;; Tests that --reformat mode collapses and re-breaks forms in place.
+  ;; Verifies file modification, quiet mode, line-length override,
+  ;; and directory traversal.
+  (testing "run in reformat mode"
+    (testing "given file with poorly broken form"
+      (testing "collapses and re-breaks in place"
+        (with-temp-dir [root]
+          (let [file (fs/path root "test.clj")
+                content "(defn foo\n  [x]\n  (+ x\n    1))"]
+            (spit (str file) content)
+            (let [[_out err exit-code] (with-captured-output
+                                         (main/run ["--reformat" (str file)]))]
+              (is (= 0 exit-code))
+              (is (str/includes? err "Reformatted:"))
+              (is (= "(defn foo\n  [x]\n  (+ x 1))" (slurp (str file)))))))))
+    (testing "given file with no changes needed"
+      (testing "does not modify file"
+        (with-temp-dir [root]
+          (let [file (fs/path root "test.clj")
+                content "(defn foo\n  [x]\n  (+ x 1))"]
+            (spit (str file) content)
+            (let [[_out err exit-code] (with-captured-output
+                                         (main/run ["--reformat" (str file)]))]
+              (is (= 0 exit-code))
+              (is (not (str/includes? err "Reformatted:")))
+              (is (= content (slurp (str file)))))))))
+    (testing "with --quiet flag"
+      (testing "suppresses Reformatted: output"
+        (with-temp-dir [root]
+          (let [file (fs/path root "test.clj")
+                content "(defn foo\n  [x]\n  (+ x\n    1))"]
+            (spit (str file) content)
+            (let [[_out err exit-code]
+                  (with-captured-output
+                    (main/run ["--reformat" "--quiet" (str file)]))]
+              (is (= 0 exit-code))
+              (is (not (str/includes? err "Reformatted:"))))))))
+    (testing "with --line-length override"
+      (testing "uses CLI value for re-breaking"
+        (with-temp-dir [root]
+          (let [file (fs/path root "test.clj")
+                content "(+ 1 2 3 4 5 6 7 8 9 10)"]
+            (spit (str file) content)
+            (let [[_out _err exit-code]
+                  (with-captured-output
+                    (main/run ["--reformat" "--line-length" "20" (str file)]))]
+              (is (= 0 exit-code))
+              ;; Should be re-broken since it exceeds 20
+              (let [result (slurp (str file))]
+                (is (str/includes? result "\n"))))))))
+    (testing "given a directory"
+      (testing "reformats all matching files"
+        (with-temp-dir [root]
+          (let [file1 (fs/path root "a.clj")
+                file2 (fs/path root "b.clj")]
+            (spit (str file1) "(defn a [x] x)")
+            (spit (str file2) "(defn b [y] y)")
+            (let [[_out err exit-code] (with-captured-output
+                                         (main/run ["--reformat" (str root)]))]
+              (is (= 0 exit-code))
+              (is (= "(defn a\n  [x]\n  x)" (slurp (str file1))))
+              (is (= "(defn b\n  [y]\n  y)" (slurp (str file2))))
+              (is (str/includes? err "Reformatted:")))))))))
+
 (deftest config-loading-test
   (testing "run with config file"
     (testing "loads config from file directory"
@@ -268,7 +348,6 @@
           (let [[_out _err exit-code] (with-captured-output
                                         (main/run [(str file)]))]
             (is (= 0 exit-code))))))
-
     (testing "CLI --line-length overrides config"
       (with-temp-dir [root]
         (let [config-path (fs/path root ".line-breaker.edn")
@@ -276,9 +355,9 @@
           (spit (str config-path) "{:line-length 80}")
           (spit (str file) "(ns test)")
           ;; Should work with CLI override
-          (let [[_out _err exit-code] (with-captured-output
-                                        (main/run ["--line-length" "100"
-                                                   (str file)]))]
+          (let [[_out _err exit-code]
+                (with-captured-output
+                  (main/run ["--line-length" "100" (str file)]))]
             (is (= 0 exit-code))))))))
 
 (deftest error-handling-test
@@ -289,7 +368,12 @@
                                      (main/run ["nonexistent.clj"]))]
           (is (= 2 exit-code))
           (is (str/includes? err "line-breaker: file-error:")))))
-
+    (testing "given --fix with --reformat"
+      (testing "exits 2 with arg-error message"
+        (let [[_out err exit-code] (with-captured-output
+                                     (main/run ["--fix" "--reformat"]))]
+          (is (= 2 exit-code))
+          (is (str/includes? err "line-breaker: arg-error:")))))
     (testing "given invalid config"
       (testing "exits 2 with error message"
         (with-temp-dir [root]
@@ -305,5 +389,7 @@
 (deftest format-error-test
   (testing "format-error"
     (testing "formats error with type and message"
-      (is (= "line-breaker: config-error: bad value"
-             (main/format-error "config-error" "bad value"))))))
+      (is
+       (=
+        "line-breaker: config-error: bad value"
+        (main/format-error "config-error" "bad value"))))))
