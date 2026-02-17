@@ -390,6 +390,22 @@
   (let [pw (effective-pair-width exc-name exc-value config)]
     (> (+ indent-col pw) max-length)))
 
+(defn- has-wide-atom?
+  "Returns true if node's subtree contains a non-breakable leaf whose
+  text width exceeds max-length - body-indent. This means in-place
+  sub-form breaking can't make the content fit at body-indent."
+  [node body-indent max-length]
+  (let [available (- max-length body-indent)]
+    (loop [stack (vec (node/named-children node))]
+      (when (seq stack)
+        (let [child (peek stack)
+              rest-stack (pop stack)]
+          (if (rules/breakable-node? child)
+            (recur (into rest-stack (node/named-children child)))
+            (if (> (count (node/node-text child)) available)
+              true
+              (recur rest-stack))))))))
+
 (defn- collapse-moved-pair-children
   "Collapse pair-grouped children whose column will change after breaking.
   Filters pairs-to-break for pair-grouped second elements that will move
@@ -506,12 +522,23 @@
            split-pair? (and
                         exceeding-pair
                         (rules/breakable-node? exc-value)
-                        (pair-exceeds-at-indent?
-                         exc-name
-                         exc-value
-                         indent-col
-                         max-length
-                         config))]
+                        (or
+                         ;; Phase 3: value is multi-line, still
+                         ;; exceeding, and has an atom too wide
+                         ;; for the current body indent — sub-form
+                         ;; breaking alone can't fix it
+                         (and
+                          (not (single-line-node? exc-value))
+                          (has-wide-atom?
+                           exc-value
+                           (+ (form-start-column exc-value) 2)
+                           max-length))
+                         (pair-exceeds-at-indent?
+                          exc-name
+                          exc-value
+                          indent-col
+                          max-length
+                          config)))]
        (if split-pair?
          ;; Pair's first line (key + value head) exceeds at indent,
          ;; split onto separate lines regardless of other children.

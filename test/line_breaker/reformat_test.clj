@@ -485,7 +485,30 @@
                       input {:line-length 40})]
           (is
            (re-find #"(?m)^\s+\(do$" result)
-           "do body starts on its own line"))))))
+           "do body starts on its own line"))))
+    (testing "given a cond with do body containing wide atoms"
+      (testing "splits pair when atoms can't fit at current indent"
+        (let [input (str
+                     "(cond\n"
+                     "  (or (= cmd \"--help\")"
+                     " (= cmd \"-h\"))"
+                     " (do (println \"abcdefghij\")"
+                     " (println \"klmnopqrst\"))"
+                     "\n  :else :ok)")
+              result (reformat/reformat-source
+                      input {:line-length 40})]
+          (is
+           (re-find #"(?m)^\s+\(do$" result)
+           "do starts on its own line")
+          (is
+           (re-find #"(?m)^\s+\(println \"abc" result)
+           "println at reduced indent")
+          (is
+           (< (apply max
+                     (map count
+                          (str/split-lines result)))
+              41)
+           "all lines within limit"))))))
 
 (deftest reformat-comment-indentation-test
   ;; Verify that whole-line comments inside pair-grouped forms retain
