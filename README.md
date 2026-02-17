@@ -45,11 +45,22 @@ Automatically fix line length violations in-place:
 line-breaker --fix src/myfile.clj
 ```
 
-Output fixed content to stdout (leaves original file unchanged):
+Reformat files by collapsing and re-breaking every top-level form:
 
 ```bash
-line-breaker --stdout src/myfile.clj
+line-breaker --reformat src/myfile.clj
 ```
+
+Output to stdout instead of modifying files (use with `--fix` or
+`--reformat`):
+
+```bash
+line-breaker --fix --stdout src/myfile.clj
+line-breaker --reformat --stdout src/myfile.clj
+```
+
+When processing multiple files with `--stdout`, each file's output is
+prefixed with a `;;; <filepath>` comment header.
 
 Paths can be files or directories. When given a directory, all matching
 files are processed recursively.
@@ -116,8 +127,14 @@ The marker also protects nested forms within the ignored form.
 
 ### CLI Options
 
+- `--check` — Check for line length violations (default mode)
+- `--fix` — Fix line length violations in-place
+- `--reformat` — Collapse and re-break every top-level form
+- `--stdout` — Output to stdout instead of modifying files
+  (use with `--fix` or `--reformat`)
 - `--line-length N` — Maximum line length (default: 80)
 - `-q, --quiet` — Suppress summary output
+- `-h, --help` — Show usage
 
 ```bash
 line-breaker --line-length 100 --check src/
@@ -148,3 +165,9 @@ Create `.line-breaker.edn` in your project root:
   - `:do` — Body on next line
 
 CLI options override config file values, which override defaults.
+
+## Exit Codes
+
+- `0` — Success
+- `1` — Violations found (check mode)
+- `2` — Error
