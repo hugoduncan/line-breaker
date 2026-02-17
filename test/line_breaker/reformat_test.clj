@@ -21,8 +21,7 @@
       (is
        (=
         "(defn foo [x] (+ x 1))"
-        (reformat/collapse-top-level-forms
-         "(defn foo\n  [x]\n  (+ x 1))"))))
+        (reformat/collapse-top-level-forms "(defn foo\n  [x]\n  (+ x 1))"))))
     (testing "collapses deeply nested multi-line forms"
       (is
        (=
@@ -52,24 +51,16 @@
        (=
         "(defn foo [x] x)\n\n(defn bar [y] y)"
         (reformat/collapse-top-level-forms
-         (str
-          "(defn foo\n  [x]\n  x)"
-          "\n\n"
-          "(defn bar\n  [y]\n  y)")))))
+         (str "(defn foo\n  [x]\n  x)" "\n\n" "(defn bar\n  [y]\n  y)")))))
     (testing "leaves already single-line form unchanged"
-      (is
-       (=
-        "(+ 1 2)"
-        (reformat/collapse-top-level-forms "(+ 1 2)"))))
+      (is (= "(+ 1 2)" (reformat/collapse-top-level-forms "(+ 1 2)"))))
     (testing "collapses ignored forms"
       ;; Ignore directives are not respected during collapse
       (is
        (=
         "#_:line-breaker/ignore\n(defn foo [x] (+ x 1))"
         (reformat/collapse-top-level-forms
-         (str
-          "#_:line-breaker/ignore\n"
-          "(defn foo\n  [x]\n  (+ x 1))")))))))
+         (str "#_:line-breaker/ignore\n" "(defn foo\n  [x]\n  (+ x 1))")))))))
 
 (deftest apply-forced-breaks-test
   ;; Verify forced line breaks at structurally significant positions.
@@ -81,47 +72,25 @@
         (is
          (=
           "(defn foo\n  [x]\n  (+ x 1))"
-          (reformat/apply-forced-breaks
-           "(defn foo [x] (+ x 1))"
-           {})))))
+          (reformat/apply-forced-breaks "(defn foo [x] (+ x 1))" {})))))
     (testing "given a defn with docstring"
       (testing "breaks after name, after docstring, and after argvec"
         (is
          (=
-          (str
-           "(defn foo\n"
-           "  \"doc\"\n"
-           "  [x]\n"
-           "  (+ x 1))")
-          (reformat/apply-forced-breaks
-           "(defn foo \"doc\" [x] (+ x 1))"
-           {})))))
+          (str "(defn foo\n" "  \"doc\"\n" "  [x]\n" "  (+ x 1))")
+          (reformat/apply-forced-breaks "(defn foo \"doc\" [x] (+ x 1))" {})))))
     (testing "given a multi-arity defn"
       (testing "breaks after name and after argvec in each arity"
         (is
          (=
-          (str
-           "(defn foo\n"
-           "  ([x]\n"
-           "   x)\n"
-           "  ([x y]\n"
-           "   y))")
-          (reformat/apply-forced-breaks
-           "(defn foo ([x] x) ([x y] y))"
-           {})))))
+          (str "(defn foo\n" "  ([x]\n" "   x)\n" "  ([x y]\n" "   y))")
+          (reformat/apply-forced-breaks "(defn foo ([x] x) ([x y] y))" {})))))
     (testing "given a multi-arity fn"
       (testing "breaks after argvec in each arity"
         (is
          (=
-          (str
-           "(fn\n"
-           "  ([x]\n"
-           "   x)\n"
-           "  ([x y]\n"
-           "   y))")
-          (reformat/apply-forced-breaks
-           "(fn ([x] x) ([x y] y))"
-           {})))))
+          (str "(fn\n" "  ([x]\n" "   x)\n" "  ([x y]\n" "   y))")
+          (reformat/apply-forced-breaks "(fn ([x] x) ([x y] y))" {})))))
     (testing "given a multi-arity defn with docstring"
       (testing "breaks after name, docstring, and argvec in each arity"
         (is
@@ -141,36 +110,25 @@
         (is
          (=
           "(defn ^:private foo\n  [x]\n  x)"
-          (reformat/apply-forced-breaks
-           "(defn ^:private foo [x] x)"
-           {})))))
+          (reformat/apply-forced-breaks "(defn ^:private foo [x] x)" {})))))
     (testing "given a defmethod"
       (testing "breaks after dispatch-val and argvec"
         (is
          (=
           "(defmethod foo :bar\n  [x]\n  x)"
-          (reformat/apply-forced-breaks
-           "(defmethod foo :bar [x] x)"
-           {})))))
+          (reformat/apply-forced-breaks "(defmethod foo :bar [x] x)" {})))))
     (testing "given a deftest"
       (testing "breaks after name"
         (is
          (=
           "(deftest my-test\n  (is (= 1 1)))"
-          (reformat/apply-forced-breaks
-           "(deftest my-test (is (= 1 1)))"
-           {})))))
+          (reformat/apply-forced-breaks "(deftest my-test (is (= 1 1)))" {})))))
     (testing "given a ns"
       (testing "breaks after name"
         (is
          (=
-          (str
-           "(ns my.ns\n"
-           "  (:require\n"
-           "   [foo]))")
-          (reformat/apply-forced-breaks
-           "(ns my.ns (:require [foo]))"
-           {}))))
+          (str "(ns my.ns\n" "  (:require\n" "   [foo]))")
+          (reformat/apply-forced-breaks "(ns my.ns (:require [foo]))" {}))))
       (testing "breaks after docstring"
         (is
          (=
@@ -185,15 +143,9 @@
       (testing "breaks each require libspec onto its own line"
         (is
          (=
-          (str
-           "(ns my.ns\n"
-           "  (:require\n"
-           "   [a]\n"
-           "   [b]\n"
-           "   [c]))")
+          (str "(ns my.ns\n" "  (:require\n" "   [a]\n" "   [b]\n" "   [c]))")
           (reformat/apply-forced-breaks
-           "(ns my.ns (:require [a] [b] [c]))"
-           {}))))
+           "(ns my.ns (:require [a] [b] [c]))" {}))))
       (testing "breaks symbol libspecs"
         (is
          (=
@@ -219,13 +171,8 @@
       (testing "breaks single-child require after keyword"
         (is
          (=
-          (str
-           "(ns my.ns\n"
-           "  (:require\n"
-           "   [a]))")
-          (reformat/apply-forced-breaks
-           "(ns my.ns (:require [a]))"
-           {}))))
+          (str "(ns my.ns\n" "  (:require\n" "   [a]))")
+          (reformat/apply-forced-breaks "(ns my.ns (:require [a]))" {}))))
       (testing "breaks between require and import clauses"
         (is
          (=
@@ -248,70 +195,50 @@
         (is
          (=
           "(def foo\n  \"A var.\"\n  42)"
-          (reformat/apply-forced-breaks
-           "(def foo \"A var.\" 42)"
-           {})))))
+          (reformat/apply-forced-breaks "(def foo \"A var.\" 42)" {})))))
     (testing "given a defonce"
       (testing "breaks after name"
         (is
          (=
           "(defonce foo\n  42)"
-          (reformat/apply-forced-breaks
-           "(defonce foo 42)"
-           {})))))
+          (reformat/apply-forced-breaks "(defonce foo 42)" {})))))
     (testing "given a defmulti"
       (testing "breaks after name"
         (is
          (=
           "(defmulti foo\n  :type)"
-          (reformat/apply-forced-breaks
-           "(defmulti foo :type)"
-           {})))))
+          (reformat/apply-forced-breaks "(defmulti foo :type)" {})))))
     (testing "given nested forms"
       (testing "breaks outer before inner"
         (is
          (=
           "(def foo\n  (defn bar\n    [x]\n    x))"
-          (reformat/apply-forced-breaks
-           "(def foo (defn bar [x] x))"
-           {})))))
+          (reformat/apply-forced-breaks "(def foo (defn bar [x] x))" {})))))
     (testing "given a defn with multiple body forms"
       (testing "breaks between body siblings"
         (is
          (=
           "(defn foo\n  [x]\n  (bar x)\n  (baz x))"
-          (reformat/apply-forced-breaks
-           "(defn foo [x] (bar x) (baz x))"
-           {})))))
+          (reformat/apply-forced-breaks "(defn foo [x] (bar x) (baz x))" {})))))
     (testing "given an already-broken form"
       (testing "returns unchanged"
         (let [s "(defn foo\n  [x]\n  (+ x 1))"]
-          (is
-           (= s (reformat/apply-forced-breaks s {}))))))
+          (is (= s (reformat/apply-forced-breaks s {}))))))
     (testing "given a do with multiple body forms"
       (testing "breaks between every body form"
         (is
          (=
           "(do\n  (a)\n  (b)\n  (c))"
-          (reformat/apply-forced-breaks
-           "(do (a) (b) (c))"
-           {})))))
+          (reformat/apply-forced-breaks "(do (a) (b) (c))" {})))))
     (testing "given a do with two body forms"
       (testing "breaks between them"
         (is
          (=
           "(do\n  (a)\n  (b))"
-          (reformat/apply-forced-breaks
-           "(do (a) (b))"
-           {})))))
+          (reformat/apply-forced-breaks "(do (a) (b))" {})))))
     (testing "given a do with one body form"
       (testing "only breaks after do keyword"
-        (is
-         (=
-          "(do\n  (a))"
-          (reformat/apply-forced-breaks
-           "(do (a))"
-           {})))))
+        (is (= "(do\n  (a))" (reformat/apply-forced-breaks "(do (a))" {})))))
     (testing "with user config override"
       (testing "uses config :force-breaks over defaults"
         (is
@@ -345,10 +272,7 @@
        (=
         "(defn my-function\n  [x y]\n  (+ x y (- x y)))"
         (reformat/reformat-source
-         (str
-          "(defn my-function [x y]\n"
-          "  (+ x y\n"
-          "    (- x y)))")
+         (str "(defn my-function [x y]\n" "  (+ x y\n" "    (- x y)))")
          {:line-length 30}))))
     (testing "preserves EOL comment through collapse and re-break"
       (is
@@ -387,25 +311,14 @@
     (testing "reformats ns require onto separate lines"
       (is
        (=
-        (str
-         "(ns my.ns\n"
-         "  (:require\n"
-         "   [a]\n"
-         "   [b]\n"
-         "   [c]))")
+        (str "(ns my.ns\n" "  (:require\n" "   [a]\n" "   [b]\n" "   [c]))")
         (reformat/reformat-source
-         (str
-          "(ns my.ns\n"
-          "  (:require [a] [b]\n"
-          "            [c]))")
+         (str "(ns my.ns\n" "  (:require [a] [b]\n" "            [c]))")
          {:line-length 80}))))
     (testing "reformats ns import onto separate lines"
       (is
        (=
-        (str
-         "(ns my.ns\n"
-         "  (:import\n"
-         "   [java.io File]))")
+        (str "(ns my.ns\n" "  (:import\n" "   [java.io File]))")
         (reformat/reformat-source
          "(ns my.ns (:import [java.io File]))"
          {:line-length 80}))))
@@ -413,19 +326,12 @@
       (is
        (=
         "(do\n  (a)\n  (b)\n  (c))"
-        (reformat/reformat-source
-         "(do (a)\n  (b) (c))"
-         {:line-length 80}))))
+        (reformat/reformat-source "(do (a)\n  (b) (c))" {:line-length 80}))))
     (testing "breaks do body forms in map values"
       (is
        (=
-        (str
-         "{:task (do\n"
-         "         (a)\n"
-         "         (b))}")
-        (reformat/reformat-source
-         "{:task (do (a) (b))}"
-         {:line-length 80}))))
+        (str "{:task (do\n" "         (a)\n" "         (b))}")
+        (reformat/reformat-source "{:task (do (a) (b))}" {:line-length 80}))))
     (testing "breaks when-not body in let with comment"
       (is
        (=
@@ -445,22 +351,11 @@
       ;; line length. The final forced-breaks pass must
       ;; re-expand them.
       (let [build-src (slurp "build.clj")
-            input
-            (subs
-             build-src
-             (.indexOf
-              build-src "(defn native-image"))
-            result
-            (reformat/reformat-source
-             input {:line-length 80})]
+            input (subs build-src (.indexOf build-src "(defn native-image"))
+            result (reformat/reformat-source input {:line-length 80})]
         (is
-         (not
-          (re-find
-           #"\(when-not \S+ \(throw"
-           result))
-         (str
-          "when-not body on same line:\n"
-          result))))))
+         (not (re-find #"\(when-not \S+ \(throw" result))
+         (str "when-not body on same line:\n" result))))))
 
 (deftest apply-pair-breaking-test
   ;; Verify that apply-pair-breaking forces pair-grouped forms onto
@@ -472,15 +367,10 @@
         (is
          (=
           "{:a 1\n :b 2\n :c 3}"
-          (reformat/apply-pair-breaking
-           "{:a 1 :b 2 :c 3}"
-           {})))))
+          (reformat/apply-pair-breaking "{:a 1 :b 2 :c 3}" {})))))
     (testing "given a map with one pair"
       (testing "leaves it on one line"
-        (is
-         (=
-          "{:a 1}"
-          (reformat/apply-pair-breaking "{:a 1}" {})))))
+        (is (= "{:a 1}" (reformat/apply-pair-breaking "{:a 1}" {})))))
     (testing "given a cond with multiple clauses"
       (testing "breaks each clause onto its own line"
         (is
@@ -491,62 +381,44 @@
            "  (= x 2) :two\n"
            "  :else :other)")
           (reformat/apply-pair-breaking
-           (str
-            "(cond (= x 1) :one"
-            " (= x 2) :two"
-            " :else :other)")
+           (str "(cond (= x 1) :one" " (= x 2) :two" " :else :other)")
            {})))))
     (testing "given a cond with one clause"
       (testing "leaves it on one line"
         (is
          (=
           "(cond (= x 1) :one)"
-          (reformat/apply-pair-breaking
-           "(cond (= x 1) :one)"
-           {})))))
+          (reformat/apply-pair-breaking "(cond (= x 1) :one)" {})))))
     (testing "given a condp with multiple clauses"
       (testing "breaks each clause onto its own line"
         (is
          (=
           (str "(condp = x\n" "  1 :one\n" "  2 :two)")
-          (reformat/apply-pair-breaking
-           "(condp = x 1 :one 2 :two)"
-           {})))))
+          (reformat/apply-pair-breaking "(condp = x 1 :one 2 :two)" {})))))
     (testing "given a case with multiple clauses"
       (testing "breaks each clause onto its own line"
         (is
          (=
           (str "(case x\n" "  1 :one\n" "  2 :two)")
-          (reformat/apply-pair-breaking
-           "(case x 1 :one 2 :two)"
-           {})))))
+          (reformat/apply-pair-breaking "(case x 1 :one 2 :two)" {})))))
     (testing "given a cond-> with multiple clauses"
       (testing "breaks each clause onto its own line"
         (is
          (=
-          (str
-           "(cond-> x\n"
-           "  true inc\n"
-           "  false dec)")
-          (reformat/apply-pair-breaking
-           "(cond-> x true inc false dec)"
-           {})))))
+          (str "(cond-> x\n" "  true inc\n" "  false dec)")
+          (reformat/apply-pair-breaking "(cond-> x true inc false dec)" {})))))
     (testing "given a binding vector"
       (testing "breaks each pair onto its own line"
         (is
          (=
           "(let [a 1\n      b 2] (+ a b))"
-          (reformat/apply-pair-breaking
-           "(let [a 1 b 2] (+ a b))"
-           {})))))
+          (reformat/apply-pair-breaking "(let [a 1 b 2] (+ a b))" {})))))
     (testing "given nested maps"
       (testing "breaks both outer and inner maps"
         (is
          (=
           "{:a {:x 1\n     :y 2}\n :b 3}"
-          (reformat/apply-pair-breaking
-           "{:a {:x 1 :y 2} :b 3}"
-           {})))))))
+          (reformat/apply-pair-breaking "{:a {:x 1 :y 2} :b 3}" {})))))))
 
 (deftest reformat-source-pair-breaking-test
   ;; Verify that reformat-source forces pair-grouped forms to break
@@ -557,18 +429,12 @@
         (is
          (=
           "{:a 1\n :b 2\n :c 3}"
-          (reformat/reformat-source
-           "{:a 1 :b 2 :c 3}"
-           {:line-length 80})))))
+          (reformat/reformat-source "{:a 1 :b 2 :c 3}" {:line-length 80})))))
     (testing "given a defn containing a map"
       (testing "forces map pair breaking"
         (is
          (=
-          (str
-           "(defn foo\n"
-           "  []\n"
-           "  {:a 1\n"
-           "   :b 2})")
+          (str "(defn foo\n" "  []\n" "  {:a 1\n" "   :b 2})")
           (reformat/reformat-source
            "(defn foo [] {:a 1 :b 2})"
            {:line-length 80})))))
@@ -576,30 +442,37 @@
       (testing "collapses then pair-breaks"
         (is
          (=
-          (str
-           "(cond\n"
-           "  (= x 1) :one\n"
-           "  (= x 2) :two)")
+          (str "(cond\n" "  (= x 1) :one\n" "  (= x 2) :two)")
           (reformat/reformat-source
-           (str
-            "(cond (= x 1)\n"
-            "  :one (= x 2)\n"
-            "  :two)")
+           (str "(cond (= x 1)\n" "  :one (= x 2)\n" "  :two)")
            {:line-length 80})))))
     (testing "given a cond with long test+value pairs"
-      (testing "keeps pair together when broken value head fits"
+      (testing "splits pair when in-place broken value still exceeds"
         (let [input (str
                      "(cond (not (fs/exists? p))"
                      " (throw (ex-info \"m\" {}))"
                      " :else nil)")
               result (reformat/reformat-source
-                      input
-                      {:line-length 40})]
+                      input {:line-length 40})]
           (is
            (re-find
-            #"(?m)\(not \(fs/exists\? p\)\) \(throw"
+            #"(?m)^\s+\(not \(fs/exists\? p\)\)\n\s+\(throw"
             result)
-           "test and value head on same line"))))))
+           "test and value on separate lines"))))
+    (testing "given a cond with long test and multi-line do body"
+      (testing "splits pair onto separate lines"
+        (let [input (str
+                     "(cond\n"
+                     "  (or (= cmd \"--help\")"
+                     " (= cmd \"-h\")"
+                     " (nil? cmd))"
+                     " (do (prn \"Usage\") nil)"
+                     "\n  :else :ok)")
+              result (reformat/reformat-source
+                      input {:line-length 40})]
+          (is
+           (re-find #"(?m)^\s+\(do$" result)
+           "do body starts on its own line"))))))
 
 (deftest reformat-comment-indentation-test
   ;; Verify that whole-line comments inside pair-grouped forms retain
@@ -618,18 +491,14 @@
                      "    (+ 1 b))\n"
                      "  (some? r) (+ 2 b)\n"
                      "  :else (+ 1 b))")
-              result (reformat/reformat-source
-                      input
-                      {:line-length 40})]
+              result (reformat/reformat-source input {:line-length 40})]
           (is
            (re-find #"(?m)^  ;; First comment\." result)
            "first comment at column 2")
           (is
            (re-find #"(?m)^  ;; Second comment\." result)
            "second comment at column 2")
-          (is
-           (re-find #"(?m)^  \(if-let " result)
-           "if-let at column 2"))))
+          (is (re-find #"(?m)^  \(if-let " result) "if-let at column 2"))))
     (testing "given a defn with comment before argvec"
       (testing "indents comment and argvec to body indent"
         (let [input (str
@@ -637,15 +506,9 @@
                      "  ;; doc comment\n"
                      "  [x]\n"
                      "  (+ x 1))")
-              result (reformat/reformat-source
-                      input
-                      {:line-length 40})]
-          (is
-           (re-find #"(?m)^  ;; doc comment" result)
-           "comment at column 2")
-          (is
-           (re-find #"(?m)^  \[x\]" result)
-           "argvec at column 2"))))
+              result (reformat/reformat-source input {:line-length 40})]
+          (is (re-find #"(?m)^  ;; doc comment" result) "comment at column 2")
+          (is (re-find #"(?m)^  \[x\]" result) "argvec at column 2"))))
     (testing "given a defn body comment between regular forms"
       (testing "indents comment to body indent"
         (let [input (str
@@ -657,9 +520,7 @@
                      "  ;; Copy resources\n"
                      "  (b/copy-dir {:src [\"r\"]})\n"
                      "  (b/copy-dir {:src [\"s\"]}))")
-              result (reformat/reformat-source
-                      input
-                      {:line-length 80})]
+              result (reformat/reformat-source input {:line-length 80})]
           (is
            (re-find #"(?m)^  ;; Copy resources" result)
            "comment at column 2")
@@ -690,9 +551,7 @@
                      " rep (subs s end)))\n"
                      "     source\n"
                      "     sorted)))")
-              result (reformat/reformat-source
-                      input
-                      {:line-length 40})]
+              result (reformat/reformat-source input {:line-length 40})]
           ;; reduce's children must be at column 5 (reduce-col + 1),
           ;; not at a high column from the collapsed line
           (is
@@ -711,9 +570,7 @@
                      "    (when (pos? a)\n"
                      "      (println a))\n"
                      "    (transform a x)))")
-              result (reformat/reformat-source
-                      input
-                      {:line-length 30})]
+              result (reformat/reformat-source input {:line-length 30})]
           ;; Verify no extreme indentation
           (is
            (every? #(<= (count %) 30) (.split result "\n"))
@@ -725,13 +582,9 @@
                      "  [x y]\n"
                      "  (let [a (bar x)]\n"
                      "    (baz a y)))")
-              result (reformat/reformat-source
-                      input
-                      {:line-length 40})]
+              result (reformat/reformat-source input {:line-length 40})]
           (is
-           (=
-            result
-            (reformat/reformat-source result {:line-length 40}))
+           (= result (reformat/reformat-source result {:line-length 40}))
            "second reformat produces same output"))))))
 
 (deftest intermediate-ancestor-reformat-test
@@ -747,9 +600,7 @@
                      " (testing \"inner\"\n"
                      "    (let [x (long-fn a b)]"
                      " (do-thing x)))))")
-              result (reformat/reformat-source
-                      input
-                      {:line-length 40})]
+              result (reformat/reformat-source input {:line-length 40})]
           (is
            (re-find #"(?m)^\s+\(testing \"inner\"" result)
            "inner testing on its own line")
@@ -772,9 +623,7 @@
                      " :task (do"
                      " (println \"Linting...\")"
                      " (shell \"cmd\"))}}")
-              result (reformat/reformat-source
-                      input
-                      {:line-length 80})]
+              result (reformat/reformat-source input {:line-length 80})]
           (is
            (re-find #"(?m):task \(do$" result)
            ":task and (do stay on the same line"))))))
@@ -792,16 +641,10 @@
                      " :task (let [cmd *cmd-line-args*"
                      " files (get-files dir)]"
                      " (run cmd files))}")
-              result (reformat/reformat-source
-                      input
-                      {:line-length 40})]
+              result (reformat/reformat-source input {:line-length 40})]
           (is
-           (re-find
-            #"(?m)^ {7}files"
-            result)
-           (str "files at col 7 (bracket+1),"
-                " got:\n"
-                result)))))))
+           (re-find #"(?m)^ {7}files" result)
+           (str "files at col 7 (bracket+1)," " got:\n" result)))))))
 
 (deftest multiline-child-breaking-test
   ;; When a function call has a child that becomes multi-line (e.g. a
@@ -813,70 +656,47 @@
     (testing "given a function call with a small map arg"
       (testing "separates sibling args from map"
         (let [input "(f {:a 1 :b 2} \"x\" \"y\")"
-              result (reformat/reformat-source
-                      input
-                      {:line-length 25})]
+              result (reformat/reformat-source input {:line-length 25})]
           (is
            (not (re-find #"\}.*\"" result))
-           (str "no string args on same line as },"
-                " got:\n"
-                result)))))
+           (str "no string args on same line as }," " got:\n" result)))))
     (testing "given a map arg that fits on its own line"
       (testing "collapses map to single line after reposition"
-        (let [input (str "(p/shell"
-                         " {:out :string"
-                         " :err :string"
-                         " :continue true}"
-                         " \"arch\""
-                         " \"-x86_64\""
-                         " \"/usr/bin/true\")")
-              result (reformat/reformat-source
-                      input
-                      {:line-length 80})]
+        (let [input (str
+                     "(p/shell"
+                     " {:out :string"
+                     " :err :string"
+                     " :continue true}"
+                     " \"arch\""
+                     " \"-x86_64\""
+                     " \"/usr/bin/true\")")
+              result (reformat/reformat-source input {:line-length 80})]
           (is
            (re-find #"(?m)^ \{:out" result)
-           (str "map starts at col 1,"
-                " got:\n"
-                result))
+           (str "map starts at col 1," " got:\n" result))
           (is
            (not (re-find #"(?m)^ {5,}" result))
-           (str "no stale indent (5+ spaces),"
-                " got:\n"
-                result)))))
+           (str "no stale indent (5+ spaces)," " got:\n" result)))))
     (testing "given a map arg too long for one line"
       (testing "re-breaks map with correct indent"
-        (let [input (str "(f {:aaa 1 :bbb 2"
-                         " :ccc 3} \"x\" \"y\")")
-              result (reformat/reformat-source
-                      input
-                      {:line-length 20})]
+        (let [input (str "(f {:aaa 1 :bbb 2" " :ccc 3} \"x\" \"y\")")
+              result (reformat/reformat-source input {:line-length 20})]
           (is
            (not (re-find #"\}.*\"" result))
-           (str "no string args on same line as },"
-                " got:\n"
-                result))
+           (str "no string args on same line as }," " got:\n" result))
           (is
            (re-find #"(?m)^ \{:aaa 1$" result)
-           (str "map at col 1 with first pair,"
-                " got:\n"
-                result))
+           (str "map at col 1 with first pair," " got:\n" result))
           (is
            (re-find #"(?m)^  :bbb 2$" result)
-           (str "second pair at col 2,"
-                " got:\n"
-                result)))))
+           (str "second pair at col 2," " got:\n" result)))))
     (testing "given a nested call with map arg in let binding"
       (testing "separates sibling args from map"
-        (let [input (str "(let [r (f {:a 1 :b 2"
-                         " :c 3} \"x\" \"y\")])")
-              result (reformat/reformat-source
-                      input
-                      {:line-length 30})]
+        (let [input (str "(let [r (f {:a 1 :b 2" " :c 3} \"x\" \"y\")])")
+              result (reformat/reformat-source input {:line-length 30})]
           (is
            (not (re-find #"\}.*\"" result))
-           (str "no args on } line,"
-                " got:\n"
-                result)))))))
+           (str "no args on } line," " got:\n" result)))))))
 
 (deftest nested-map-reformat-convergence-test
   ;; Verify that reformatting nested maps with pair-grouped values
@@ -886,26 +706,22 @@
   ;; indent-col) and collapsed them back, creating an infinite loop.
   (testing "reformat-source"
     (testing "converges for nested maps"
-      (let [input (str "{:a\n"
-                       " {:k1 {:x 1 :y 2}\n"
-                       "  :k2 {:x 3 :y 4}\n"
-                       "  :k3 {:x 5 :y 6}}}")
-            result (reformat/reformat-source
-                    input {:line-length 20})]
-        (is (every? #(<= (count %) 20)
-                    (.split result "\n" -1))
-            (str "all lines <= 20,"
-                 " got:\n" result))))
+      (let [input (str
+                   "{:a\n"
+                   " {:k1 {:x 1 :y 2}\n"
+                   "  :k2 {:x 3 :y 4}\n"
+                   "  :k3 {:x 5 :y 6}}}")
+            result (reformat/reformat-source input {:line-length 20})]
+        (is
+         (every? #(<= (count %) 20) (.split result "\n" -1))
+         (str "all lines <= 20," " got:\n" result))))
     (testing "does not collapse pair values"
-      (let [input (str "{:a {:k1 long-val"
-                       " :k2 long-val"
-                       " :k3 long-val}}")
-            result (reformat/reformat-source
-                    input {:line-length 20})
+      (let [input (str "{:a {:k1 long-val" " :k2 long-val" " :k3 long-val}}")
+            result (reformat/reformat-source input {:line-length 20})
             lines (.split result "\n" -1)]
-        (is (>= (count lines) 3)
-            (str "pairs should be broken,"
-                 " got:\n" result))
-        (is (some #(re-find #":k2" %) lines)
-            (str ":k2 should appear,"
-                 " got:\n" result))))))
+        (is
+         (>= (count lines) 3)
+         (str "pairs should be broken," " got:\n" result))
+        (is
+         (some #(re-find #":k2" %) lines)
+         (str ":k2 should appear," " got:\n" result))))))

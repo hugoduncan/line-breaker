@@ -131,25 +131,24 @@
     (let [[start-line end-line] (node/node-line-range node)]
       (when (not= start-line end-line)
         (let [children (node/named-children node)
-              edits
-              (into
-               []
-               (keep
-                (fn [[prev-child next-child]]
-                  (let [end-byte (element-end-offset prev-child)
-                        start-byte (element-start-offset next-child)]
-                    (when (> start-byte end-byte)
-                      {:start end-byte
-                       :end start-byte
-                       :replacement
-                       (if (and
-                            (= :comment (node/node-type next-child))
-                            (not=
-                             (second (node/node-line-range prev-child))
-                             (node-start-line next-child)))
-                         "\n"
-                         " ")}))))
-               (partition 2 1 children))]
+              edits (into
+                     []
+                     (keep
+                      (fn [[prev-child next-child]]
+                        (let [end-byte (element-end-offset prev-child)
+                              start-byte (element-start-offset next-child)]
+                          (when (> start-byte end-byte)
+                            {:start end-byte
+                             :end start-byte
+                             :replacement
+                             (if (and
+                                  (= :comment (node/node-type next-child))
+                                  (not=
+                                   (second (node/node-line-range prev-child))
+                                   (node-start-line next-child)))
+                               "\n"
+                               " ")}))))
+                     (partition 2 1 children))]
           (when (seq edits)
             edits))))))
 
@@ -197,19 +196,17 @@
   For metadata-wrapped values, the metadata child shifts named-children
   indices, so keep-count is adjusted to compensate."
   [exc-name exc-value config]
-  (let [value-end
-        (if (rules/breakable-node? exc-value)
-          (let [children (node/named-children exc-value)
-                val-rule (rules/get-effective-rule exc-value config)
-                keep-count
-                (cond-> (rules/elements-to-keep-on-first-line val-rule)
-                  (rules/metadata-wrapped? exc-value) inc)]
-            (if (and (seq children)
-                     (< keep-count (count children)))
-              (first-line-end-column
-               (nth children (dec keep-count)))
-              (first-line-end-column exc-value)))
-          (first-line-end-column exc-value))]
+  (let [value-end (if (rules/breakable-node? exc-value)
+                    (let [children (node/named-children exc-value)
+                          val-rule (rules/get-effective-rule exc-value config)
+                          keep-count
+                          (cond-> (rules/elements-to-keep-on-first-line
+                                   val-rule)
+                            (rules/metadata-wrapped? exc-value) inc)]
+                      (if (and (seq children) (< keep-count (count children)))
+                        (first-line-end-column (nth children (dec keep-count)))
+                        (first-line-end-column exc-value)))
+                    (first-line-end-column exc-value))]
     (- value-end (form-start-column exc-name))))
 
 (defn- max-line-end-column
@@ -298,15 +295,13 @@
       ;; Comment on same line as prev: keep them together (no edit)
       (and (comment-node? next-child) (same-line? prev-child next-child)) nil
       ;; Prev is comment (ends with newline): just add indent
-      (comment-node? prev-child)
-      {:start (element-end-offset prev-child)
-       :end (element-start-offset next-child)
-       :replacement indent-spaces}
+      (comment-node? prev-child) {:start (element-end-offset prev-child)
+                                  :end (element-start-offset next-child)
+                                  :replacement indent-spaces}
       ;; Normal case: add newline + indent
-      :else
-      {:start (element-end-offset prev-child)
-       :end (element-start-offset next-child)
-       :replacement (str "\n" indent-spaces)})))
+      :else {:start (element-end-offset prev-child)
+             :end (element-start-offset next-child)
+             :replacement (str "\n" indent-spaces)})))
 
 (defn generate-paired-edits
   "Generate edits for pair-grouped breaking.
@@ -355,25 +350,22 @@
   When the value is multi-line, recursively collapses it (including nested
   forms) to a single line so it gets re-broken at the new indent position.
   Returns a result map {:edits [...]} or nil."
-  [exc-name exc-value children base-keep-count breakable-children
-   indent-col]
+  [exc-name exc-value children base-keep-count breakable-children indent-col]
   (let [join-edits (collect-collapse-edits exc-value)
         indent-str (apply str (repeat indent-col \space))
         split-edit {:start (element-end-offset exc-name)
                     :end (element-start-offset exc-value)
                     :replacement (str "\n" indent-str)}
-        pair-edits
-        (when (seq breakable-children)
-          (generate-paired-edits
-           (nth children (dec base-keep-count))
-           breakable-children
-           indent-col))
-        all-edits
-        (into
-         (vec pair-edits)
-         (if join-edits
-           (cons split-edit join-edits)
-           [split-edit]))]
+        pair-edits (when (seq breakable-children)
+                     (generate-paired-edits
+                      (nth children (dec base-keep-count))
+                      breakable-children
+                      indent-col))
+        all-edits (into
+                   (vec pair-edits)
+                   (if join-edits
+                     (cons split-edit join-edits)
+                     [split-edit]))]
     (when (seq all-edits)
       {:edits all-edits})))
 
@@ -401,8 +393,7 @@
               (rules/uses-pair-grouping? child config)
               (not= (form-start-column child) indent-col)))))
          pairs-to-break)]
-    (collapse-repositioned-children
-     moved-pair-children indent-col)))
+    (collapse-repositioned-children moved-pair-children indent-col)))
 
 (defn generate-parent-break-edits
   "When breaking a child will make it multi-line, check whether the
@@ -416,46 +407,40 @@
   [child-node config]
   (when-let [parent (node/node-parent child-node)]
     (let [rule (rules/get-effective-rule parent config)]
-      (when (and (rules/breakable-node? parent)
-                 (not (rules/uses-pair-grouping? parent config))
-                 (nil? rule)
-                 (has-consecutive-children-on-line? parent))
+      (when (and
+             (rules/breakable-node? parent)
+             (not (rules/uses-pair-grouping? parent config))
+             (nil? rule)
+             (has-consecutive-children-on-line? parent))
         (let [children (node/named-children parent)
-              base-keep-count
-              (rules/elements-to-keep-on-first-line rule)
+              base-keep-count (rules/elements-to-keep-on-first-line rule)
               indent-col (indent-column parent rule)
-              breakable-children
-              (drop base-keep-count children)]
+              breakable-children (drop base-keep-count children)]
           (when (seq breakable-children)
             (let [last-kept (nth children (dec base-keep-count))
-                  all-pairs
-                  (cons
-                   [last-kept (first breakable-children)]
-                   (partition 2 1 breakable-children))
-                  sharing-line?
-                  (fn [[prev-child next-child]]
-                    (let [[_ prev-end]
-                          (node/node-line-range prev-child)
-                          next-start
-                          (node-start-line next-child)]
-                      (= prev-end next-start)))
-                  pairs-to-break
-                  (filterv sharing-line? all-pairs)
-                  break-edits
-                  (into
-                   []
-                   (keep
-                    (fn [[prev-child next-child]]
-                      (make-break-edit
-                       prev-child next-child indent-col)))
-                   pairs-to-break)
-                  collapse-edits
-                  (collapse-moved-pair-children
-                   pairs-to-break indent-col config)
-                  moves-child?
-                  (not=
-                   (form-start-column child-node)
-                   indent-col)]
+                  all-pairs (cons
+                             [last-kept (first breakable-children)]
+                             (partition 2 1 breakable-children))
+                  sharing-line? (fn [[prev-child next-child]]
+                                  (let [[_ prev-end] (node/node-line-range
+                                                      prev-child)
+                                        next-start (node-start-line next-child)]
+                                    (= prev-end next-start)))
+                  pairs-to-break (filterv sharing-line? all-pairs)
+                  break-edits (into
+                               []
+                               (keep
+                                (fn [[prev-child next-child]]
+                                  (make-break-edit
+                                   prev-child
+                                   next-child
+                                   indent-col)))
+                               pairs-to-break)
+                  collapse-edits (collapse-moved-pair-children
+                                  pairs-to-break
+                                  indent-col
+                                  config)
+                  moves-child? (not= (form-start-column child-node) indent-col)]
               (when (seq break-edits)
                 {:edits (into break-edits collapse-edits)
                  :moves-child? moves-child?}))))))))
@@ -504,60 +489,65 @@
                             (find-exceeding-pair node rule max-length))
            [exc-name exc-value] exceeding-pair
            breakable-children (drop base-keep-count children)
-           split-pair?
-           (and
-            exceeding-pair
-            (rules/breakable-node? exc-value)
-            (pair-exceeds-at-indent?
-             exc-name exc-value indent-col max-length config))]
+           split-pair? (and
+                        exceeding-pair
+                        (rules/breakable-node? exc-value)
+                        (or
+                         ;; Phase 3: multi-line breakable value still exceeds
+                         (not (single-line-node? exc-value))
+                         ;; NonBindingPairSplit: pair width at indent exceeds
+                         (pair-exceeds-at-indent?
+                          exc-name
+                          exc-value
+                          indent-col
+                          max-length
+                          config)))]
        (if split-pair?
          ;; Pair's first line (key + value head) exceeds at indent,
          ;; split onto separate lines regardless of other children.
          (break-exceeding-pair
-          exc-name exc-value children base-keep-count
-          breakable-children indent-col)
+          exc-name
+          exc-value
+          children
+          base-keep-count
+          breakable-children
+          indent-col)
          (when (seq breakable-children)
            (let [last-kept (nth children (dec base-keep-count))
-                 parent-result
-                 (generate-parent-break-edits node config)]
+                 parent-result (generate-parent-break-edits node config)]
              (if (:moves-child? parent-result)
                ;; Parent will move this form — omit internal edits
                ;; (they'd use stale indent). Next iteration re-breaks.
                {:edits (:edits parent-result)}
-               (let [edits
-                     (if (rules/uses-pair-grouping? node config)
-                       (generate-paired-edits
-                        last-kept
-                        breakable-children
-                        indent-col)
-                       (generate-sequential-edits
-                        last-kept
-                        breakable-children
-                        indent-col))]
+               (let [edits (if (rules/uses-pair-grouping? node config)
+                             (generate-paired-edits
+                              last-kept
+                              breakable-children
+                              indent-col)
+                             (generate-sequential-edits
+                              last-kept
+                              breakable-children
+                              indent-col))]
                  (when (seq edits)
                    (let [collapse-targets
                          (if (rules/uses-pair-grouping? node config)
                            ;; Only collapse pair-start elements (keys).
                            ;; Pair values are naturally positioned after
                            ;; their keys, not at indent-col.
-                           (let [non-comment
-                                 (remove comment-node?
-                                         breakable-children)]
+                           (let [non-comment (remove
+                                              comment-node?
+                                              breakable-children)]
                              (into
                               []
-                              (comp
-                               (partition-all 2)
-                               (map first))
+                              (comp (partition-all 2) (map first))
                               non-comment))
                            breakable-children)
-                         collapse-edits
-                         (collapse-repositioned-children
-                          collapse-targets indent-col)
+                         collapse-edits (collapse-repositioned-children
+                                         collapse-targets
+                                         indent-col)
                          parent-edits (:edits parent-result)]
-                     {:edits
-                      (cond-> (into edits collapse-edits)
-                        parent-edits
-                        (into parent-edits))})))))))))))
+                     {:edits (cond-> (into edits collapse-edits)
+                               parent-edits (into parent-edits))})))))))))))
 
 ;;; Line length checking
 
@@ -604,7 +594,8 @@
    []
    (comp
     (remove single-line-node?)
-    (filter (fn [child] (not= (form-start-column child) indent-col)))
+    (filter (fn [child]
+              (not= (form-start-column child) indent-col)))
     (mapcat collect-collapse-edits))
    breakable-children))
 
@@ -637,10 +628,8 @@
   positions after re-parsing.
   Public for use by reformat.clj batch edit collection."
   [broken-ranges [start end]]
-  (some
-   (fn [[s e]]
-     (and (<= s start) (<= end e)))
-   broken-ranges))
+  (some (fn [[s e]]
+          (and (<= s start) (<= end e))) broken-ranges))
 
 (defn try-collect-edits
   "Collect edits for a form if they are new, change source, and don't overlap.
@@ -650,14 +639,13 @@
   [state source form edits]
   (let [{:keys [seen collected]} state
         range (node/node-range form)]
-    (if (or (seen range)
-            (not (seq edits))
-            (not (edits-change-source? source edits))
-            (edits-overlap? collected edits))
+    (if (or
+         (seen range)
+         (not (seq edits))
+         (not (edits-change-source? source edits))
+         (edits-overlap? collected edits))
       [state nil]
-      [(-> state
-           (update :seen conj range)
-           (update :collected into edits))
+      [(-> state (update :seen conj range) (update :collected into edits))
        edits])))
 
 ;;; Form-based walk
@@ -672,18 +660,14 @@
       (fn [[prev-child next-child]]
         (let [[_ prev-end] (node/node-line-range prev-child)
               next-start (node-start-line next-child)]
-          (and (= prev-end next-start)
-               (contains? long-lines-set prev-end))))
+          (and (= prev-end next-start) (contains? long-lines-set prev-end))))
       (partition 2 1 children)))))
 
 (defn- contains-long-line?
   "Returns true if node spans any line in long-lines-set."
   [node long-lines-set]
   (let [[start-line end-line] (node/node-line-range node)]
-    (boolean
-     (some
-      #(and (>= % start-line) (<= % end-line))
-      long-lines-set))))
+    (boolean (some #(and (>= % start-line) (<= % end-line)) long-lines-set))))
 
 (defn- try-form-break
   "Try to generate edits for a single form.
@@ -697,19 +681,17 @@
   [node source config form-breakers long-lines-set]
   (let [max-length (get config :line-length)]
     (or
-     (some
-      (fn [breaker]
-        (breaker node source config))
-      form-breakers)
+     (some (fn [breaker]
+             (breaker node source config)) form-breakers)
      (when (and
             (rules/breakable-node? node)
             (seq long-lines-set)
-            (or (nil? max-length)
-                (>= (max-line-end-column node) max-length))
+            (or (nil? max-length) (>= (max-line-end-column node) max-length))
             (or
              (children-sharing-long-line? node long-lines-set)
-             (and (contains-long-line? node long-lines-set)
-                  (has-consecutive-children-on-line? node))))
+             (and
+              (contains-long-line? node long-lines-set)
+              (has-consecutive-children-on-line? node))))
        (break-form node config)))))
 
 (defn- walk-and-collect-edits
@@ -719,39 +701,35 @@
   nodes. Does not descend into metadata-wrapped forms."
   [root source config form-breakers long-lines-set ignored-ranges]
   (loop [stack (vec (rseq (vec (node/named-children root))))
-         state {:seen #{} :collected []}]
+         state {:seen #{}
+                :collected []}]
     (if (empty? stack)
       (:collected state)
       (let [node (peek stack)
             rest-stack (pop stack)]
         (cond
-          (nil? node)
-          (recur rest-stack state)
-
-          (rules/metadata-node? node)
-          (recur rest-stack state)
-
-          (node-in-ignored-range? node ignored-ranges)
-          (recur rest-stack state)
-
-          (inside-broken-form? (:seen state) (node/node-range node))
-          (recur rest-stack state)
-
+          (nil? node) (recur rest-stack state)
+          (rules/metadata-node? node) (recur rest-stack state)
+          (node-in-ignored-range? node ignored-ranges) (recur rest-stack state)
+          (inside-broken-form? (:seen state) (node/node-range node)) (recur
+                                                                      rest-stack
+                                                                      state)
           :else
           (let [result (try-form-break
-                        node source config
-                        form-breakers long-lines-set)
+                        node
+                        source
+                        config
+                        form-breakers
+                        long-lines-set)
                 edits (:edits result)
-                [new-state _]
-                (if (seq edits)
-                  (try-collect-edits state source node edits)
-                  [state nil])
+                [new-state _] (if (seq edits)
+                                (try-collect-edits state source node edits)
+                                [state nil])
                 descend? (not (rules/metadata-wrapped? node))
                 children (when descend?
                            (node/named-children node))
                 new-stack (if (seq children)
-                            (into rest-stack
-                                  (rseq (vec children)))
+                            (into rest-stack (rseq (vec children)))
                             rest-stack)]
             (recur new-stack new-state)))))))
 
@@ -779,17 +757,15 @@
         source
         (let [tree (parser/parse-source source)
               root (node/root-node tree)
-              long-lines-set
-              (set (find-long-lines source max-length))
-              ignored-ranges
-              (check/find-ignored-byte-ranges tree)
-              collected
-              (walk-and-collect-edits
-               root source config
-               (or form-breakers [])
-               long-lines-set ignored-ranges)]
-          (if (and (seq collected)
-                   (edits-change-source? source collected))
-            (recur (apply-edits source collected)
-                   (inc iteration))
+              long-lines-set (set (find-long-lines source max-length))
+              ignored-ranges (check/find-ignored-byte-ranges tree)
+              collected (walk-and-collect-edits
+                         root
+                         source
+                         config
+                         (or form-breakers [])
+                         long-lines-set
+                         ignored-ranges)]
+          (if (and (seq collected) (edits-change-source? source collected))
+            (recur (apply-edits source collected) (inc iteration))
             source))))))
