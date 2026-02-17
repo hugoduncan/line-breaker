@@ -719,7 +719,7 @@
                         node source config
                         form-breakers long-lines-set)
                 edits (:edits result)
-                [new-state _collected?]
+                [new-state _]
                 (if (seq edits)
                   (try-collect-edits state source node edits)
                   [state nil])
