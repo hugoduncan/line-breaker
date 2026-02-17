@@ -535,9 +535,24 @@
                         breakable-children
                         indent-col))]
                  (when (seq edits)
-                   (let [collapse-edits
+                   (let [collapse-targets
+                         (if (rules/uses-pair-grouping? node config)
+                           ;; Only collapse pair-start elements (keys).
+                           ;; Pair values are naturally positioned after
+                           ;; their keys, not at indent-col.
+                           (let [non-comment
+                                 (remove comment-node?
+                                         breakable-children)]
+                             (into
+                              []
+                              (comp
+                               (partition-all 2)
+                               (map first))
+                              non-comment))
+                           breakable-children)
+                         collapse-edits
                          (collapse-repositioned-children
-                          breakable-children indent-col)
+                          collapse-targets indent-col)
                          parent-edits (:edits parent-result)]
                      {:edits
                       (cond-> (into edits collapse-edits)

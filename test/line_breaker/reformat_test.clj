@@ -877,3 +877,35 @@
            (str "no args on } line,"
                 " got:\n"
                 result)))))))
+
+(deftest nested-map-reformat-convergence-test
+  ;; Verify that reformatting nested maps with pair-grouped values
+  ;; converges instead of oscillating between collapsed and broken
+  ;; states. The bug was that collapse-repositioned-children treated
+  ;; pair values (at their key's column) as mispositioned (not at
+  ;; indent-col) and collapsed them back, creating an infinite loop.
+  (testing "reformat-source"
+    (testing "converges for nested maps"
+      (let [input (str "{:a\n"
+                       " {:k1 {:x 1 :y 2}\n"
+                       "  :k2 {:x 3 :y 4}\n"
+                       "  :k3 {:x 5 :y 6}}}")
+            result (reformat/reformat-source
+                    input {:line-length 20})]
+        (is (every? #(<= (count %) 20)
+                    (.split result "\n" -1))
+            (str "all lines <= 20,"
+                 " got:\n" result))))
+    (testing "does not collapse pair values"
+      (let [input (str "{:a {:k1 long-val"
+                       " :k2 long-val"
+                       " :k3 long-val}}")
+            result (reformat/reformat-source
+                    input {:line-length 20})
+            lines (.split result "\n" -1)]
+        (is (>= (count lines) 3)
+            (str "pairs should be broken,"
+                 " got:\n" result))
+        (is (some #(re-find #":k2" %) lines)
+            (str ":k2 should appear,"
+                 " got:\n" result))))))
