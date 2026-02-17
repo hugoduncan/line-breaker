@@ -1,27 +1,23 @@
 {:tasks
- {lint
-  {:doc "Run clj-kondo linting on src and test"
-   :task (do
-           (println "Linting src and test directories...")
-           (shell "clj-kondo --lint src test"))}
+ {lint {:doc "Run clj-kondo linting on src and test"
+        :task (do
+                (println "Linting src and test directories...")
+                (shell "clj-kondo --lint src test"))}
 
-  format
-  {:doc "Format code with cljfmt"
-   :task (do
-           (println "Formatting code...")
-           (shell "cljfmt fix src test"))}
+  format {:doc "Format code with cljfmt"
+          :task (do
+                  (println "Formatting code...")
+                  (shell "cljfmt fix src test"))}
 
-  format-check
-  {:doc "Check code formatting with cljfmt"
-   :task (do
-           (println "Checking code formatting...")
-           (shell "cljfmt check src test"))}
+  format-check {:doc "Check code formatting with cljfmt"
+                :task (do
+                        (println "Checking code formatting...")
+                        (shell "cljfmt check src test"))}
 
-  test
-  {:doc "Run tests with kaocha (unit tests only)"
-   :task (do
-           (println "Running tests...")
-           (shell "clojure -M:test :unit"))}
+  test {:doc "Run tests with kaocha (unit tests only)"
+        :task (do
+                (println "Running tests...")
+                (shell "clojure -M:test :unit"))}
 
   test-all
   {:doc "Run all tests including treesitter tests (requires native libs)"
@@ -29,59 +25,89 @@
            (println "Running all tests...")
            (shell "clojure -M:test"))}
 
-  import-kondo-config
-  {:doc "Import clj-kondo configs from dependencies"
-   :task (let [cp (-> (shell {:out :string} "clojure -Spath") :out str/trim)]
-           (println "Importing clj-kondo configs from dependencies...")
-           (shell "clj-kondo" "--copy-configs" "--dependencies" "--lint" cp))}
+  import-kondo-config {:doc "Import clj-kondo configs from dependencies"
+                       :task
+                       (let [cp (->
+                                 (shell {:out :string} "clojure -Spath")
+                                 :out
+                                 str/trim)]
+                         (println
+                          "Importing clj-kondo configs from dependencies...")
+                         (shell
+                          "clj-kondo"
+                          "--copy-configs"
+                          "--dependencies"
+                          "--lint"
+                          cp))}
 
-  build-native
-  {:doc "Build tree-sitter native libraries for current platform"
-   :task (shell "scripts/build-native.sh")}
+  build-native {:doc "Build tree-sitter native libraries for current platform"
+                :task (shell "scripts/build-native.sh")}
 
-  javac
-  {:doc "Compile Java sources (NativeLoader for jtreesitter)"
-   :task (shell "clojure -T:build javac")}
+  javac {:doc "Compile Java sources (NativeLoader for jtreesitter)"
+         :task (shell "clojure -T:build javac")}
 
-  native-image
-  {:doc "Build native executable using GraalVM native-image"
-   :task (shell "clojure -T:build native-image")}
+  native-image {:doc "Build native executable using GraalVM native-image"
+                :task (shell "clojure -T:build native-image")}
 
-  line-length
-  {:doc "Check or fix line length violations"
-   :depends [javac]
-   :task
-   (let [args *command-line-args*
-         cmd (first args)
-         files (rest args)]
-     (cond
-       (or (= cmd "--help") (= cmd "-h") (nil? cmd))
-       (do
-         (println "Usage: bb line-length <command> [files...]")
-         (println)
-         (println "Commands:")
-         (println "  check   Check files for line length violations")
-         (println "  fix     Fix files by reformatting long lines")
-         (println)
-         (println "Arguments:")
-         (println "  files   Files or directories to process")
-         (println "          (default: current directory)")
-         (println)
-         (println "Examples:")
-         (println "  bb line-length check")
-         (println "  bb line-length check src")
-         (println "  bb line-length fix src/foo.clj"))
+  line-length {:doc "Check or fix line length violations"
+               :depends [javac]
+               :task
+               (let [args *command-line-args*
+                     cmd (first args)
+                     files (rest args)]
+                 (cond
+                   (or (= cmd "--help") (= cmd "-h") (nil? cmd))
+                   (do
+                     (println "Usage: bb line-length <command> [files...]")
+                     (println)
+                     (println "Commands:")
+                     (println
+                      "  check      Check files for line length violations")
+                     (println
+                      "  fix        Fix files by reformatting long lines")
+                     (println "  reformat   Reformat files (structure-aware)")
+                     (println)
+                     (println "Arguments:")
+                     (println "  files   Files or directories to process")
+                     (println "          (default: current directory)")
+                     (println)
+                     (println "Examples:")
+                     (println "  bb line-length check")
+                     (println "  bb line-length check src")
+                     (println "  bb line-length fix src/foo.clj")
+                     (println "  bb line-length reformat src"))
 
-       (= cmd "check")
-       (apply shell "clojure" "-J--enable-native-access=ALL-UNNAMED"
-              "-M" "-m" "line-breaker.main" "--check" files)
+                   (= cmd "check") (apply
+                                    shell
+                                    "clojure"
+                                    "-J--enable-native-access=ALL-UNNAMED"
+                                    "-M"
+                                    "-m"
+                                    "line-breaker.main"
+                                    "--check"
+                                    files)
 
-       (= cmd "fix")
-       (apply shell "clojure" "-J--enable-native-access=ALL-UNNAMED"
-              "-M" "-m" "line-breaker.main" "--fix" files)
+                   (= cmd "fix") (apply
+                                  shell
+                                  "clojure"
+                                  "-J--enable-native-access=ALL-UNNAMED"
+                                  "-M"
+                                  "-m"
+                                  "line-breaker.main"
+                                  "--fix"
+                                  files)
 
-       :else
-       (do
-         (println (str "Unknown command: " cmd))
-         (println "Run 'bb line-length --help' for usage")
-         (System/exit 2))))}}}
+                   (= cmd "reformat") (apply
+                                       shell
+                                       "clojure"
+                                       "-J--enable-native-access=ALL-UNNAMED"
+                                       "-M"
+                                       "-m"
+                                       "line-breaker.main"
+                                       "--reformat"
+                                       files)
+
+                   :else (do
+                           (println (str "Unknown command: " cmd))
+                           (println "Run 'bb line-length --help' for usage")
+                           (System/exit 2))))}}}

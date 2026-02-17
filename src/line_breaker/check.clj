@@ -13,9 +13,11 @@
   (into
    []
    (comp
-    (map-indexed (fn [idx line] {:line (inc idx)
-                                 :length (count line)}))
-    (filter (fn [{:keys [length]}] (> length max-length))))
+    (map-indexed (fn [idx line]
+                   {:line (inc idx)
+                    :length (count line)}))
+    (filter (fn [{:keys [length]}]
+              (> length max-length))))
    (str/split-lines source)))
 
 (defn check-line-lengths
@@ -137,7 +139,8 @@
      []
      (remove
       (fn [{:keys [line]}]
-        (some (fn [[start end]] (<= start line end)) ignored-ranges)))
+        (some (fn [[start end]]
+                (<= start line end)) ignored-ranges)))
      violations)))
 
 (defn check-file-with-ignore

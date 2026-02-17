@@ -2,22 +2,13 @@
   "Reformat functions for collapsing and re-breaking Clojure code.
 
   Provides the reformat pipeline: collapse all top-level forms to single
-  lines, then iteratively apply forced breaks, pair breaking, fix-source,
-  and multiline child breaking until stable."
+  lines, then run a unified fix pass with forced breaks, pair breaking,
+  and line-length fixing."
   (:require
    [line-breaker.fix :as fix]
+   [line-breaker.rules :as rules]
    [line-breaker.treesitter.node :as node]
    [line-breaker.treesitter.parser :as parser]))
-
-;;; Tree walking
-
-(defn- find-first-preorder
-  "Pre-order walk returning the first node for which pred returns true."
-  [pred node]
-  (when node
-    (if (pred node)
-      node
-      (some #(find-first-preorder pred %) (node/named-children node)))))
 
 ;;; Collapse
 
@@ -44,7 +35,7 @@
 
 ;;; Forced line breaks
 
-;;; NOTE: Keep in sync with default-indent-rules in fix.clj
+;;; NOTE: Keep in sync with default-indent-rules in rules.clj
 (def ^:private default-force-break-rules
   "Rules for inserting forced line breaks in specific forms.
   Each entry maps a head symbol to a rule with :after-indices (0-based
@@ -116,7 +107,7 @@
       (= :kwd_lit (node/node-type first-child))
       (contains? ns-require-import-kws (node/node-text first-child))))
    (when-let [parent (node/node-parent node)]
-     (= 'ns (fix/get-head-symbol parent)))))
+     (= 'ns (rules/get-head-symbol parent)))))
 
 (defn- ns-require-import-rule
   "Build a force-break rule for a require/import form.
@@ -135,7 +126,7 @@
    (let [first-child (first (node/named-children node))]
      (= :vec_lit (node/node-type first-child)))
    (when-let [parent (node/node-parent node)]
-     (contains? multi-arity-parent-syms (fix/get-head-symbol parent)))))
+     (contains? multi-arity-parent-syms (rules/get-head-symbol parent)))))
 
 (defn- arity-clause-indices
   "Return indices of arity-clause children (list_lit starting with vec_lit)."
@@ -159,7 +150,7 @@
   and :require/:import forms inside ns."
   [node config]
   (or
-   (when-let [head-sym (fix/get-head-symbol node)]
+   (when-let [head-sym (rules/get-head-symbol node)]
      (let [base-rule (or
                       (get-in config [:force-breaks head-sym])
                       (get default-force-break-rules head-sym))]
@@ -185,14 +176,13 @@
          ;; For ns, break between all clause children (list_lit)
          (and base-rule (= 'ns head-sym))
          (let [children (node/named-children node)
-               clause-idxs
-               (into
-                []
-                (keep-indexed
-                 (fn [i c]
-                   (when (= :list_lit (node/node-type c))
-                     i)))
-                children)]
+               clause-idxs (into
+                            []
+                            (keep-indexed
+                             (fn [i c]
+                               (when (= :list_lit (node/node-type c))
+                                 i)))
+                            children)]
            (if (> (count clause-idxs) 1)
              (update
               base-rule
@@ -212,18 +202,19 @@
   type in :after-types."
   [children rule]
   (let [base (:after-indices rule #{})
-        type-indices
-        (when-let [types (:after-types rule)]
-          (into
-           #{}
-           (keep
-            (fn [type-kw]
-              (some
-               (fn [i]
-                 (when (= type-kw (node/node-type (nth children i)))
-                   i))
-               (range (count children)))))
-           types))]
+        type-indices (when-let [types (:after-types rule)]
+                       (into
+                        #{}
+                        (keep
+                         (fn [type-kw]
+                           (some
+                            (fn [i]
+                              (when (=
+                                     type-kw
+                                     (node/node-type (nth children i)))
+                                i))
+                            (range (count children)))))
+                        types))]
     (into base type-indices)))
 
 (defn- contiguous-line?
@@ -236,18 +227,19 @@
 
 (defn- body-separation-positions
   "Indices for body children after the last forced break position that
-  share a line with their next sibling.  Skips comment nodes and the
-  comment chain from the max break position since the comment-following
-  loop already handles those."
-  [children break-positions]
+  share a line with their next sibling or precede a misindented child.
+  Skips comment nodes and the comment chain from the max break position
+  since the comment-following loop already handles those."
+  [children break-positions indent-col]
   (when (seq break-positions)
     (let [n (count children)
           ;; Skip past comment chain from the max break position
-          first-body-idx
-          (loop [i (inc (apply max break-positions))]
-            (if (and (< i n) (fix/comment-node? (nth children i)))
-              (recur (inc i))
-              i))]
+          first-body-idx (loop [i (inc (apply max break-positions))]
+                           (if (and
+                                (< i n)
+                                (fix/comment-node? (nth children i)))
+                             (recur (inc i))
+                             i))]
       (into
        #{}
        (filter
@@ -256,7 +248,9 @@
             (and
              (< ni n)
              (not (fix/comment-node? (nth children i)))
-             (contiguous-line? (nth children i) (nth children ni))))))
+             (or
+              (contiguous-line? (nth children i) (nth children ni))
+              (not= indent-col (fix/form-start-column (nth children ni))))))))
        (range first-body-idx (dec n))))))
 
 (defn- needs-break-or-reindent?
@@ -283,9 +277,10 @@
            (when (< ni n)
              (let [child (nth children i)
                    next-child (nth children ni)]
-               (or (needs-break-or-reindent? child next-child indent-col)
-                   (when (fix/comment-node? next-child)
-                     (recur ni))))))))
+               (or
+                (needs-break-or-reindent? child next-child indent-col)
+                (when (fix/comment-node? next-child)
+                  (recur ni))))))))
      break-positions)))
 
 (defn- generate-forced-break-edits
@@ -300,15 +295,17 @@
         n (count children)]
     (when rule
       (let [base-positions (forced-break-positions children rule)
-            break-positions
-            (if (fix/uses-pair-grouping? node config)
-              base-positions
-              (into
-               base-positions
-               (body-separation-positions children base-positions)))
             indent-col (fix/indent-column
                         node
-                        (fix/get-effective-rule node config))]
+                        (rules/get-effective-rule node config))
+            break-positions (if (rules/uses-pair-grouping? node config)
+                              base-positions
+                              (into
+                               base-positions
+                               (body-separation-positions
+                                children
+                                base-positions
+                                indent-col)))]
         (when (form-needs-forced-break? children break-positions indent-col)
           (into
            []
@@ -326,10 +323,7 @@
                                  child
                                  next-child
                                  indent-col)
-                            (fix/make-break-edit
-                             child
-                             next-child
-                             indent-col))]
+                            (fix/make-break-edit child next-child indent-col))]
                       (if (fix/comment-node? next-child)
                         (recur ni (if edit
                                     (conj edits edit)
@@ -369,46 +363,35 @@
              positions (forced-break-positions children rule)
              indent-col (fix/indent-column
                          node
-                         (fix/get-effective-rule node config))]
+                         (rules/get-effective-rule node config))]
          (form-needs-forced-break? children positions indent-col))))))
+
+(defn- forced-break-form
+  "Form-breaker for forced line breaks.
+  Skips the at-line-start? check because the pre-order walk's
+  inside-broken-form? skip handles stale-position concerns.
+  Returns {:edits [...]} if the form needs forced breaks, nil otherwise."
+  [node _source config]
+  (when (needs-forced-breaking? node nil config)
+    (let [edits (generate-forced-break-edits node config)]
+      (when (seq edits)
+        {:edits edits}))))
 
 (defn apply-forced-breaks
   "Insert forced line breaks at structurally significant positions.
-  Iteratively finds forms matching force-break rules and inserts line
-  breaks, re-parsing between each to maintain correct column positions.
-  When check-position? is false, skips the at-line-start? guard for use
-  after the pipeline has stabilized and all positions are final."
+  Uses fix-source with a forced-break form-breaker.
+  When check-position? is false, skips the at-line-start? guard.
+  Not used by the reformat pipeline; exposed for unit testing."
   ([source config]
    (apply-forced-breaks source config true))
   ([source config check-position?]
-   (loop [s source
-          iteration 0]
-     (if (>= iteration fix/max-iterations)
-       s
-       (let [tree (parser/parse-source s)
-             root (node/root-node tree)
-             src-arg (when check-position?
-                       s)
-             form (find-first-preorder
-                   #(needs-forced-breaking? % src-arg config)
-                   root)]
-         (if-not form
-           s
-           (let [edits (generate-forced-break-edits form config)]
-             (if (and (seq edits) (fix/edits-change-source? s edits))
-               (recur (fix/apply-edits s edits) (inc iteration))
-               s))))))))
+   (let [breaker (if check-position?
+                   forced-break-form
+                   (fn [form _source config]
+                     (forced-break-form form nil config)))]
+     (fix/fix-source source config :form-breakers [breaker]))))
 
 ;;; Forced pair breaking
-
-(def ^:private non-binding-pair-rules
-  "Pair-grouping rules for non-binding forms (cond, case, condp, cond->).
-  These benefit from pair separation before internal line breaking."
-  #{:cond :condp :case :cond->})
-
-(def ^:private binding-pair-rules
-  "Pair-grouping rules for binding and map forms."
-  #{:map :binding-vector})
 
 (defn- pair-group-count
   "Count the number of pairs in a pair-grouped form.
@@ -416,11 +399,11 @@
   condp/cond->, skips the non-pair prefix elements. Comments are
   excluded before counting."
   [node config]
-  (let [rule (fix/get-effective-rule node config)
+  (let [rule (rules/get-effective-rule node config)
         children (node/named-children node)
         prefix (if (#{:map :binding-vector} rule)
                  0
-                 (fix/elements-to-keep-on-first-line rule))
+                 (rules/elements-to-keep-on-first-line rule))
         non-comment (remove fix/comment-node? (drop prefix children))]
     (count (partition-all 2 non-comment))))
 
@@ -430,11 +413,11 @@
   pair grouping structure. If any pair's first element is on the same
   line as the previous pair's last element, breaking is needed."
   [node config]
-  (let [rule (fix/get-effective-rule node config)
+  (let [rule (rules/get-effective-rule node config)
         children (node/named-children node)
         prefix (if (#{:map :binding-vector} rule)
                  0
-                 (fix/elements-to-keep-on-first-line rule))
+                 (rules/elements-to-keep-on-first-line rule))
         non-comment (remove fix/comment-node? (drop prefix children))
         pairs (partition-all 2 non-comment)]
     (some
@@ -448,137 +431,68 @@
   "Returns true if node is a pair-grouped form with >1 pair that has
   consecutive pairs on the same line. Does not require at-line-start
   because the pre-order walk breaks outermost forms first, ensuring
-  inner forms are at their final position when reached.
-  When rule-filter is provided, only matches nodes whose effective rule
-  is in the filter set."
-  ([node config]
-   (needs-pair-breaking? node config nil))
-  ([node config rule-filter]
-   (and
-    (fix/breakable-node? node)
-    (fix/uses-pair-grouping? node config)
-    (or
-     (nil? rule-filter)
-     (contains? rule-filter (fix/get-effective-rule node config)))
-    (> (pair-group-count node config) 1)
-    (has-unseparated-pairs? node config))))
+  inner forms are at their final position when reached."
+  [node config]
+  (and
+   (rules/breakable-node? node)
+   (rules/uses-pair-grouping? node config)
+   (> (pair-group-count node config) 1)
+   (has-unseparated-pairs? node config)))
 
 (defn- generate-pair-break-edits
   "Generate edits to break a pair-grouped form so each pair is on its
-  own line. Also collapses multi-line values so they get properly
-  re-broken at their new indent position by subsequent fix-source
-  passes. Returns edits or nil."
+  own line. When breaking will make the form multi-line, backtracks to
+  break siblings in the parent form. If the parent break moves this
+  form, omits internal edits so the next iteration re-breaks correctly.
+  Returns edits or nil."
   [node config]
-  (let [rule (fix/get-effective-rule node config)
+  (let [rule (rules/get-effective-rule node config)
         children (node/named-children node)
-        base-keep-count (fix/elements-to-keep-on-first-line rule)
+        base-keep-count (rules/elements-to-keep-on-first-line rule)
         indent-col (fix/indent-column node rule)
         breakable-children (drop base-keep-count children)]
     (when (seq breakable-children)
       (let [last-kept (nth children (dec base-keep-count))
-            break-edits (fix/generate-paired-edits
-                         last-kept
-                         breakable-children
-                         indent-col)]
-        (when (seq break-edits)
-          break-edits)))))
+            parent-result (fix/generate-parent-break-edits node config)]
+        (if (:moves-child? parent-result)
+          (:edits parent-result)
+          (let [break-edits (fix/generate-paired-edits
+                             last-kept
+                             breakable-children
+                             indent-col)
+                parent-edits (:edits parent-result)]
+            (when (seq break-edits)
+              (cond-> break-edits
+                parent-edits (into parent-edits)))))))))
+
+(defn- pair-break-form
+  "Form-breaker for pair-grouped forms.
+  Returns {:edits [...]} if the form needs pair breaking, nil otherwise."
+  [node _source config]
+  (when (needs-pair-breaking? node config)
+    (let [edits (generate-pair-break-edits node config)]
+      (when (seq edits)
+        {:edits edits}))))
 
 (defn apply-pair-breaking
   "Force pair-grouped forms to break so each pair is on its own line.
-  Iteratively finds the first qualifying form, applies edits, and
-  re-parses until no more forms need breaking.
-  When rule-filter is provided, only processes forms whose effective rule
-  is in the filter set."
-  ([source config]
-   (apply-pair-breaking source config nil))
-  ([source config rule-filter]
-   (loop [s source
-          iteration 0]
-     (if (>= iteration fix/max-iterations)
-       s
-       (let [tree (parser/parse-source s)
-             root (node/root-node tree)
-             form (find-first-preorder
-                   #(needs-pair-breaking? % config rule-filter)
-                   root)]
-         (if-not form
-           s
-           (let [edits (generate-pair-break-edits form config)]
-             (if (seq edits)
-               (recur (fix/apply-edits s edits) (inc iteration))
-               s))))))))
-
-;;; Multiline child breaking
-
-(defn- has-multiline-child?
-  "Returns true if any named child of node spans multiple lines."
-  [node]
-  (some
-   (fn [child]
-     (not (fix/single-line-node? child)))
-   (node/named-children node)))
-
-(defn- needs-multiline-child-breaking?
-  "Returns true if a breakable form has a multi-line child and some
-  breakable children still share a line with a sibling."
-  [node config]
-  (and
-   (fix/breakable-node? node)
-   (has-multiline-child? node)
-   (let [children (node/named-children node)
-         rule (fix/get-effective-rule node config)
-         keep-n (fix/elements-to-keep-on-first-line rule)
-         breakable-children (drop keep-n children)]
-     (some
-      (fn [[a b]]
-        (contiguous-line? a b))
-      (partition 2 1 breakable-children)))))
-
-(defn apply-multiline-child-breaking
-  "Break forms that contain multi-line children so every child is on
-  its own line. Iteratively finds qualifying forms and applies break
-  edits, re-parsing between each."
+  Uses fix-source with a pair-break form-breaker.
+  Not used by the reformat pipeline; exposed for unit testing."
   [source config]
-  (loop [s source
-         iteration 0]
-    (if (>= iteration fix/max-iterations)
-      s
-      (let [tree (parser/parse-source s)
-            root (node/root-node tree)
-            form (find-first-preorder
-                  #(needs-multiline-child-breaking? % config)
-                  root)]
-        (if-not form
-          s
-          (let [edits (fix/break-form form config)]
-            (if (and (seq edits) (fix/edits-change-source? s edits))
-              (recur (fix/apply-edits s edits) (inc iteration))
-              s)))))))
+  (fix/fix-source source config :form-breakers [pair-break-form]))
 
 ;;; Reformat pipeline
 
 (defn reformat-source
-  "Reformat source by collapsing then iteratively applying all passes
-  until stable. Each iteration runs forced breaks (position-checked),
-  non-binding pair breaking, fix-source, binding pair breaking, multiline
-  child breaking, then forced breaks again without position checking to
-  catch mid-line forms, followed by fix-source and multiline child
-  breaking for any changes from the unchecked forced breaks."
+  "Reformat source by collapsing then applying a unified fix pass.
+  Collapses all top-level forms to single lines, then runs fix-source
+  with forced-break and pair-break strategies. The unified loop handles
+  all breaking concerns in priority order: forced breaks first, then
+  pair breaks, then line-length fixes."
   [source config]
   (let [collapsed (collapse-top-level-forms source)]
-    (loop [s collapsed
-           iteration 0]
-      (if (>= iteration fix/max-iterations)
-        s
-        (let [result (-> s
-                         (apply-forced-breaks config)
-                         (apply-pair-breaking config non-binding-pair-rules)
-                         (fix/fix-source config)
-                         (apply-pair-breaking config binding-pair-rules)
-                         (apply-multiline-child-breaking config)
-                         (apply-forced-breaks config false)
-                         (fix/fix-source config)
-                         (apply-multiline-child-breaking config))]
-          (if (= result s)
-            result
-            (recur result (inc iteration))))))))
+    (fix/fix-source
+     collapsed
+     config
+     :form-breakers
+     [forced-break-form pair-break-form])))

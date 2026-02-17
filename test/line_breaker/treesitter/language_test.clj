@@ -68,7 +68,10 @@
         (constantly nil)
         lang/find-in-library-path
         (constantly nil)]
-        (let [ex (try (#'lang/find-library-path) nil (catch ExceptionInfo e e))]
+        (let [ex (try
+                   (#'lang/find-library-path)
+                   nil
+                   (catch ExceptionInfo e e))]
           (is
            (instance? ExceptionInfo ex)
            "throws ExceptionInfo when library not found")

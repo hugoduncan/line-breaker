@@ -86,8 +86,10 @@
       (let [tree (parser/parse-source "(+ 1 2)")
             root (node/root-node tree)]
         (is
-         (= {:row 0
-             :column 0} (node/node-position root))
+         (=
+          {:row 0
+           :column 0}
+          (node/node-position root))
          "root starts at 0,0")))
     (testing "returns correct positions for multiline"
       (let [tree (parser/parse-source "(foo\n  bar)")
@@ -95,8 +97,10 @@
             list-node (first (node/named-children root))
             bar-sym (second (node/named-children list-node))]
         (is
-         (= {:row 1
-             :column 2} (node/node-position bar-sym))
+         (=
+          {:row 1
+           :column 2}
+          (node/node-position bar-sym))
          "bar is on line 1, column 2")))
     (testing "returns nil for nil input"
       (is (nil? (node/node-position nil)) "nil node returns nil"))))

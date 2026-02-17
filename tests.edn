@@ -1,9 +1,9 @@
-#kaocha/v1
- {:tests [{:id :unit
-           :source-paths ["src"]
-           :test-paths ["test"]
-           :ns-patterns ["^line-breaker\\.(?!treesitter).*-test$"]}
-          {:id :treesitter
-           :source-paths ["src"]
-           :test-paths ["test"]
-           :ns-patterns ["^line-breaker\\.treesitter\\..*-test$"]}]}
+#kaocha/v1 {:tests
+            [{:id :unit
+              :source-paths ["src"]
+              :test-paths ["test"]
+              :ns-patterns ["^line-breaker\\.(?!treesitter).*-test$"]}
+             {:id :treesitter
+              :source-paths ["src"]
+              :test-paths ["test"]
+              :ns-patterns ["^line-breaker\\.treesitter\\..*-test$"]}]}

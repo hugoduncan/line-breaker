@@ -1,4 +1,5 @@
 (ns nested.inner)
 
-(defn greet []
+(defn greet
+  []
   (js/console.log "Hi"))

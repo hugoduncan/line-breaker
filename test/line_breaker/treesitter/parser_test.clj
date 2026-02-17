@@ -48,9 +48,9 @@
         [p]
         (is (some? (.getLanguage p)) "parser has language configured")))
     (testing "allows parsing within body"
-      (let [result
-            (parser/with-parser
-              [p]
-              (let [optional-tree (.parse p "(+ 1 2)")]
-                (when (.isPresent optional-tree) (.get optional-tree))))]
+      (let [result (parser/with-parser
+                     [p]
+                     (let [optional-tree (.parse p "(+ 1 2)")]
+                       (when (.isPresent optional-tree)
+                         (.get optional-tree))))]
         (is (instance? Tree result) "can parse within with-parser body")))))
