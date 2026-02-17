@@ -81,33 +81,12 @@
         (not= replacement (subs source start-char end-char))))
     edits)))
 
-;;; Finding breakable forms
-
-(defn- node-contains-line?
-  "Returns true if node spans the given 1-indexed line number."
-  [node line]
-  (when-let [[start-line end-line] (node/node-line-range node)]
-    (<= start-line line end-line)))
+;;; Node helpers
 
 (defn node-start-line
   "Get the 1-indexed start line of a node."
   [node]
   (first (node/node-line-range node)))
-
-(defn- form-needs-breaking-on-line?
-  "Returns true if form has consecutive children both on the target line.
-  Uses end-line for prev-child to handle multiline nodes (e.g. after
-  forced breaks, a multiline child ends on a line where the next sibling
-  starts). A form already broken (children on separate lines) returns
-  false."
-  [node line]
-  (let [children (node/named-children node)]
-    (some
-     (fn [[prev-child next-child]]
-       (let [[_ prev-end-line] (node/node-line-range prev-child)
-             next-line (node-start-line next-child)]
-         (= prev-end-line next-line line)))
-     (partition 2 1 children))))
 
 (defn- node-in-ignored-range?
   "Returns true if node falls within any of the ignored byte ranges.
@@ -119,100 +98,6 @@
      (fn [[ign-start ign-end]]
        (and (<= ign-start start-byte) (<= end-byte ign-end)))
      ignored-ranges)))
-
-(defn- find-breakable-forms-on-line
-  "Find all breakable nodes containing the given line that need breaking.
-
-  Returns a vector of nodes from outermost to innermost. Only includes
-  forms that have consecutive children on the target line. Skips forms
-  that fall within ignored ranges.
-
-  Forms with metadata attached (first child is meta_lit) are breakable,
-  but we don't descend into their children. This keeps the metadata attached
-  and prevents inner elements from being broken separately."
-  [node line ignored-ranges]
-  (when (and
-         (node-contains-line? node line)
-         (not (node-in-ignored-range? node ignored-ranges))
-         (not (rules/metadata-node? node)))
-    (if (rules/metadata-wrapped? node)
-      ;; Metadata-wrapped form: breakable but don't descend into children
-      (when (and
-             (rules/breakable-node? node)
-             (form-needs-breaking-on-line? node line))
-        [node])
-      ;; Normal form: check self and recurse into children
-      (let [self
-            (when (and
-                   (rules/breakable-node? node)
-                   (form-needs-breaking-on-line? node line))
-              [node])
-            children-results
-            (mapcat
-             #(find-breakable-forms-on-line % line ignored-ranges)
-             (node/named-children node))]
-        (into (vec self) children-results)))))
-
-(defn- has-preceding-sibling-on-line?
-  "Returns true if node has a preceding sibling in its parent that
-  ends on the same line where node starts."
-  [node]
-  (when-let [parent (node/node-parent node)]
-    (let [node-start (node-start-line node)
-          node-range (node/node-range node)]
-      (some
-       (fn [[prev-child next-child]]
-         (and
-          (= (node/node-range next-child) node-range)
-          (= (second (node/node-line-range prev-child)) node-start)))
-       (partition 2 1 (node/named-children parent))))))
-
-(defn- find-ancestors-needing-sibling-separation
-  "Walk up from node collecting all ancestors that share their start
-  line with a preceding sibling. Returns a seq of ancestor parents
-  (breakable forms whose children need separating), outermost first.
-  Returns all matches so that if the outermost is already broken,
-  intermediate ancestors can be tried."
-  [node]
-  (loop [n node
-         results []]
-    (if-not n
-      (rseq results)
-      (let [parent (node/node-parent n)]
-        (if-not parent
-          (rseq results)
-          (recur
-           parent
-           (if (and
-                (has-preceding-sibling-on-line? n)
-                (rules/breakable-node? parent))
-             (conj results parent)
-             results)))))))
-
-(defn find-breakable-forms
-  "Find all breakable forms containing the given line.
-
-  Takes a parsed tree, a 1-indexed line number, and optionally a set of
-  ignored ranges. Returns a vector of breakable nodes from outermost to
-  innermost that span that line and have consecutive children on that line.
-  Forms within ignored ranges are skipped."
-  ([tree line]
-   (find-breakable-forms tree line #{}))
-  ([tree line ignored-ranges]
-   (find-breakable-forms-on-line (node/root-node tree) line ignored-ranges)))
-
-(defn find-breakable-form
-  "Find the outermost breakable form containing the given line.
-
-  Takes a parsed tree, a 1-indexed line number, and optionally a set of
-  ignored ranges. Returns the outermost breakable node (list_lit, vec_lit,
-  map_lit, set_lit) that spans that line and has consecutive children on
-  that line, or nil if no breakable form is found. Forms within ignored
-  ranges are skipped."
-  ([tree line]
-   (find-breakable-form tree line #{}))
-  ([tree line ignored-ranges]
-   (first (find-breakable-forms tree line ignored-ranges))))
 
 ;;; Byte offset helpers
 
@@ -368,19 +253,6 @@
            [name-node value-node]))
        pairs))))
 
-(defn- find-node-on-line
-  "Find a named descendant node on the given 1-indexed line.
-  Uses tree-sitter getNamedDescendant to find the deepest named
-  node at the start of the line."
-  [tree line]
-  (let [root (node/root-node tree)
-        row (dec line)
-        p1 (io.github.treesitter.jtreesitter.Point. row 0)
-        p2 (io.github.treesitter.jtreesitter.Point. row 1)
-        result (.getNamedDescendant root p1 p2)]
-    (when (.isPresent result)
-      (.get result))))
-
 (defn- has-consecutive-children-on-line?
   "Returns true if node has at least two consecutive named children
   where the first ends on the same line as the second starts."
@@ -393,18 +265,6 @@
          (second (node/node-line-range prev-child))
          (first (node/node-line-range next-child))))
       (partition 2 1 children)))))
-
-(defn- find-unbroken-breakable-ancestor
-  "Walk up from node to find the innermost breakable ancestor that
-  still has consecutive children on the same line. Breaking such a
-  form would separate its children and potentially reduce indent for
-  descendants on the violating line."
-  [node]
-  (loop [n (node/node-parent node)]
-    (when n
-      (if (and (rules/breakable-node? n) (has-consecutive-children-on-line? n))
-        n
-        (recur (node/node-parent n))))))
 
 (defn indent-column
   "Calculate the indent column for broken elements.
@@ -583,7 +443,7 @@
                    pairs-to-break)
                   collapse-edits
                   (collapse-repositioned-children
-                   moved-pair-children)
+                   moved-pair-children indent-col)
                   moves-child?
                   (not=
                    (form-start-column child-node)
@@ -669,7 +529,7 @@
                  (when (seq edits)
                    (let [collapse-edits
                          (collapse-repositioned-children
-                          breakable-children)
+                          breakable-children indent-col)
                          parent-edits (:edits parent-result)]
                      {:edits
                       (cond-> (into edits collapse-edits)
@@ -713,12 +573,15 @@
   "Generate collapse edits for multi-line children being repositioned.
   When a parent form is broken, children that move to new lines have
   stale internal indent. Collapsing them lets the next iteration
-  re-break at the correct position."
-  [breakable-children]
+  re-break at the correct position. Only collapses children whose
+  current column differs from indent-col, since children already at
+  the target indent don't need re-breaking."
+  [breakable-children indent-col]
   (into
    []
    (comp
     (remove single-line-node?)
+    (filter (fn [child] (not= (form-start-column child) indent-col)))
     (mapcat collect-collapse-edits))
    breakable-children))
 
@@ -774,134 +637,121 @@
            (update :collected into edits))
        edits])))
 
-(defn- try-guarded-break
-  "Try to break a form, guarding against inside-broken-form and already-seen.
-  Returns [updated-state result-map] on success, [state nil] otherwise."
-  [state source form config]
-  (let [range (node/node-range form)]
-    (if (or (inside-broken-form? (:seen state) range)
-            ((:seen state) range))
-      [state nil]
-      (let [result (break-form form config)
-            edits (:edits result)
-            [new-state collected-edits]
-            (try-collect-edits state source form edits)]
-        (if collected-edits
-          [new-state result]
-          [new-state nil])))))
+;;; Form-based walk
 
-(defn- try-first-guarded-break
-  "Try to break forms in order, returning first success.
-  Returns [updated-state result-map] or [state nil]."
-  [state source forms config]
-  (reduce
-   (fn [[state _] form]
-     (let [[new-state result] (try-guarded-break
-                               state source form config)]
-       (if result
-         (reduced [new-state result])
-         [new-state nil])))
-   [state nil]
-   forms))
+(defn- children-sharing-long-line?
+  "Returns true if node has consecutive named children where one ends
+  and the next starts on a line in long-lines-set."
+  [node long-lines-set]
+  (let [children (node/named-children node)]
+    (boolean
+     (some
+      (fn [[prev-child next-child]]
+        (let [[_ prev-end] (node/node-line-range prev-child)
+              next-start (node-start-line next-child)]
+          (and (= prev-end next-start)
+               (contains? long-lines-set prev-end))))
+      (partition 2 1 children)))))
 
-(defn- break-on-line
-  "Try strategies to break forms on a single long line.
-  Tries ancestor forms first, then direct forms, then the innermost
-  unbroken breakable ancestor of any node on the line.
-  Returns [updated-state result] or [state nil]."
-  [state source tree line ignored-ranges config]
-  (let [forms (find-breakable-forms tree line ignored-ranges)
-        ancestor-forms
-        (sort-by
-         (fn [f]
-           (let [[s e] (node/node-range f)]
-             (- s e)))
-         (into
-          []
-          (comp
-           (mapcat find-ancestors-needing-sibling-separation)
-           (filter #(not (node-in-ignored-range? % ignored-ranges)))
-           (distinct))
-          forms))
-        [state result] (try-first-guarded-break
-                        state source ancestor-forms config)]
-    (if result
-      [state result]
-      (let [[state result] (try-first-guarded-break
-                            state source forms config)]
-        (if result
-          [state result]
-          (if-let [anc (some-> (find-node-on-line tree line)
-                               find-unbroken-breakable-ancestor)]
-            (try-guarded-break state source anc config)
-            [state nil]))))))
+(defn- try-form-break
+  "Try to generate edits for a single form.
+  Tries each form-breaker function in order, then falls back to
+  line-length breaking for breakable forms with children on long lines
+  whose end column exceeds the limit (so we don't break forms that
+  merely exist on a long line without contributing to it)."
+  [node source config form-breakers long-lines-set]
+  (let [max-length (get config :line-length)]
+    (or
+     (some
+      (fn [breaker]
+        (breaker node source config))
+      form-breakers)
+     (when (and (rules/breakable-node? node)
+                (seq long-lines-set)
+                (or (nil? max-length)
+                    (>= (max-line-end-column node) max-length))
+                (children-sharing-long-line? node long-lines-set))
+       (break-form node config)))))
 
-(defn- try-break-on-lines
-  "Break the outermost form on every long line in a single pass.
+(defn- walk-and-collect-edits
+  "Pre-order walk collecting non-overlapping edits from all forms.
+  Tries form-breakers first, then line-length breaking for each form.
+  Skips children of already-broken forms, ignored ranges, and metadata
+  nodes. Does not descend into metadata-wrapped forms."
+  [root source config form-breakers long-lines-set ignored-ranges]
+  (loop [stack (vec (rseq (vec (node/named-children root))))
+         state {:seen #{} :collected []}]
+    (if (empty? stack)
+      (:collected state)
+      (let [node (peek stack)
+            rest-stack (pop stack)]
+        (cond
+          (nil? node)
+          (recur rest-stack state)
 
-  Breadth-first: breaks all outermost forms across all long lines before
-  descending into sub-forms. Deduplicates by byte range so a form spanning
-  multiple long lines is only broken once. Skips forms whose edits would
-  overlap with already-collected edits (retried next iteration). Skips
-  forms contained within an already-broken form to avoid using stale
-  column positions for indent computation.
-  Falls back to deeper forms when the outermost form on a line produces
-  no change.
-  Returns the new source if any forms were broken, nil otherwise."
-  [source tree long-lines ignored-ranges config]
-  (let [{:keys [all-edits]}
-        (reduce
-         (fn [state line]
-           (let [[state result] (break-on-line
-                                 state source tree line
-                                 ignored-ranges config)]
-             (if result
-               (update state :all-edits into (:edits result))
-               state)))
-         {:seen #{} :collected [] :all-edits []}
-         long-lines)]
-    (when (seq all-edits)
-      (let [new-source (apply-edits source all-edits)]
-        (when (not= new-source source)
-          new-source)))))
+          (rules/metadata-node? node)
+          (recur rest-stack state)
+
+          (node-in-ignored-range? node ignored-ranges)
+          (recur rest-stack state)
+
+          (inside-broken-form? (:seen state) (node/node-range node))
+          (recur rest-stack state)
+
+          :else
+          (let [result (try-form-break
+                        node source config
+                        form-breakers long-lines-set)
+                edits (:edits result)
+                [new-state _collected?]
+                (if (seq edits)
+                  (try-collect-edits state source node edits)
+                  [state nil])
+                descend? (not (rules/metadata-wrapped? node))
+                children (when descend?
+                           (node/named-children node))
+                new-stack (if (seq children)
+                            (into rest-stack
+                                  (rseq (vec children)))
+                            rest-stack)]
+            (recur new-stack new-state)))))))
 
 (defn fix-source
-  "Fix line length violations in source code.
+  "Fix line length violations and apply structural breaks to source code.
 
-  Takes a source string and config map with :line-length. Iteratively breaks
-  forms until all lines fit or only unbreakable atoms remain. Returns the
-  fixed source string. Forms preceded by #_:line-breaker/ignore are not
-  modified.
+  Takes a source string and config map with :line-length. Iteratively
+  walks all forms in pre-order, applying breaking strategies until stable.
+  Returns the fixed source string. Forms preceded by #_:line-breaker/ignore
+  are not modified.
 
-  When breaking a form makes it multi-line, break-form backtracks to the
-  parent to separate siblings sharing lines with the newly multi-line child.
+  Breaking strategies are tried per-form in this order:
+  1. Each function in :form-breakers (if provided)
+  2. Line-length breaking (for breakable forms with children on lines
+     exceeding the limit)
 
-  The algorithm uses breadth-first breaking:
-  1. Find lines exceeding max-length
-  2. Collect ignored byte ranges (re-collected each pass as positions shift)
-  3. Break the outermost form on every long line in a single pass
-  4. Re-parse and repeat until stable
-
-  This ensures sibling forms at the same depth are all broken before
-  descending into sub-forms."
-  [source config]
+  The pre-order walk ensures outer forms are broken before inner forms.
+  Children of broken forms are skipped until the next iteration when
+  re-parsing provides correct column positions."
+  [source config & {:keys [form-breakers]}]
   (let [max-length (get config :line-length 80)]
     (loop [source source
            iteration 0]
       (if (>= iteration max-iterations)
         source
-        (let [long-lines (find-long-lines source max-length)
-              tree (parser/parse-source source)
+        (let [tree (parser/parse-source source)
+              root (node/root-node tree)
+              long-lines-set
+              (set (find-long-lines source max-length))
               ignored-ranges
               (check/find-ignored-byte-ranges tree)
-              new-source
-              (if (seq long-lines)
-                (or (try-break-on-lines
-                     source tree long-lines
-                     ignored-ranges config)
-                    source)
-                source)]
-          (if (not= new-source source)
-            (recur new-source (inc iteration))
+              collected
+              (walk-and-collect-edits
+               root source config
+               (or form-breakers [])
+               long-lines-set ignored-ranges)]
+          (if (and (seq collected)
+                   (edits-change-source? source collected))
+            (recur (apply-edits source collected)
+                   (inc iteration))
             source))))))
 

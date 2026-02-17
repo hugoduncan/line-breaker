@@ -2,28 +2,13 @@
   "Reformat functions for collapsing and re-breaking Clojure code.
 
   Provides the reformat pipeline: collapse all top-level forms to single
-  lines, then apply forced breaks, pair breaking, and fix-source."
+  lines, then run a unified fix pass with forced breaks, pair breaking,
+  and line-length fixing."
   (:require
    [line-breaker.fix :as fix]
    [line-breaker.rules :as rules]
    [line-breaker.treesitter.node :as node]
    [line-breaker.treesitter.parser :as parser]))
-
-;;; Tree walking
-
-(defn- find-all-preorder
-  "Pre-order walk collecting all nodes for which pred returns true.
-  Returns a vector of matching nodes, outermost first."
-  [pred node]
-  (if node
-    (let [self (when (pred node) [node])
-          children-results
-          (into
-           []
-           (mapcat #(find-all-preorder pred %))
-           (node/named-children node))]
-      (into (or self []) children-results))
-    []))
 
 ;;; Collapse
 
@@ -381,53 +366,29 @@
                          (rules/get-effective-rule node config))]
          (form-needs-forced-break? children positions indent-col))))))
 
-(defn- batch-collect-edits
-  "Reduce over forms, skipping children of already-broken parents and
-  collecting non-overlapping edits via try-collect-edits.
-  Returns the collected edits vector.  edit-fn is called with each form
-  and should return a seq of edits or nil."
-  [source forms edit-fn]
-  (:collected
-   (reduce
-    (fn [state form]
-      (let [range (node/node-range form)]
-        (if (fix/inside-broken-form? (:seen state) range)
-          state
-          (let [edits (edit-fn form)
-                [new-state _]
-                (fix/try-collect-edits state source form edits)]
-            new-state))))
-    {:seen #{} :collected []}
-    forms)))
+(defn- forced-break-form
+  "Form-breaker for forced line breaks.
+  Skips the at-line-start? check because the pre-order walk's
+  inside-broken-form? skip handles stale-position concerns.
+  Returns {:edits [...]} if the form needs forced breaks, nil otherwise."
+  [node _source config]
+  (when (needs-forced-breaking? node nil config)
+    (let [edits (generate-forced-break-edits node config)]
+      (when (seq edits)
+        {:edits edits}))))
 
 (defn apply-forced-breaks
   "Insert forced line breaks at structurally significant positions.
-  Batches all qualifying forms per parse, skipping children of
-  already-broken parents and overlapping edits. Deferred overlaps
-  are retried on the next iteration after re-parse.
-  When check-position? is false, skips the at-line-start? guard for use
-  after the pipeline has stabilized and all positions are final."
+  Uses fix-source with a forced-break form-breaker.
+  When check-position? is false, skips the at-line-start? guard."
   ([source config]
    (apply-forced-breaks source config true))
   ([source config check-position?]
-   (loop [s source
-          iteration 0]
-     (if (>= iteration fix/max-iterations)
-       s
-       (let [tree (parser/parse-source s)
-             root (node/root-node tree)
-             src-arg (when check-position? s)
-             forms (find-all-preorder
-                    #(needs-forced-breaking? % src-arg config)
-                    root)
-             collected (batch-collect-edits
-                        s forms
-                        #(generate-forced-break-edits % config))]
-         (if (and (seq collected)
-                  (fix/edits-change-source? s collected))
-           (recur (fix/apply-edits s collected)
-                  (inc iteration))
-           s))))))
+   (let [breaker (if check-position?
+                   forced-break-form
+                   (fn [form _source config]
+                     (forced-break-form form nil config)))]
+     (fix/fix-source source config :form-breakers [breaker]))))
 
 ;;; Forced pair breaking
 
@@ -504,50 +465,31 @@
               (cond-> break-edits
                 parent-edits (into parent-edits)))))))))
 
+(defn- pair-break-form
+  "Form-breaker for pair-grouped forms.
+  Returns {:edits [...]} if the form needs pair breaking, nil otherwise."
+  [node _source config]
+  (when (needs-pair-breaking? node config)
+    (let [edits (generate-pair-break-edits node config)]
+      (when (seq edits)
+        {:edits edits}))))
+
 (defn apply-pair-breaking
   "Force pair-grouped forms to break so each pair is on its own line.
-  Batches all qualifying forms per parse, skipping children of
-  already-broken parents and overlapping edits."
+  Uses fix-source with a pair-break form-breaker."
   [source config]
-  (loop [s source
-         iteration 0]
-    (if (>= iteration fix/max-iterations)
-      s
-      (let [tree (parser/parse-source s)
-            root (node/root-node tree)
-            forms (find-all-preorder
-                   #(needs-pair-breaking? % config)
-                   root)
-            collected (batch-collect-edits
-                       s forms
-                       #(generate-pair-break-edits % config))]
-        (if (seq collected)
-          (recur (fix/apply-edits s collected)
-                 (inc iteration))
-          s)))))
+  (fix/fix-source source config :form-breakers [pair-break-form]))
 
 ;;; Reformat pipeline
 
-(defn- run-middle-steps
-  "Run the middle pipeline steps: pair breaking and fix-source."
-  [source config]
-  (let [s1 (apply-pair-breaking source config)]
-    (fix/fix-source s1 config)))
-
 (defn reformat-source
-  "Reformat source by collapsing then applying a single-pass pipeline.
-  Runs forced breaks (position-checked), middle steps (pair breaking,
-  fix-source), then forced breaks (unchecked). If the unchecked pass
-  changed anything, re-runs middle steps and forced breaks again, since
-  fix-source may collapse forms that need forced breaks."
+  "Reformat source by collapsing then applying a unified fix pass.
+  Collapses all top-level forms to single lines, then runs fix-source
+  with forced-break and pair-break strategies. The unified loop handles
+  all breaking concerns in priority order: forced breaks first, then
+  pair breaks, then line-length fixes."
   [source config]
-  (let [collapsed (collapse-top-level-forms source)
-        s1 (apply-forced-breaks collapsed config)
-        s2 (run-middle-steps s1 config)
-        s3 (apply-forced-breaks s2 config false)
-        result (if (not= s3 s2)
-                 (-> s3
-                     (run-middle-steps config)
-                     (apply-forced-breaks config false))
-                 s3)]
-    result))
+  (let [collapsed (collapse-top-level-forms source)]
+    (fix/fix-source
+     collapsed config
+     :form-breakers [forced-break-form pair-break-form])))

@@ -4,7 +4,6 @@
   Tests cover:
   - Edit application in correct order
   - Breakable node type detection
-  - Finding outermost breakable forms on a line
   - Generating break edits for various collection types
   - Ignore mechanism integration"
   (:require
@@ -113,95 +112,50 @@
             str-node (first (node/named-children root))]
         (is (not (rules/breakable-node? str-node)))))))
 
-(deftest find-breakable-form-test
-  ;; Verify finding the outermost breakable form on a line.
-  (testing "find-breakable-form"
-    (testing "finds simple list on line 1"
-      (let [tree (parser/parse-source "(a b c)")
-            form (fix/find-breakable-form tree 1)]
-        (is (some? form))
-        (is (= :list_lit (node/node-type form)))
-        (is (= "(a b c)" (node/node-text form)))))
-    (testing "finds outermost form when nested"
-      (let [tree (parser/parse-source "(a (b c) d)")
-            form (fix/find-breakable-form tree 1)]
-        (is
-         (= "(a (b c) d)" (node/node-text form))
-         "returns outer form, not inner")))
-    (testing "returns nil for line without breakable form"
-      (let [tree (parser/parse-source "foo")
-            form (fix/find-breakable-form tree 1)]
-        (is (nil? form))))
-    (testing "finds form on correct line in multiline source"
-      (let [tree (parser/parse-source "(a)\n(b c d)")
-            form (fix/find-breakable-form tree 2)]
-        (is (= "(b c d)" (node/node-text form)))))
-    (testing "returns nil for empty line"
-      (let [tree (parser/parse-source "(a)\n\n(b)")
-            form (fix/find-breakable-form tree 2)]
-        (is (nil? form))))
-    (testing "with metadata"
-      (testing "returns metadata-wrapped form as breakable"
-        ;; The vec_lit "^double [[a b] [c d]]" has a meta_lit child.
-        ;; It IS breakable (with special indent handling), but we don't
-        ;; descend into its children.
-        (let [source "^double [[a b] [c d]]"
-              tree (parser/parse-source source)
-              forms (fix/find-breakable-forms tree 1)
-              form-texts (mapv node/node-text forms)]
-          (is (= [source] form-texts) "metadata-wrapped form is breakable")))
-      (testing "does not return nodes inside metadata-annotated form"
-        ;; In a defn, the arg vector may have metadata attached.
-        ;; The inner vectors [a b] and [c d] should not be returned.
-        (let [source "(defn foo ^ret [[a b] [c d]] body)"
-              tree (parser/parse-source source)
-              forms (fix/find-breakable-forms tree 1)
-              form-texts (map node/node-text forms)]
-          (is
-           (not (some #{"[a b]" "[c d]"} form-texts))
-           "inner vectors in metadata-annotated form not returned")
-          (is (some #{source} form-texts) "outer defn form is returned"))))))
+(defn- parse-first-form
+  "Parse source and return the first top-level form."
+  [source]
+  (let [tree (parser/parse-source source)
+        root (node/root-node tree)]
+    (first (node/named-children root))))
 
 (deftest break-form-test
   ;; Verify edit generation for breaking forms.
   (testing "break-form"
     (testing "returns result map with :edits for simple list"
-      (let [tree (parser/parse-source "(a b c)")
-            form (fix/find-breakable-form tree 1)
+      (let [source "(a b c)"
+            form (parse-first-form source)
             result (fix/break-form form)]
         (is (map? result))
         (is (vector? (:edits result)))
         (is (= "(a\n b\n c)"
-               (fix/apply-edits "(a b c)" (:edits result))))))
+               (fix/apply-edits source (:edits result))))))
     (testing "returns result map with :edits for vector"
-      (let [tree (parser/parse-source "[a b c]")
-            form (fix/find-breakable-form tree 1)
+      (let [source "[a b c]"
+            form (parse-first-form source)
             result (fix/break-form form)]
         (is (map? result))
         (is (= "[a\n b\n c]"
-               (fix/apply-edits "[a b c]" (:edits result))))))
+               (fix/apply-edits source (:edits result))))))
     (testing "returns result map with :edits for map"
-      (let [tree (parser/parse-source "{:a 1 :b 2}")
-            form (fix/find-breakable-form tree 1)
+      (let [source "{:a 1 :b 2}"
+            form (parse-first-form source)
             result (fix/break-form form)]
         (is (map? result))
         (is (= "{:a 1\n :b 2}"
-               (fix/apply-edits "{:a 1 :b 2}" (:edits result))))))
+               (fix/apply-edits source (:edits result))))))
     (testing "returns nil for single-element form"
-      (let [tree (parser/parse-source "(a)")
-            form (fix/find-breakable-form tree 1)]
+      (let [form (parse-first-form "(a)")]
         (is (nil? (fix/break-form form)))))
     (testing "returns nil for metadata-only form"
       ;; Edge case: ^double [] has metadata but the inner vec is empty.
       ;; tree-sitter parses this as vec_lit with only meta_lit as a child.
       ;; break-form should return nil since there's no content to break.
-      (let [tree (parser/parse-source "^double []")
-            form (fix/find-breakable-form tree 1)]
+      (let [form (parse-first-form "^double []")]
         (is (nil? (fix/break-form form)))))
     (testing "preserves indentation based on form position"
       (let [source "  (a b c)"
-            tree (parser/parse-source source)
-            form (fix/find-breakable-form tree 1)
+            form (parse-first-form source)
             result (fix/break-form form)]
         (is (= "  (a\n   b\n   c)"
                (fix/apply-edits source (:edits result)))
@@ -209,8 +163,7 @@
     (testing "splits exceeding pair"
       (testing "when broken value head still exceeds at indent"
         (let [source "{:abcde (fghij k l) :x 1}"
-              tree (parser/parse-source source)
-              form (fix/find-breakable-form tree 1)
+              form (parse-first-form source)
               result (fix/break-form
                       form {:line-length 10})]
           (is (map? result))
@@ -220,8 +173,7 @@
               "pair is split when head exceeds")))
       (testing "not when broken value head fits at indent"
         (let [source "{:a (b c d e) :x 1}"
-              tree (parser/parse-source source)
-              form (fix/find-breakable-form tree 1)
+              form (parse-first-form source)
               result (fix/break-form
                       form {:line-length 10})]
           (is (map? result))
