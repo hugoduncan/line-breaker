@@ -242,10 +242,10 @@
 
 (defn- body-separation-positions
   "Indices for body children after the last forced break position that
-  share a line with their next sibling.  Skips comment nodes and the
-  comment chain from the max break position since the comment-following
-  loop already handles those."
-  [children break-positions]
+  share a line with their next sibling or precede a misindented child.
+  Skips comment nodes and the comment chain from the max break position
+  since the comment-following loop already handles those."
+  [children break-positions indent-col]
   (when (seq break-positions)
     (let [n (count children)
           ;; Skip past comment chain from the max break position
@@ -262,7 +262,9 @@
             (and
              (< ni n)
              (not (fix/comment-node? (nth children i)))
-             (contiguous-line? (nth children i) (nth children ni))))))
+             (or (contiguous-line? (nth children i) (nth children ni))
+                 (not= indent-col
+                       (fix/form-start-column (nth children ni))))))))
        (range first-body-idx (dec n))))))
 
 (defn- needs-break-or-reindent?
@@ -306,15 +308,16 @@
         n (count children)]
     (when rule
       (let [base-positions (forced-break-positions children rule)
+            indent-col (fix/indent-column
+                        node
+                        (rules/get-effective-rule node config))
             break-positions
             (if (rules/uses-pair-grouping? node config)
               base-positions
               (into
                base-positions
-               (body-separation-positions children base-positions)))
-            indent-col (fix/indent-column
-                        node
-                        (rules/get-effective-rule node config))]
+               (body-separation-positions
+                children base-positions indent-col)))]
         (when (form-needs-forced-break? children break-positions indent-col)
           (into
            []

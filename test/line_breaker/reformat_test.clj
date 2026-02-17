@@ -624,7 +624,27 @@
            "comment at column 2")
           (is
            (re-find #"(?m)^  \[x\]" result)
-           "argvec at column 2"))))))
+           "argvec at column 2"))))
+    (testing "given a defn body comment between regular forms"
+      (testing "indents comment to body indent"
+        (let [input (str
+                     "(defn uber\n"
+                     "  \"Build.\"\n"
+                     "  [_]\n"
+                     "  (clean nil)\n"
+                     "  (javac nil)\n"
+                     "  ;; Copy resources\n"
+                     "  (b/copy-dir {:src [\"r\"]})\n"
+                     "  (b/copy-dir {:src [\"s\"]}))")
+              result (reformat/reformat-source
+                      input
+                      {:line-length 80})]
+          (is
+           (re-find #"(?m)^  ;; Copy resources" result)
+           "comment at column 2")
+          (is
+           (re-find #"(?m)^  \(b/copy-dir" result)
+           "form after comment at column 2"))))))
 
 (deftest reformat-no-rightward-drift-test
   ;; When fix-source processes multiple long lines in one pass, a
