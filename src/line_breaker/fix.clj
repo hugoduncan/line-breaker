@@ -653,12 +653,24 @@
                (contains? long-lines-set prev-end))))
       (partition 2 1 children)))))
 
+(defn- contains-long-line?
+  "Returns true if node spans any line in long-lines-set."
+  [node long-lines-set]
+  (let [[start-line end-line] (node/node-line-range node)]
+    (boolean
+     (some
+      #(and (>= % start-line) (<= % end-line))
+      long-lines-set))))
+
 (defn- try-form-break
   "Try to generate edits for a single form.
   Tries each form-breaker function in order, then falls back to
-  line-length breaking for breakable forms with children on long lines
-  whose end column exceeds the limit (so we don't break forms that
-  merely exist on a long line without contributing to it)."
+  line-length breaking. A form is broken when it:
+  - has children sharing a long line, OR
+  - contains a long line and has unseparated children (breaking the
+    form reduces nesting, which can indirectly fix the long line)
+  In both cases the form's end column must reach the line-length limit
+  to avoid breaking forms that don't contribute to long lines."
   [node source config form-breakers long-lines-set]
   (let [max-length (get config :line-length)]
     (or
@@ -666,11 +678,15 @@
       (fn [breaker]
         (breaker node source config))
       form-breakers)
-     (when (and (rules/breakable-node? node)
-                (seq long-lines-set)
-                (or (nil? max-length)
-                    (>= (max-line-end-column node) max-length))
-                (children-sharing-long-line? node long-lines-set))
+     (when (and
+            (rules/breakable-node? node)
+            (seq long-lines-set)
+            (or (nil? max-length)
+                (>= (max-line-end-column node) max-length))
+            (or
+             (children-sharing-long-line? node long-lines-set)
+             (and (contains-long-line? node long-lines-set)
+                  (has-consecutive-children-on-line? node))))
        (break-form node config)))))
 
 (defn- walk-and-collect-edits

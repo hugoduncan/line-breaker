@@ -128,22 +128,19 @@
             result (fix/break-form form)]
         (is (map? result))
         (is (vector? (:edits result)))
-        (is (= "(a\n b\n c)"
-               (fix/apply-edits source (:edits result))))))
+        (is (= "(a\n b\n c)" (fix/apply-edits source (:edits result))))))
     (testing "returns result map with :edits for vector"
       (let [source "[a b c]"
             form (parse-first-form source)
             result (fix/break-form form)]
         (is (map? result))
-        (is (= "[a\n b\n c]"
-               (fix/apply-edits source (:edits result))))))
+        (is (= "[a\n b\n c]" (fix/apply-edits source (:edits result))))))
     (testing "returns result map with :edits for map"
       (let [source "{:a 1 :b 2}"
             form (parse-first-form source)
             result (fix/break-form form)]
         (is (map? result))
-        (is (= "{:a 1\n :b 2}"
-               (fix/apply-edits source (:edits result))))))
+        (is (= "{:a 1\n :b 2}" (fix/apply-edits source (:edits result))))))
     (testing "returns nil for single-element form"
       (let [form (parse-first-form "(a)")]
         (is (nil? (fix/break-form form)))))
@@ -157,30 +154,26 @@
       (let [source "  (a b c)"
             form (parse-first-form source)
             result (fix/break-form form)]
-        (is (= "  (a\n   b\n   c)"
-               (fix/apply-edits source (:edits result)))
-            "indentation accounts for form's column position")))
+        (is
+         (= "  (a\n   b\n   c)" (fix/apply-edits source (:edits result)))
+         "indentation accounts for form's column position")))
     (testing "splits exceeding pair"
       (testing "when broken value head still exceeds at indent"
         (let [source "{:abcde (fghij k l) :x 1}"
               form (parse-first-form source)
-              result (fix/break-form
-                      form {:line-length 10})]
+              result (fix/break-form form {:line-length 10})]
           (is (map? result))
-          (is (str/includes?
-               (fix/apply-edits source (:edits result))
-               ":abcde\n")
-              "pair is split when head exceeds")))
+          (is
+           (str/includes? (fix/apply-edits source (:edits result)) ":abcde\n")
+           "pair is split when head exceeds")))
       (testing "not when broken value head fits at indent"
         (let [source "{:a (b c d e) :x 1}"
               form (parse-first-form source)
-              result (fix/break-form
-                      form {:line-length 10})]
+              result (fix/break-form form {:line-length 10})]
           (is (map? result))
-          (is (not (str/includes?
-                    (fix/apply-edits source (:edits result))
-                    ":a\n"))
-              "pair stays together, value broken internally"))))))
+          (is
+           (not (str/includes? (fix/apply-edits source (:edits result)) ":a\n"))
+           "pair stays together, value broken internally"))))))
 
 (deftest find-long-lines-test
   ;; Verify detection of lines exceeding max length.
@@ -192,7 +185,8 @@
     (testing "returns multiple line numbers"
       (is
        (= [1 3] (fix/find-long-lines "long line here\nok\nlong line here" 10))))
-    (testing "handles empty string" (is (= [] (fix/find-long-lines "" 10))))
+    (testing "handles empty string"
+      (is (= [] (fix/find-long-lines "" 10))))
     (testing "uses 1-indexed line numbers"
       (is (= [2] (fix/find-long-lines "ok\nthis is too long\nok" 10))))))
 
@@ -413,9 +407,8 @@
     (testing "does not break nested form inside ignored"
       (let [source "#_:line-breaker/ignore (foo (bar baz qux))"
             result (fix/fix-source source {:line-length 10})]
-        (is
-         (= source result)
-         "nested forms within ignored are also preserved")))
+        (is (= source result)
+            "nested forms within ignored are also preserved")))
     (testing "breaks non-ignored forms"
       (let [source "(foo bar baz) #_:line-breaker/ignore (keep this)"
             result (fix/fix-source source {:line-length 10})]
@@ -525,7 +518,9 @@
               result (fix/fix-source source {:line-length 30})]
           (is
            (=
-            (str "(defn foo\n" "  ^double [[x y] [a b]]\n" "  body)")
+            (str "(defn foo\n"
+                 "  ^double [[x y] [a b]]\n"
+                 "  body)")
             result)))))))
 
 (deftest join-form-edits-test
@@ -564,7 +559,8 @@
               form (first (node/named-children (node/root-node tree)))]
           (is (nil? (fix/join-form-edits form))))))
     (testing "for a nil node"
-      (testing "returns nil" (is (nil? (fix/join-form-edits nil)))))
+      (testing "returns nil"
+        (is (nil? (fix/join-form-edits nil)))))
     (testing "for a deeply indented multi-line form"
       (testing "collapses indent whitespace to single space"
         (let [source "(a\n      b\n      c)"
@@ -827,10 +823,10 @@
         ;; since the broken first line (key + value head) fits at indent.
         (let [source "{:key1 (long-fn a b) :key2 val2}"
               result (fix/fix-source source {:line-length 15})]
-          (is (not (str/includes? result ":key1\n"))
-              "pair stays together")
-          (is (str/includes? result ":key1 (long-fn")
-              "key and value head on same line")
+          (is (not (str/includes? result ":key1\n")) "pair stays together")
+          (is
+           (str/includes? result ":key1 (long-fn")
+           "key and value head on same line")
           (is (str/includes? result ":key2") "second pair present"))))
     (testing "for binding vectors"
       (testing "keeps atomic binding values with names"
@@ -855,7 +851,9 @@
         (let [source "(let [nm (some-fn a b c)] (bar nm baz))"
               result (fix/fix-source source {:line-length 30})]
           (is
-           (= (str "(let [nm (some-fn a b c)]\n" "  (bar nm baz))") result))))
+           (= (str "(let [nm (some-fn a b c)]\n"
+                   "  (bar nm baz))")
+              result))))
       (testing "inter-pair breaking resolves the violation"
         ;; Multiple pairs: the first pair fits on its own line once
         ;; the second pair is moved to the next line.
@@ -1024,7 +1022,7 @@
       (testing "leaves single-element vector unchanged"
         (is (= "[x]" (fix/fix-source "[x]" {:line-length 2}))))
       (testing "leaves map with one pair unchanged when within limit"
-;; Map with k v has 2 children, stays unchanged if within limit
+        ;; Map with k v has 2 children, stays unchanged if within limit
         (is (= "{k v}" (fix/fix-source "{k v}" {:line-length 10})))))
     (testing "for already-formatted code"
       (testing "leaves properly broken list unchanged"
