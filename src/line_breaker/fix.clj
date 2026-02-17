@@ -303,6 +303,27 @@
           newline-idx (.indexOf ^String text "\n")]
       (+ start-col newline-idx))))
 
+(defn- effective-pair-width
+  "Compute the first-line pair width accounting for value breaking.
+  For breakable values with more children than kept on the first line,
+  estimates the width after breaking by using the end column of the last
+  kept child. This avoids over-estimating when a collapsed value would
+  be broken internally rather than split from its key."
+  [exc-name exc-value config]
+  (let [value-end
+        (if (rules/breakable-node? exc-value)
+          (let [children (node/named-children exc-value)
+                val-rule (rules/get-effective-rule exc-value config)
+                keep-count
+                (rules/elements-to-keep-on-first-line val-rule)]
+            (if (and (seq children)
+                     (< keep-count (count children)))
+              (first-line-end-column
+               (nth children (dec keep-count)))
+              (first-line-end-column exc-value)))
+          (first-line-end-column exc-value))]
+    (- value-end (form-start-column exc-name))))
+
 (defn- max-line-end-column
   "Get the maximum end column across all lines of a node.
   Returns the end column of whichever line is longest. For single-line
@@ -493,6 +514,14 @@
     (when (seq all-edits)
       {:edits all-edits})))
 
+(defn- pair-exceeds-at-indent?
+  "Returns true if an exceeding pair's first line would still exceed
+  max-length when placed at indent-col. For breakable values, estimates
+  the post-break width (key + value head) rather than the full width."
+  [exc-name exc-value indent-col max-length config]
+  (let [pw (effective-pair-width exc-name exc-value config)]
+    (> (+ indent-col pw) max-length)))
+
 (defn break-form
   "Generate edits to break a form across multiple lines.
 
@@ -504,11 +533,11 @@
   For forms that use pair grouping (maps, cond, case), keeps related pairs
   together (key-value, test-result, etc.) and breaks only between pairs.
 
-  For pair-grouped forms with exceeding pairs:
-  - If a pair value would still exceed the limit at the indent position
-    (single-line, breakable), backtracks to split the pair onto its own line
-  - If the value is multi-line and breakable, collapses it to a single line
-    and moves to own line at indent-col for re-breaking
+  Uses a single-pass-then-backtrack approach for pair-grouped forms:
+  generates normal paired edits first, then checks if any exceeding pair
+  would still exceed at the indent position (using estimated post-break
+  width for breakable values). If so, backtracks to split the pair onto
+  its own line via break-exceeding-pair.
 
   When breaking repositions children that are already multi-line, also
   collapses them so the next iteration re-breaks at the correct indent.
@@ -527,39 +556,22 @@
            indent-col (indent-column node rule)
            base-keep-count (rules/elements-to-keep-on-first-line rule)
            max-length (get config :line-length)
-           ;; For pair-grouped forms, check if any pair exceeds limit
            exceeding-pair (when (rules/uses-pair-grouping? node config)
                             (find-exceeding-pair node rule max-length))
            [exc-name exc-value] exceeding-pair
-           ;; Phase 3: multi-line breakable value — un-break and move
-           ;; to own line. Phase 2 already broke it in-place but the
-           ;; first line still exceeds.
-           phase-3? (and
-                     exceeding-pair
-                     (rules/breakable-node? exc-value)
-                     (not (single-line-node? exc-value)))
-           ;; Non-binding pair split: for cond/case/condp/cond->, split
-           ;; the exceeding pair immediately rather than deferring via
-           ;; Phase 1. Only splits when the pair would still exceed at
-           ;; its indent position, not just at the pre-break column.
+           breakable-children (drop base-keep-count children)
            split-pair?
            (and
             exceeding-pair
-            (not phase-3?)
-            (contains? rules/non-binding-pair-rules rule)
-            (let [pair-width (-
-                              (first-line-end-column exc-value)
-                              (form-start-column exc-name))]
-              (> (+ indent-col pair-width) max-length)))
-           breakable-children (drop base-keep-count children)]
-       (cond
-         (or phase-3? split-pair?)
+            (rules/breakable-node? exc-value)
+            (pair-exceeds-at-indent?
+             exc-name exc-value indent-col max-length config))]
+       (if split-pair?
+         ;; Pair's first line (key + value head) exceeds at indent,
+         ;; split onto separate lines regardless of other children.
          (break-exceeding-pair
           exc-name exc-value children base-keep-count
           breakable-children indent-col)
-         ;; Normal breaking — if a pair value would still exceed at
-         ;; the indent position, backtrack to split the pair.
-         :else
          (when (seq breakable-children)
            (let [last-kept (nth children (dec base-keep-count))
                  edits
@@ -573,22 +585,11 @@
                     breakable-children
                     indent-col))]
              (when (seq edits)
-               (if (and
-                    exceeding-pair
-                    (single-line-node? exc-value)
-                    (rules/breakable-node? exc-value)
-                    (let [pair-width
-                          (- (first-line-end-column exc-value)
-                             (form-start-column exc-name))]
-                      (> (+ indent-col pair-width) max-length)))
-                 (break-exceeding-pair
-                  exc-name exc-value children base-keep-count
-                  breakable-children indent-col)
-                 (let [collapse-edits
-                       (collapse-repositioned-children
-                        breakable-children)]
-                   {:edits
-                    (into edits collapse-edits)}))))))))))
+               (let [collapse-edits
+                     (collapse-repositioned-children
+                      breakable-children)]
+                 {:edits
+                  (into edits collapse-edits)})))))))))
 
 ;;; Line length checking
 

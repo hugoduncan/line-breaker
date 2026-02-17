@@ -566,7 +566,7 @@
             "  :two)")
            {:line-length 80})))))
     (testing "given a cond with long test+value pairs"
-      (testing "splits pairs before breaking test internally"
+      (testing "keeps pair together when broken value head fits"
         (let [input (str
                      "(cond (not (fs/exists? p))"
                      " (throw (ex-info \"m\" {}))"
@@ -575,11 +575,10 @@
                       input
                       {:line-length 40})]
           (is
-           (re-find #"(?m)^  \(not \(fs/exists\? p\)\)$" result)
-           "test stays on one line")
-          (is
-           (re-find #"(?m)^  \(throw " result)
-           "value starts on its own line"))))))
+           (re-find
+            #"(?m)\(not \(fs/exists\? p\)\) \(throw"
+            result)
+           "test and value head on same line"))))))
 
 (deftest reformat-comment-indentation-test
   ;; Verify that whole-line comments inside pair-grouped forms retain

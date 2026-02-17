@@ -167,6 +167,4 @@
   (let [rule (get-effective-rule node config)]
     (#{:cond :condp :case :cond-> :map :binding-vector} rule)))
 
-(def non-binding-pair-rules
-  "Pair-grouping rules for non-binding forms (cond, case, condp, cond->)."
-  #{:cond :condp :case :cond->})
+

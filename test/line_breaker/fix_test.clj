@@ -207,8 +207,8 @@
                (fix/apply-edits source (:edits result)))
             "indentation accounts for form's column position")))
     (testing "splits exceeding pair"
-      (testing "when value would exceed at indent position"
-        (let [source "{:a (b c d e) :x 1}"
+      (testing "when broken value head still exceeds at indent"
+        (let [source "{:abcde (fghij k l) :x 1}"
               tree (parser/parse-source source)
               form (fix/find-breakable-form tree 1)
               result (fix/break-form
@@ -216,19 +216,19 @@
           (is (map? result))
           (is (str/includes?
                (fix/apply-edits source (:edits result))
-               ":a\n")
-              "pair value is split onto a new line")))
-      (testing "not when pair fits at indent position"
-        (let [source "{:a (b c) :x 1}"
+               ":abcde\n")
+              "pair is split when head exceeds")))
+      (testing "not when broken value head fits at indent"
+        (let [source "{:a (b c d e) :x 1}"
               tree (parser/parse-source source)
               form (fix/find-breakable-form tree 1)
               result (fix/break-form
-                      form {:line-length 15})]
+                      form {:line-length 10})]
           (is (map? result))
           (is (not (str/includes?
                     (fix/apply-edits source (:edits result))
                     ":a\n"))
-              "pair stays together when it fits"))))))
+              "pair stays together, value broken internally"))))))
 
 (deftest find-long-lines-test
   ;; Verify detection of lines exceeding max length.
@@ -871,12 +871,15 @@
               result (fix/fix-source source {:line-length 20})]
           (is (= source result) "atomic value stays with key")))
       (testing "handles multiple pairs with first pair too long"
-        ;; Pair exceeds at indent — backtracks to split, then value
-        ;; is broken in-place by subsequent iteration.
+        ;; Value is broken internally while keeping key-value together,
+        ;; since the broken first line (key + value head) fits at indent.
         (let [source "{:key1 (long-fn a b) :key2 val2}"
               result (fix/fix-source source {:line-length 15})]
-          (is (str/includes? result ":key1\n") "pair is split")
-          (is (str/includes? result ":key2") "second pair is present"))))
+          (is (not (str/includes? result ":key1\n"))
+              "pair stays together")
+          (is (str/includes? result ":key1 (long-fn")
+              "key and value head on same line")
+          (is (str/includes? result ":key2") "second pair present"))))
     (testing "for binding vectors"
       (testing "keeps atomic binding values with names"
         (let [source "(let [some-long-name atomic-val] body)"
