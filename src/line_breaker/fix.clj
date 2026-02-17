@@ -33,9 +33,9 @@
         (>= char-idx len) len
         :else
         (let [code-point (.codePointAt s char-idx)
-;; Number of chars this code point uses (1 or 2 for surrogates)
+              ;; Number of chars this code point uses (1 or 2 for surrogates)
               char-count (Character/charCount code-point)
-;; Number of UTF-8 bytes this code point uses
+              ;; Number of UTF-8 bytes this code point uses
               code-point-bytes (cond
                                  (<= code-point 0x7F) 1
                                  (<= code-point 0x7FF) 2
@@ -775,4 +775,3 @@
             (recur (apply-edits source collected)
                    (inc iteration))
             source))))))
-
