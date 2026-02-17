@@ -152,7 +152,8 @@
          (=
           (str "(ns my.ns\n" "  (:require\n" "   [a]\n" "   [b]\n" "   [c]))")
           (reformat/apply-forced-breaks
-           "(ns my.ns (:require [a] [b] [c]))" {}))))
+           "(ns my.ns (:require [a] [b] [c]))"
+           {}))))
       (testing "breaks symbol libspecs"
         (is
          (=
@@ -459,18 +460,12 @@
                      "(cond (not (fs/exists? p))"
                      " (throw (ex-info \"m\" {}))"
                      " :else nil)")
-              result (reformat/reformat-source
-                      input {:line-length 40})]
+              result (reformat/reformat-source input {:line-length 40})]
           (is
-           (str/includes?
-            result
-            "(not (fs/exists? p)) (throw")
+           (str/includes? result "(not (fs/exists? p)) (throw")
            "test and value-head on same line")
           (is
-           (< (apply max
-                     (map count
-                          (str/split-lines result)))
-              41)
+           (< (apply max (map count (str/split-lines result))) 41)
            "all lines within limit"))))
     (testing "given a cond with long test and multi-line do body"
       (testing "splits pair onto separate lines"
@@ -481,8 +476,7 @@
                      " (nil? cmd))"
                      " (do (prn \"Usage\") nil)"
                      "\n  :else :ok)")
-              result (reformat/reformat-source
-                      input {:line-length 40})]
+              result (reformat/reformat-source input {:line-length 40})]
           (is
            (re-find #"(?m)^\s+\(do$" result)
            "do body starts on its own line"))))
@@ -495,19 +489,13 @@
                      " (do (println \"abcdefghij\")"
                      " (println \"klmnopqrst\"))"
                      "\n  :else :ok)")
-              result (reformat/reformat-source
-                      input {:line-length 40})]
-          (is
-           (re-find #"(?m)^\s+\(do$" result)
-           "do starts on its own line")
+              result (reformat/reformat-source input {:line-length 40})]
+          (is (re-find #"(?m)^\s+\(do$" result) "do starts on its own line")
           (is
            (re-find #"(?m)^\s+\(println \"abc" result)
            "println at reduced indent")
           (is
-           (< (apply max
-                     (map count
-                          (str/split-lines result)))
-              41)
+           (< (apply max (map count (str/split-lines result))) 41)
            "all lines within limit"))))))
 
 (deftest reformat-comment-indentation-test
@@ -768,23 +756,14 @@
   ;; Blank lines are intentional grouping separators.
   (testing "reformat-source"
     (testing "preserves blank lines between map entries"
-      (let [input (str "{:a {:x 1 :y 2}\n"
-                       "\n"
-                       " :b {:z 3 :w 4}}")
-            result (reformat/reformat-source
-                    input {:line-length 80})]
+      (let [input (str "{:a {:x 1 :y 2}\n" "\n" " :b {:z 3 :w 4}}")
+            result (reformat/reformat-source input {:line-length 80})]
         (is
          (pos? (count (re-seq #"\n\n" result)))
          (str "blank line lost, got:\n" result))))
     (testing "preserves multiple blank line groups"
-      (let [input (str "{:a 1\n"
-                       "\n"
-                       " :b 2\n"
-                       "\n"
-                       " :c 3}")
-            result (reformat/reformat-source
-                    input {:line-length 80})]
+      (let [input (str "{:a 1\n" "\n" " :b 2\n" "\n" " :c 3}")
+            result (reformat/reformat-source input {:line-length 80})]
         (is
          (= 2 (count (re-seq #"\n\n" result)))
-         (str "expected 2 blank lines,"
-              " got:\n" result))))))
+         (str "expected 2 blank lines," " got:\n" result))))))

@@ -183,9 +183,10 @@
             (is (map? result))
             (is
              (str/includes? output ":a\n")
-             (str "pair split when value head"
-                  " exceeds at indent, got:\n"
-                  output))))))))
+             (str
+              "pair split when value head"
+              " exceeds at indent, got:\n"
+              output))))))))
 
 (deftest find-long-lines-test
   ;; Verify detection of lines exceeding max length.
@@ -419,8 +420,9 @@
     (testing "does not break nested form inside ignored"
       (let [source "#_:line-breaker/ignore (foo (bar baz qux))"
             result (fix/fix-source source {:line-length 10})]
-        (is (= source result)
-            "nested forms within ignored are also preserved")))
+        (is
+         (= source result)
+         "nested forms within ignored are also preserved")))
     (testing "breaks non-ignored forms"
       (let [source "(foo bar baz) #_:line-breaker/ignore (keep this)"
             result (fix/fix-source source {:line-length 10})]
@@ -530,9 +532,7 @@
               result (fix/fix-source source {:line-length 30})]
           (is
            (=
-            (str "(defn foo\n"
-                 "  ^double [[x y] [a b]]\n"
-                 "  body)")
+            (str "(defn foo\n" "  ^double [[x y] [a b]]\n" "  body)")
             result)))))))
 
 (deftest join-form-edits-test
@@ -863,9 +863,7 @@
         (let [source "(let [nm (some-fn a b c)] (bar nm baz))"
               result (fix/fix-source source {:line-length 30})]
           (is
-           (= (str "(let [nm (some-fn a b c)]\n"
-                   "  (bar nm baz))")
-              result))))
+           (= (str "(let [nm (some-fn a b c)]\n" "  (bar nm baz))") result))))
       (testing "inter-pair breaking resolves the violation"
         ;; Multiple pairs: the first pair fits on its own line once
         ;; the second pair is moved to the next line.
@@ -1349,11 +1347,7 @@
                      "    (testing \"b\"\n"
                      "      (is (= x y)"
                      " \"msg-long-enough\"))))")
-              result (fix/fix-source
-                      input {:line-length 35})]
+              result (fix/fix-source input {:line-length 35})]
           (is
-           (< (apply max
-                     (mapv count
-                           (str/split-lines result)))
-              36)
+           (< (apply max (mapv count (str/split-lines result))) 36)
            "all lines within limit"))))))

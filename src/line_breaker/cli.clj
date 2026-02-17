@@ -76,21 +76,22 @@
   Throws ex-info with :type :file-error if path does not exist.
   Returns [\".\"] contents when paths is empty."
   [paths extensions]
-  (let [paths (if (seq paths) paths ["."])]
+  (let [paths (if (seq paths)
+                paths
+                ["."])]
     (->>
      paths
      (mapcat
       (fn [path]
         (cond
-          (not (fs/exists? path))
-          (throw
-           (ex-info
-            (str "Path does not exist: " path)
-            {:type :file-error
-             :path path}))
-          (fs/directory? path)
-          (let [pattern (glob-pattern-for-extensions extensions)]
-            (fs/glob path pattern))
+          (not (fs/exists? path)) (throw
+                                   (ex-info
+                                    (str "Path does not exist: " path)
+                                    {:type :file-error
+                                     :path path}))
+          (fs/directory? path) (let [pattern (glob-pattern-for-extensions
+                                              extensions)]
+                                 (fs/glob path pattern))
           (matches-extension? path extensions) [(fs/absolutize path)]
           :else [])))
      (map (comp str fs/normalize fs/absolutize))

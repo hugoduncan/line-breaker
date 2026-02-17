@@ -12,29 +12,45 @@
 (deftest parse-args-test
   (testing "parse-args"
     (testing "defaults to check mode when no mode specified"
-      (is (= {:opts {:check true}
-              :args []} (cli/parse-args []))))
+      (is (=
+           {:opts {:check true}
+            :args []}
+           (cli/parse-args []))))
     (testing "parses --check flag"
-      (is (= {:opts {:check true}
-              :args []} (cli/parse-args ["--check"]))))
+      (is (=
+           {:opts {:check true}
+            :args []}
+           (cli/parse-args ["--check"]))))
     (testing "parses --fix flag"
-      (is (= {:opts {:fix true}
-              :args []} (cli/parse-args ["--fix"]))))
+      (is (=
+           {:opts {:fix true}
+            :args []}
+           (cli/parse-args ["--fix"]))))
     (testing "parses --reformat flag"
       (is
-       (= {:opts {:reformat true}
-           :args []} (cli/parse-args ["--reformat"]))))
+       (=
+        {:opts {:reformat true}
+         :args []}
+        (cli/parse-args ["--reformat"]))))
     (testing "parses --stdout flag"
-      (is (= {:opts {:stdout true}
-              :args []} (cli/parse-args ["--stdout"]))))
+      (is (=
+           {:opts {:stdout true}
+            :args []}
+           (cli/parse-args ["--stdout"]))))
     (testing "parses --reformat --stdout combination"
-      (is (= {:opts {:reformat true :stdout true}
-              :args []}
-             (cli/parse-args ["--reformat" "--stdout"]))))
+      (is
+       (=
+        {:opts {:reformat true
+                :stdout true}
+         :args []}
+        (cli/parse-args ["--reformat" "--stdout"]))))
     (testing "parses --fix --stdout combination"
-      (is (= {:opts {:fix true :stdout true}
-              :args []}
-             (cli/parse-args ["--fix" "--stdout"]))))
+      (is
+       (=
+        {:opts {:fix true
+                :stdout true}
+         :args []}
+        (cli/parse-args ["--fix" "--stdout"]))))
     (testing "parses --line-length as a number"
       (is
        (=
@@ -43,11 +59,15 @@
          :args []}
         (cli/parse-args ["--line-length" "100"]))))
     (testing "parses --help flag"
-      (is (= {:opts {:help true}
-              :args []} (cli/parse-args ["--help"]))))
+      (is (=
+           {:opts {:help true}
+            :args []}
+           (cli/parse-args ["--help"]))))
     (testing "parses -h alias for help"
-      (is (= {:opts {:help true}
-              :args []} (cli/parse-args ["-h"]))))
+      (is (=
+           {:opts {:help true}
+            :args []}
+           (cli/parse-args ["-h"]))))
     (testing "captures positional arguments"
       (is
        (=

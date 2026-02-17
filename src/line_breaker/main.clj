@@ -72,15 +72,14 @@ Exit codes:
   Checks each file for line length violations, respecting ignore directives.
   Reports to stderr. Returns exit code: 0 if no violations, 1 if violations."
   [files max-length quiet?]
-  (let [all-violations
-        (into
-         []
-         (mapcat
-          (fn [file]
-            (map
-             #(assoc % :file file)
-             (check/check-file-with-ignore file max-length))))
-         files)
+  (let [all-violations (into
+                        []
+                        (mapcat
+                         (fn [file]
+                           (map
+                            #(assoc % :file file)
+                            (check/check-file-with-ignore file max-length))))
+                        files)
         violation-count (check/report-violations all-violations max-length)]
     (when-not quiet?
       (when-let [summary (check/format-summary (count files) violation-count)]
@@ -127,10 +126,15 @@ Exit codes:
   [files opts config]
   (let [stdout? (:stdout opts)]
     (cond
-      (and stdout? (:reformat opts))
-      (do (process-stdout files config reformat/reformat-source) 0)
-      stdout?
-      (do (process-stdout files config fix/fix-source) 0)
+      (and stdout? (:reformat opts)) (do
+                                       (process-stdout
+                                        files
+                                        config
+                                        reformat/reformat-source)
+                                       0)
+      stdout? (do
+                (process-stdout files config fix/fix-source)
+                0)
       (:fix opts) (process-fix files config (:quiet opts))
       (:reformat opts) (process-reformat files config (:quiet opts))
       (:check opts) (process-check files (:line-length config) (:quiet opts))
@@ -153,8 +157,9 @@ Exit codes:
                             config/default-config)
               ;; Merge CLI overrides with config
               final-config (cond-> base-config
-                             (:line-length opts)
-                             (assoc :line-length (:line-length opts)))
+                             (:line-length opts) (assoc
+                                                  :line-length
+                                                  (:line-length opts)))
               ;; Validate: load-config validates, but when no config file exists
               ;; we use default-config directly with CLI overrides applied.
               _ (config/validate-config final-config)

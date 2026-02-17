@@ -91,9 +91,12 @@
 ;; 50 chars - would violate default 80, but not 60
                 line (apply str (repeat 50 "z"))]
             (spit (str file) line)
-            (let [[_out _err exit-code]
-                  (with-captured-output
-                    (main/run ["--line-length" "60" "--check" (str file)]))]
+            (let [[_out _err exit-code] (with-captured-output
+                                          (main/run
+                                           ["--line-length"
+                                            "60"
+                                            "--check"
+                                            (str file)]))]
               (is (= 0 exit-code)))))))
     (testing "summary output"
       (testing "given multiple files with no violations"
@@ -137,9 +140,9 @@
                 file2 (fs/path root "b.clj")]
             (spit (str file1) "(ns a)")
             (spit (str file2) "(ns b)")
-            (let [[_out err exit-code]
-                  (with-captured-output
-                    (main/run ["--check" "--quiet" (str root)]))]
+            (let [[_out err exit-code] (with-captured-output
+                                         (main/run
+                                          ["--check" "--quiet" (str root)]))]
               (is (= 0 exit-code))
               (is (not (str/includes? err "Checked")))))))
       (testing "with -q alias"
@@ -149,9 +152,9 @@
                   file2 (fs/path root "b.clj")]
               (spit (str file1) "(ns a)")
               (spit (str file2) "(ns b)")
-              (let [[_out err exit-code]
-                    (with-captured-output
-                      (main/run ["--check" "-q" (str root)]))]
+              (let [[_out err exit-code] (with-captured-output
+                                           (main/run
+                                            ["--check" "-q" (str root)]))]
                 (is (= 0 exit-code))
                 (is (not (str/includes? err "Checked")))))))))))
 
@@ -173,7 +176,7 @@
       (testing "rewrites file with breaking applied"
         (with-temp-dir [root]
           (let [file (fs/path root "long.clj")
-;; Construct 90-char list (exceeds 80)
+                ;; Construct 90-char list (exceeds 80)
                 long-form (str "(foo " (str/join " " (repeat 20 "arg")) ")")]
             (spit (str file) long-form)
             (let [[_out err exit-code] (with-captured-output
@@ -192,9 +195,9 @@
           (let [file (fs/path root "long.clj")
                 long-form (str "(foo " (str/join " " (repeat 20 "arg")) ")")]
             (spit (str file) long-form)
-            (let [[_out err exit-code]
-                  (with-captured-output
-                    (main/run ["--fix" "--quiet" (str file)]))]
+            (let [[_out err exit-code] (with-captured-output
+                                         (main/run
+                                          ["--fix" "--quiet" (str file)]))]
               (is (= 0 exit-code))
               (is (not (str/includes? err "Fixed:"))))))))))
 
@@ -249,10 +252,11 @@
           (let [file (fs/path root "test.clj")
                 input "(+ x\n    1 2)"]
             (spit (str file) input)
-            (let [[out _err exit-code]
-                  (with-captured-output
-                    (main/run
-                     ["--reformat" "--stdout" (str file)]))]
+            (let [[out _err exit-code] (with-captured-output
+                                         (main/run
+                                          ["--reformat"
+                                           "--stdout"
+                                           (str file)]))]
               (is (= 0 exit-code))
               ;; Collapsed to single line
               (is (= "(+ x 1 2)" out))
@@ -264,10 +268,11 @@
           (let [file (fs/path root "test.clj")
                 input "(ns test)\n"]
             (spit (str file) input)
-            (let [[out _err exit-code]
-                  (with-captured-output
-                    (main/run
-                     ["--reformat" "--stdout" (str file)]))]
+            (let [[out _err exit-code] (with-captured-output
+                                         (main/run
+                                          ["--reformat"
+                                           "--stdout"
+                                           (str file)]))]
               (is (= 0 exit-code))
               (is (= input out)))))))))
 
@@ -304,9 +309,9 @@
           (let [file (fs/path root "test.clj")
                 content "(defn foo\n  [x]\n  (+ x\n    1))"]
             (spit (str file) content)
-            (let [[_out err exit-code]
-                  (with-captured-output
-                    (main/run ["--reformat" "--quiet" (str file)]))]
+            (let [[_out err exit-code] (with-captured-output
+                                         (main/run
+                                          ["--reformat" "--quiet" (str file)]))]
               (is (= 0 exit-code))
               (is (not (str/includes? err "Reformatted:"))))))))
     (testing "with --line-length override"
@@ -315,9 +320,12 @@
           (let [file (fs/path root "test.clj")
                 content "(+ 1 2 3 4 5 6 7 8 9 10)"]
             (spit (str file) content)
-            (let [[_out _err exit-code]
-                  (with-captured-output
-                    (main/run ["--reformat" "--line-length" "20" (str file)]))]
+            (let [[_out _err exit-code] (with-captured-output
+                                          (main/run
+                                           ["--reformat"
+                                            "--line-length"
+                                            "20"
+                                            (str file)]))]
               (is (= 0 exit-code))
               ;; Should be re-broken since it exceeds 20
               (let [result (slurp (str file))]
@@ -355,9 +363,9 @@
           (spit (str config-path) "{:line-length 80}")
           (spit (str file) "(ns test)")
           ;; Should work with CLI override
-          (let [[_out _err exit-code]
-                (with-captured-output
-                  (main/run ["--line-length" "100" (str file)]))]
+          (let [[_out _err exit-code] (with-captured-output
+                                        (main/run
+                                         ["--line-length" "100" (str file)]))]
             (is (= 0 exit-code))))))))
 
 (deftest error-handling-test

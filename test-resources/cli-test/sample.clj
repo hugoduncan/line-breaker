@@ -1,4 +1,5 @@
 (ns sample)
 
-(defn hello [name]
+(defn hello
+  [name]
   (println "Hello," name))

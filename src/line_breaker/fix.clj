@@ -32,17 +32,18 @@
       (cond
         (>= byte-idx byte-offset) char-idx
         (>= char-idx len) len
-        :else
-        (let [code-point (.codePointAt s char-idx)
-              ;; Number of chars this code point uses (1 or 2 for surrogates)
-              char-count (Character/charCount code-point)
-              ;; Number of UTF-8 bytes this code point uses
-              code-point-bytes (cond
-                                 (<= code-point 0x7F) 1
-                                 (<= code-point 0x7FF) 2
-                                 (<= code-point 0xFFFF) 3
-                                 :else 4)]
-          (recur (+ char-idx char-count) (+ byte-idx code-point-bytes)))))))
+        :else (let [code-point (.codePointAt s char-idx)
+                    ;; Chars this code point uses (1 or 2 for surrogates)
+                    char-count (Character/charCount code-point)
+                    ;; Number of UTF-8 bytes this code point uses
+                    code-point-bytes (cond
+                                       (<= code-point 0x7F) 1
+                                       (<= code-point 0x7FF) 2
+                                       (<= code-point 0xFFFF) 3
+                                       :else 4)]
+                (recur
+                 (+ char-idx char-count)
+                 (+ byte-idx code-point-bytes)))))))
 
 (defn apply-edits
   "Apply replacement edits to source string.
@@ -138,14 +139,14 @@
                       (fn [[prev-child next-child]]
                         (let [end-byte (element-end-offset prev-child)
                               start-byte (element-start-offset next-child)
-                              prev-end-line
-                              (second (node/node-line-range prev-child))
-                              next-start-line
-                              (node-start-line next-child)]
+                              prev-end-line (second
+                                             (node/node-line-range prev-child))
+                              next-start-line (node-start-line next-child)]
                           ;; Skip blank line gaps — they're intentional
                           ;; grouping separators, not formatting
-                          (when (and (> start-byte end-byte)
-                                     (< (- next-start-line prev-end-line) 2))
+                          (when (and
+                                 (> start-byte end-byte)
+                                 (< (- next-start-line prev-end-line) 2))
                             {:start end-byte
                              :end start-byte
                              :replacement
@@ -298,10 +299,14 @@
   Preserves blank lines between children as grouping separators."
   [prev-child next-child indent-col]
   (let [indent-spaces (apply str (repeat indent-col \space))
-        blank-line? (>= (- (node-start-line next-child)
-                           (second (node/node-line-range prev-child)))
-                        2)
-        newline-str (if blank-line? "\n\n" "\n")]
+        blank-line? (>=
+                     (-
+                      (node-start-line next-child)
+                      (second (node/node-line-range prev-child)))
+                     2)
+        newline-str (if blank-line?
+                      "\n\n"
+                      "\n")]
     (cond
       ;; Comment on same line as prev: keep them together (no edit)
       (and (comment-node? next-child) (same-line? prev-child next-child)) nil
@@ -309,7 +314,8 @@
       (comment-node? prev-child) {:start (element-end-offset prev-child)
                                   :end (element-start-offset next-child)
                                   :replacement (str
-                                                (when blank-line? "\n")
+                                                (when blank-line?
+                                                  "\n")
                                                 indent-spaces)}
       ;; Normal case: add newline + indent
       :else {:start (element-end-offset prev-child)
@@ -411,17 +417,18 @@
   Filters pairs-to-break for pair-grouped second elements that will move
   to indent-col, then collapses them so they re-indent correctly."
   [pairs-to-break indent-col config]
-  (let [moved-pair-children
-        (into
-         []
-         (comp
-          (map second)
-          (filter
-           (fn [child]
-             (and
-              (rules/uses-pair-grouping? child config)
-              (not= (form-start-column child) indent-col)))))
-         pairs-to-break)]
+  (let [moved-pair-children (into
+                             []
+                             (comp
+                              (map second)
+                              (filter
+                               (fn [child]
+                                 (and
+                                  (rules/uses-pair-grouping? child config)
+                                  (not=
+                                   (form-start-column child)
+                                   indent-col)))))
+                             pairs-to-break)]
     (collapse-repositioned-children moved-pair-children indent-col)))
 
 (defn generate-parent-break-edits
@@ -741,12 +748,12 @@
             (or
              (and
               (children-sharing-long-line? node long-lines-set)
-              (or (nil? max-length)
-                  (>= (max-line-end-column node) max-length)
-                  (only-trailing-delimiters? source node)))
+              (or
+               (nil? max-length)
+               (>= (max-line-end-column node) max-length)
+               (only-trailing-delimiters? source node)))
              (and
-              (or (nil? max-length)
-                  (>= (max-line-end-column node) max-length))
+              (or (nil? max-length) (>= (max-line-end-column node) max-length))
               (contains-long-line? node long-lines-set)
               (has-consecutive-children-on-line? node))))
        (break-form node config)))))

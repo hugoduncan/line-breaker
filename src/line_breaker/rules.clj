@@ -141,8 +141,7 @@
      :cond->
      :map
      :binding-vector
-     :metadata-wrapped)
-    2
+     :metadata-wrapped) 2
     :condp 3
     (:cond :try :do) 1
     1))

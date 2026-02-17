@@ -85,22 +85,22 @@
       ;; 2. Explicit path via environment variable
       (and env-path (fs/exists? env-path)) [(fs/path env-path) :env-var]
       ;; 3. Classpath resource (extract to temp)
-      :else
-      (if-let [extracted (extract-resource-to-temp resource-path)]
-        [extracted :classpath]
-        ;; 4. java.library.path
-        (if-let [lib-path-result (find-in-library-path lib-name)]
-          [lib-path-result :library-path]
-          ;; Not found
-          (throw
-           (ex-info
-            (str "Could not find native library: " lib-name)
-            {:library lib-name
-             :os os
-             :arch arch
-             :env-var-checked (boolean env-path)
-             :resource-path resource-path
-             :library-path (System/getProperty "java.library.path")})))))))
+      :else (if-let [extracted (extract-resource-to-temp resource-path)]
+              [extracted :classpath]
+              ;; 4. java.library.path
+              (if-let [lib-path-result (find-in-library-path lib-name)]
+                [lib-path-result :library-path]
+                ;; Not found
+                (throw
+                 (ex-info
+                  (str "Could not find native library: " lib-name)
+                  {:library lib-name
+                   :os os
+                   :arch arch
+                   :env-var-checked (boolean env-path)
+                   :resource-path resource-path
+                   :library-path (System/getProperty
+                                  "java.library.path")})))))))
 
 (defn- load-clojure-language*
   "Internal: load the Clojure language grammar from a native library."

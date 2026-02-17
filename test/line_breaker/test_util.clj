@@ -18,5 +18,6 @@
          err# (java.io.StringWriter.)]
      (binding [*out* out#
                *err* err#]
-       (let [result# (do ~@body)]
+       (let [result# (do
+                       ~@body)]
          [(str out#) (str err#) result#]))))

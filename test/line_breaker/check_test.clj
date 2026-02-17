@@ -33,8 +33,9 @@
           (is
            (=
             [{:line 1
-              :length 12} {:line 3
-                           :length 15}]
+              :length 12}
+             {:line 3
+              :length 15}]
             (check/check-line-lengths (str file) 10))))))
     (testing "returns empty vector for empty file"
       (with-temp-dir [dir]
@@ -63,16 +64,20 @@
       (is
        (=
         "src/foo.clj:42: line exceeds 80 characters (actual: 95)"
-        (check/format-violation {:file "src/foo.clj"
-                                 :line 42
-                                 :length 95} 80))))
+        (check/format-violation
+         {:file "src/foo.clj"
+          :line 42
+          :length 95}
+         80))))
     (testing "formats very long line correctly"
       (is
        (=
         "test.clj:1: line exceeds 80 characters (actual: 500)"
-        (check/format-violation {:file "test.clj"
-                                 :line 1
-                                 :length 500} 80))))
+        (check/format-violation
+         {:file "test.clj"
+          :line 1
+          :length 500}
+         80))))
     (testing "formats deep path correctly"
       (is
        (=
@@ -86,9 +91,11 @@
       (is
        (=
         "x.clj:1: line exceeds 40 characters (actual: 50)"
-        (check/format-violation {:file "x.clj"
-                                 :line 1
-                                 :length 50} 40))))))
+        (check/format-violation
+         {:file "x.clj"
+          :line 1
+          :length 50}
+         40))))))
 
 (deftest report-violations-test
   ;; Tests violations are written to stderr in the correct format.
@@ -101,9 +108,9 @@
                         {:file "b.clj"
                          :line 2
                          :length 90}]
-            err-output
-            (with-out-str
-              (binding [*err* *out*] (check/report-violations violations 80)))]
+            err-output (with-out-str
+                         (binding [*err* *out*]
+                           (check/report-violations violations 80)))]
         (is
          (=
           (str
@@ -130,8 +137,9 @@
   (testing "filter-violations"
     (testing "returns all violations when no ranges"
       (let [violations [{:line 1
-                         :length 85} {:line 5
-                                      :length 90}]]
+                         :length 85}
+                        {:line 5
+                         :length 90}]]
         (is (= violations (check/filter-violations violations #{})))))
     (testing "removes violations within single range"
       (let [violations [{:line 1
@@ -143,8 +151,9 @@
         (is
          (=
           [{:line 1
-            :length 85} {:line 5
-                         :length 95}]
+            :length 85}
+           {:line 5
+            :length 95}]
           (check/filter-violations violations #{[2 4]})))))
     (testing "removes violations within multiple ranges"
       (let [violations [{:line 1
@@ -158,13 +167,15 @@
         (is
          (=
           [{:line 1
-            :length 85} {:line 10
-                         :length 100}]
+            :length 85}
+           {:line 10
+            :length 100}]
           (check/filter-violations violations #{[2 4] [6 8]})))))
     (testing "includes violation on range boundary (inclusive)"
       (let [violations [{:line 2
-                         :length 85} {:line 4
-                                      :length 90}]]
+                         :length 85}
+                        {:line 4
+                         :length 90}]]
         (is (= [] (check/filter-violations violations #{[2 4]})))))
     (testing "returns empty when all filtered"
       (let [violations [{:line 3

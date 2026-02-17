@@ -176,14 +176,13 @@
          ;; For ns, break between all clause children (list_lit)
          (and base-rule (= 'ns head-sym))
          (let [children (node/named-children node)
-               clause-idxs
-               (into
-                []
-                (keep-indexed
-                 (fn [i c]
-                   (when (= :list_lit (node/node-type c))
-                     i)))
-                children)]
+               clause-idxs (into
+                            []
+                            (keep-indexed
+                             (fn [i c]
+                               (when (= :list_lit (node/node-type c))
+                                 i)))
+                            children)]
            (if (> (count clause-idxs) 1)
              (update
               base-rule
@@ -203,18 +202,19 @@
   type in :after-types."
   [children rule]
   (let [base (:after-indices rule #{})
-        type-indices
-        (when-let [types (:after-types rule)]
-          (into
-           #{}
-           (keep
-            (fn [type-kw]
-              (some
-               (fn [i]
-                 (when (= type-kw (node/node-type (nth children i)))
-                   i))
-               (range (count children)))))
-           types))]
+        type-indices (when-let [types (:after-types rule)]
+                       (into
+                        #{}
+                        (keep
+                         (fn [type-kw]
+                           (some
+                            (fn [i]
+                              (when (=
+                                     type-kw
+                                     (node/node-type (nth children i)))
+                                i))
+                            (range (count children)))))
+                        types))]
     (into base type-indices)))
 
 (defn- contiguous-line?
@@ -234,11 +234,12 @@
   (when (seq break-positions)
     (let [n (count children)
           ;; Skip past comment chain from the max break position
-          first-body-idx
-          (loop [i (inc (apply max break-positions))]
-            (if (and (< i n) (fix/comment-node? (nth children i)))
-              (recur (inc i))
-              i))]
+          first-body-idx (loop [i (inc (apply max break-positions))]
+                           (if (and
+                                (< i n)
+                                (fix/comment-node? (nth children i)))
+                             (recur (inc i))
+                             i))]
       (into
        #{}
        (filter
@@ -247,9 +248,9 @@
             (and
              (< ni n)
              (not (fix/comment-node? (nth children i)))
-             (or (contiguous-line? (nth children i) (nth children ni))
-                 (not= indent-col
-                       (fix/form-start-column (nth children ni))))))))
+             (or
+              (contiguous-line? (nth children i) (nth children ni))
+              (not= indent-col (fix/form-start-column (nth children ni))))))))
        (range first-body-idx (dec n))))))
 
 (defn- needs-break-or-reindent?
@@ -276,9 +277,10 @@
            (when (< ni n)
              (let [child (nth children i)
                    next-child (nth children ni)]
-               (or (needs-break-or-reindent? child next-child indent-col)
-                   (when (fix/comment-node? next-child)
-                     (recur ni))))))))
+               (or
+                (needs-break-or-reindent? child next-child indent-col)
+                (when (fix/comment-node? next-child)
+                  (recur ni))))))))
      break-positions)))
 
 (defn- generate-forced-break-edits
@@ -296,13 +298,14 @@
             indent-col (fix/indent-column
                         node
                         (rules/get-effective-rule node config))
-            break-positions
-            (if (rules/uses-pair-grouping? node config)
-              base-positions
-              (into
-               base-positions
-               (body-separation-positions
-                children base-positions indent-col)))]
+            break-positions (if (rules/uses-pair-grouping? node config)
+                              base-positions
+                              (into
+                               base-positions
+                               (body-separation-positions
+                                children
+                                base-positions
+                                indent-col)))]
         (when (form-needs-forced-break? children break-positions indent-col)
           (into
            []
@@ -320,10 +323,7 @@
                                  child
                                  next-child
                                  indent-col)
-                            (fix/make-break-edit
-                             child
-                             next-child
-                             indent-col))]
+                            (fix/make-break-edit child next-child indent-col))]
                       (if (fix/comment-node? next-child)
                         (recur ni (if edit
                                     (conj edits edit)
@@ -453,8 +453,7 @@
         breakable-children (drop base-keep-count children)]
     (when (seq breakable-children)
       (let [last-kept (nth children (dec base-keep-count))
-            parent-result
-            (fix/generate-parent-break-edits node config)]
+            parent-result (fix/generate-parent-break-edits node config)]
         (if (:moves-child? parent-result)
           (:edits parent-result)
           (let [break-edits (fix/generate-paired-edits
@@ -493,5 +492,7 @@
   [source config]
   (let [collapsed (collapse-top-level-forms source)]
     (fix/fix-source
-     collapsed config
-     :form-breakers [forced-break-form pair-break-form])))
+     collapsed
+     config
+     :form-breakers
+     [forced-break-form pair-break-form])))

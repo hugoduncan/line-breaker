@@ -20,17 +20,19 @@
       (let [tree (parser/parse-source "#_:line-breaker/ignore (long-form)")]
         (is (= #{[1 1]} (check/find-ignored-ranges tree)))))
     (testing "finds multiple ignore markers"
-      (let [tree
-            (parser/parse-source
-             (str
-              "#_:line-breaker/ignore (form1)\n"
-              "(normal)\n"
-              "#_:line-breaker/ignore (form2)"))]
+      (let [tree (parser/parse-source
+                  (str
+                   "#_:line-breaker/ignore (form1)\n"
+                   "(normal)\n"
+                   "#_:line-breaker/ignore (form2)"))]
         (is (= #{[1 1] [3 3]} (check/find-ignored-ranges tree)))))
     (testing "handles multiline ignored form"
-      (let [tree
-            (parser/parse-source
-             (str "#_:line-breaker/ignore\n" "(defn foo\n" "  [x]\n" "  x)"))]
+      (let [tree (parser/parse-source
+                  (str
+                   "#_:line-breaker/ignore\n"
+                   "(defn foo\n"
+                   "  [x]\n"
+                   "  x)"))]
         (is (= #{[2 4]} (check/find-ignored-ranges tree)))))
     (testing "ignores marker at end of file with no sibling"
       (let [tree (parser/parse-source "(form)\n#_:line-breaker/ignore")]
@@ -95,8 +97,9 @@
           (is
            (=
             [{:line 1
-              :length 35} {:line 4
-                           :length 35}]
+              :length 35}
+             {:line 4
+              :length 35}]
             (check/check-file-with-ignore (str file) 30))))))
     (testing "returns empty for file with no violations"
       (with-temp-dir [dir]

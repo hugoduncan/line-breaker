@@ -1,3 +1,4 @@
 (ns nested.deep.bottom)
 
-(def value 42)
+(def value
+  42)

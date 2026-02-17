@@ -167,8 +167,10 @@
 (deftest deep-merge-test
   (testing "deep-merge"
     (testing "merges flat maps"
-      (is (= {:a 1
-              :b 2} (config/deep-merge {:a 1} {:b 2}))))
+      (is (=
+           {:a 1
+            :b 2}
+           (config/deep-merge {:a 1} {:b 2}))))
     (testing "later values override earlier"
       (is (= {:a 2} (config/deep-merge {:a 1} {:a 2}))))
     (testing "deeply merges nested maps"
