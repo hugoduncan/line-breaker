@@ -193,14 +193,17 @@
   For breakable values with more children than kept on the first line,
   estimates the width after breaking by using the end column of the last
   kept child. This avoids over-estimating when a collapsed value would
-  be broken internally rather than split from its key."
+  be broken internally rather than split from its key.
+  For metadata-wrapped values, the metadata child shifts named-children
+  indices, so keep-count is adjusted to compensate."
   [exc-name exc-value config]
   (let [value-end
         (if (rules/breakable-node? exc-value)
           (let [children (node/named-children exc-value)
                 val-rule (rules/get-effective-rule exc-value config)
                 keep-count
-                (rules/elements-to-keep-on-first-line val-rule)]
+                (cond-> (rules/elements-to-keep-on-first-line val-rule)
+                  (rules/metadata-wrapped? exc-value) inc)]
             (if (and (seq children)
                      (< keep-count (count children)))
               (first-line-end-column

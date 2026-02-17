@@ -174,11 +174,6 @@
           (is
            (not (str/includes? (fix/apply-edits source (:edits result)) ":a\n"))
            "pair stays together, value broken internally")))
-      ;; FIXME: effective-pair-width underestimates for metadata-wrapped
-      ;; map values because the metadata child shifts the pair indices.
-      ;; With :map rule keep=2, (nth children 1) is the first key
-      ;; (after metadata) instead of the first value. This causes the
-      ;; width check to miss that the first pair won't fit at indent.
       (testing "with metadata-wrapped map value"
         (testing "should split when first pair exceeds at indent"
           (let [source "{:a ^:m {:fgh ij :k l} :x 1}"
@@ -186,13 +181,10 @@
                 result (fix/break-form form {:line-length 14})
                 output (fix/apply-edits source (:edits result))]
             (is (map? result))
-            ;; Currently the pair is NOT split because the estimate
-            ;; uses :fgh (col 13) instead of ij (col 16).
-            ;; When fixed, this should split ":a\n" from its value.
             (is
-             (not (str/includes? output ":a\n"))
-             (str "pair not split (known bug),"
-                  " got:\n"
+             (str/includes? output ":a\n")
+             (str "pair split when value head"
+                  " exceeds at indent, got:\n"
                   output))))))))
 
 (deftest find-long-lines-test
