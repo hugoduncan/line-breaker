@@ -1335,3 +1335,25 @@
           (is
            (re-find #"(?m)^\s+\(testing \"inner\"" result)
            "inner testing on its own line"))))))
+
+(deftest trailing-ancestor-delimiters-test
+  ;; When a form's own end column is below the limit but trailing
+  ;; closing delimiters from ancestor forms push the line over,
+  ;; the form should still be broken.
+  (testing "fix-source"
+    (testing "given a form just under the limit"
+      (testing "breaks when ancestor parens push line over"
+        (let [input (str
+                     "(deftest t\n"
+                     "  (testing \"a\"\n"
+                     "    (testing \"b\"\n"
+                     "      (is (= x y)"
+                     " \"msg-long-enough\"))))")
+              result (fix/fix-source
+                      input {:line-length 35})]
+          (is
+           (< (apply max
+                     (mapv count
+                           (str/split-lines result)))
+              36)
+           "all lines within limit"))))))
