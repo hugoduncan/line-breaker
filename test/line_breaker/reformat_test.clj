@@ -767,16 +767,61 @@
   ;; When a function call has a child that becomes multi-line (e.g. a
   ;; map arg that gets pair-broken), sibling args should be placed on
   ;; their own lines rather than sharing the closing delimiter's line.
-  ;; This tests the MultilineChildBreaking rule from the spec.
+  ;; Multi-line pair-grouped children (maps, binding vectors) that move
+  ;; to new positions must have stale internal indentation corrected.
   (testing "reformat-source"
-    (testing "given a function call with a map arg"
-      (testing "separates sibling args after map is pair-broken"
+    (testing "given a function call with a small map arg"
+      (testing "separates sibling args from map"
         (let [input "(f {:a 1 :b 2} \"x\" \"y\")"
               result (reformat/reformat-source
                       input
                       {:line-length 25})]
           (is
            (not (re-find #"\}.*\"" result))
-              (str "no string args on same line as },"
-                   " got:\n"
-                   result)))))))
+           (str "no string args on same line as },"
+                " got:\n"
+                result)))))
+    (testing "given a map arg that fits on its own line"
+      (testing "collapses map to single line after reposition"
+        (let [input (str "(p/shell"
+                         " {:out :string"
+                         " :err :string"
+                         " :continue true}"
+                         " \"arch\""
+                         " \"-x86_64\""
+                         " \"/usr/bin/true\")")
+              result (reformat/reformat-source
+                      input
+                      {:line-length 80})]
+          (is
+           (re-find #"(?m)^ \{:out" result)
+           (str "map starts at col 1,"
+                " got:\n"
+                result))
+          (is
+           (not (re-find #"(?m)^ {5,}" result))
+           (str "no stale indent (5+ spaces),"
+                " got:\n"
+                result)))))
+    (testing "given a map arg too long for one line"
+      (testing "re-breaks map with correct indent"
+        (let [input (str "(f {:aaa 1 :bbb 2"
+                         " :ccc 3} \"x\" \"y\")")
+              result (reformat/reformat-source
+                      input
+                      {:line-length 20})]
+          (is
+           (not (re-find #"\}.*\"" result))
+           (str "no string args on same line as },"
+                " got:\n"
+                result))
+          (is
+           (re-find #"(?m)^ \{:aaa 1$" result)
+           (str "map at col 1 with first pair,"
+                " got:\n"
+                result))
+          (is
+           (re-find #"(?m)^  :bbb 2$" result)
+           (str "second pair at col 2,"
+                " got:\n"
+                result)))))))

@@ -575,12 +575,12 @@
              (when (seq edits)
                (if (and
                     exceeding-pair
-                        (single-line-node? exc-value)
-                        (rules/breakable-node? exc-value)
-                        (let [pair-width
-                              (- (first-line-end-column exc-value)
-                                 (form-start-column exc-name))]
-                          (> (+ indent-col pair-width) max-length)))
+                    (single-line-node? exc-value)
+                    (rules/breakable-node? exc-value)
+                    (let [pair-width
+                          (- (first-line-end-column exc-value)
+                             (form-start-column exc-name))]
+                      (> (+ indent-col pair-width) max-length)))
                  (break-exceeding-pair
                   exc-name exc-value children base-keep-count
                   breakable-children indent-col)
@@ -667,7 +667,7 @@
   [broken-ranges [start end]]
   (some
    (fn [[s e]]
-          (and (<= s start) (<= end e)))
+     (and (<= s start) (<= end e)))
    broken-ranges))
 
 (defn try-collect-edits
@@ -804,8 +804,10 @@
 
 (defn- generate-multiline-child-break-edits
   "Generate edits to separate children sharing lines in a form with
-  multi-line children. Only inserts breaks between children that share
-  a line — does not collapse existing multi-line children."
+  multi-line children. Inserts breaks between children that share a
+  line. Also collapses repositioned pair-grouped children (maps,
+  binding vectors) whose internal indentation would be stale at
+  their new column position."
   [node config]
   (let [rule (rules/get-effective-rule node config)
         children (node/named-children node)
@@ -817,32 +819,52 @@
             all-pairs (cons
                        [last-kept (first breakable-children)]
                        (partition 2 1 breakable-children))
-            edits
+            sharing-line?
+            (fn [[prev-child next-child]]
+              (let [[_ prev-end] (node/node-line-range prev-child)
+                    next-start (node-start-line next-child)]
+                (= prev-end next-start)))
+            pairs-to-break (filterv sharing-line? all-pairs)
+            break-edits
             (into
              []
              (keep
               (fn [[prev-child next-child]]
-                (let [[_ prev-end] (node/node-line-range prev-child)
-                      next-start (node-start-line next-child)]
-                  (when (= prev-end next-start)
-                    (make-break-edit
-                     prev-child next-child indent-col)))))
-             all-pairs)]
-        (when (seq edits)
-          edits)))))
+                (make-break-edit prev-child next-child indent-col)))
+             pairs-to-break)
+            ;; Collapse pair-grouped children moving to a new column.
+            ;; Only pair-grouped forms have stale pair indentation
+            ;; after repositioning; other forms are re-indented by
+            ;; forced-breaks or fix-source on the next iteration.
+            moved-pair-children
+            (into
+             []
+             (comp
+              (map second)
+              (filter
+               (fn [child]
+                 (and (rules/uses-pair-grouping? child config)
+                      (not= (form-start-column child) indent-col)))))
+             pairs-to-break)
+            collapse-edits
+            (collapse-repositioned-children moved-pair-children)]
+        (when (seq break-edits)
+          (into break-edits collapse-edits))))))
 
 (defn- find-multiline-child-forms
-  "Walk tree pre-order to find all forms needing multiline-child breaking."
+  "Walk tree pre-order to find forms needing multiline-child breaking.
+  Does not recurse into found forms — their children may be collapsed,
+  so inner forms are deferred to the next iteration."
   [root config]
   (let [results (transient [])]
     (letfn
      [(walk
-             [node]
-              (when node
-                (when (needs-multiline-child-breaking? node config)
-                  (conj! results node))
-                (doseq [child (node/named-children node)]
-                  (walk child))))]
+        [node]
+        (when node
+          (if (needs-multiline-child-breaking? node config)
+            (conj! results node)
+            (doseq [child (node/named-children node)]
+              (walk child)))))]
       (walk root))
     (persistent! results)))
 
