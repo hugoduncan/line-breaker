@@ -52,6 +52,12 @@
         "(defn foo [x] x)\n\n(defn bar [y] y)"
         (reformat/collapse-top-level-forms
          (str "(defn foo\n  [x]\n  x)" "\n\n" "(defn bar\n  [y]\n  y)")))))
+    (testing "preserves blank lines between sibling children"
+      (is
+       (=
+        "{:a {:x 1 :y 2}\n\n :b {:z 3 :w 4}}"
+        (reformat/collapse-top-level-forms
+         "{:a {:x 1\n     :y 2}\n\n :b {:z 3\n     :w 4}}"))))
     (testing "leaves already single-line form unchanged"
       (is (= "(+ 1 2)" (reformat/collapse-top-level-forms "(+ 1 2)"))))
     (testing "collapses ignored forms"
@@ -725,3 +731,30 @@
         (is
          (some #(re-find #":k2" %) lines)
          (str ":k2 should appear," " got:\n" result))))))
+
+(deftest blank-line-preservation-test
+  ;; Verify blank lines between sibling forms are preserved
+  ;; through the full reformat pipeline (collapse + re-break).
+  ;; Blank lines are intentional grouping separators.
+  (testing "reformat-source"
+    (testing "preserves blank lines between map entries"
+      (let [input (str "{:a {:x 1 :y 2}\n"
+                       "\n"
+                       " :b {:z 3 :w 4}}")
+            result (reformat/reformat-source
+                    input {:line-length 80})]
+        (is
+         (pos? (count (re-seq #"\n\n" result)))
+         (str "blank line lost, got:\n" result))))
+    (testing "preserves multiple blank line groups"
+      (let [input (str "{:a 1\n"
+                       "\n"
+                       " :b 2\n"
+                       "\n"
+                       " :c 3}")
+            result (reformat/reformat-source
+                    input {:line-length 80})]
+        (is
+         (= 2 (count (re-seq #"\n\n" result)))
+         (str "expected 2 blank lines,"
+              " got:\n" result))))))

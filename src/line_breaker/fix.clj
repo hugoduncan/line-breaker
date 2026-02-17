@@ -136,16 +136,21 @@
                      (keep
                       (fn [[prev-child next-child]]
                         (let [end-byte (element-end-offset prev-child)
-                              start-byte (element-start-offset next-child)]
-                          (when (> start-byte end-byte)
+                              start-byte (element-start-offset next-child)
+                              prev-end-line
+                              (second (node/node-line-range prev-child))
+                              next-start-line
+                              (node-start-line next-child)]
+                          ;; Skip blank line gaps — they're intentional
+                          ;; grouping separators, not formatting
+                          (when (and (> start-byte end-byte)
+                                     (< (- next-start-line prev-end-line) 2))
                             {:start end-byte
                              :end start-byte
                              :replacement
                              (if (and
                                   (= :comment (node/node-type next-child))
-                                  (not=
-                                   (second (node/node-line-range prev-child))
-                                   (node-start-line next-child)))
+                                  (not= prev-end-line next-start-line))
                                "\n"
                                " ")}))))
                      (partition 2 1 children))]
@@ -288,20 +293,27 @@
 (defn make-break-edit
   "Create a break edit between two children.
   Returns nil if no edit needed (comment attached to preceding element).
-  When prev-child is a comment (has trailing newline), only inserts indent."
+  When prev-child is a comment (has trailing newline), only inserts indent.
+  Preserves blank lines between children as grouping separators."
   [prev-child next-child indent-col]
-  (let [indent-spaces (apply str (repeat indent-col \space))]
+  (let [indent-spaces (apply str (repeat indent-col \space))
+        blank-line? (>= (- (node-start-line next-child)
+                           (second (node/node-line-range prev-child)))
+                        2)
+        newline-str (if blank-line? "\n\n" "\n")]
     (cond
       ;; Comment on same line as prev: keep them together (no edit)
       (and (comment-node? next-child) (same-line? prev-child next-child)) nil
       ;; Prev is comment (ends with newline): just add indent
       (comment-node? prev-child) {:start (element-end-offset prev-child)
                                   :end (element-start-offset next-child)
-                                  :replacement indent-spaces}
+                                  :replacement (str
+                                                (when blank-line? "\n")
+                                                indent-spaces)}
       ;; Normal case: add newline + indent
       :else {:start (element-end-offset prev-child)
              :end (element-start-offset next-child)
-             :replacement (str "\n" indent-spaces)})))
+             :replacement (str newline-str indent-spaces)})))
 
 (defn generate-paired-edits
   "Generate edits for pair-grouped breaking.
