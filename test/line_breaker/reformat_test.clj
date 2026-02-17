@@ -9,6 +9,7 @@
   - Comment indentation preservation through reformat
   - No rightward drift in nested forms"
   (:require
+   [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [line-breaker.reformat :as reformat]))
 
@@ -453,7 +454,7 @@
            (str "(cond (= x 1)\n" "  :one (= x 2)\n" "  :two)")
            {:line-length 80})))))
     (testing "given a cond with long test+value pairs"
-      (testing "splits pair when in-place broken value still exceeds"
+      (testing "breaks value in-place when sub-forms can be broken"
         (let [input (str
                      "(cond (not (fs/exists? p))"
                      " (throw (ex-info \"m\" {}))"
@@ -461,10 +462,16 @@
               result (reformat/reformat-source
                       input {:line-length 40})]
           (is
-           (re-find
-            #"(?m)^\s+\(not \(fs/exists\? p\)\)\n\s+\(throw"
-            result)
-           "test and value on separate lines"))))
+           (str/includes?
+            result
+            "(not (fs/exists? p)) (throw")
+           "test and value-head on same line")
+          (is
+           (< (apply max
+                     (map count
+                          (str/split-lines result)))
+              41)
+           "all lines within limit"))))
     (testing "given a cond with long test and multi-line do body"
       (testing "splits pair onto separate lines"
         (let [input (str

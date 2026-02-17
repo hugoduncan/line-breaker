@@ -1014,6 +1014,23 @@
               result (fix/fix-source source {:line-length 25})]
           (is
            (< (apply max (map count (str/split-lines result))) 26)
+           "all lines within limit"))))
+    (testing "does not split pair when internal sub-forms can be broken"
+      ;; When a pair value is multi-line with an exceeding internal
+      ;; line, the exceeding should be fixed by breaking sub-forms
+      ;; rather than splitting the pair to a separate line.
+      (testing "keeps key and value-head on same line"
+        (let [source (str
+                      "(let [blank-line?"
+                      " (>= (- (start-line nc)"
+                      " (second (line-range pc)))"
+                      " 2)] body)")
+              result (fix/fix-source source {:line-length 40})]
+          (is
+           (str/includes? result "blank-line? (>=")
+           "key and value-head stay on same line")
+          (is
+           (< (apply max (map count (str/split-lines result))) 41)
            "all lines within limit"))))))
 
 (deftest edge-cases-test

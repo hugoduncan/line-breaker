@@ -469,10 +469,11 @@
   together (key-value, test-result, etc.) and breaks only between pairs.
 
   Uses a single-pass-then-backtrack approach for pair-grouped forms:
-  generates normal paired edits first, then checks if any exceeding pair
-  would still exceed at the indent position (using estimated post-break
-  width for breakable values). If so, backtracks to split the pair onto
-  its own line via break-exceeding-pair.
+  generates normal paired edits first, then checks if any exceeding pair's
+  first line (key + value head) would still exceed at the indent position.
+  If so, backtracks to split the pair onto its own line via
+  break-exceeding-pair. Internal lines of multi-line values are left to
+  subsequent iterations to fix by breaking sub-forms.
 
   When breaking repositions children that are already multi-line, also
   collapses them so the next iteration re-breaks at the correct indent.
@@ -504,16 +505,12 @@
            split-pair? (and
                         exceeding-pair
                         (rules/breakable-node? exc-value)
-                        (or
-                         ;; Phase 3: multi-line breakable value still exceeds
-                         (not (single-line-node? exc-value))
-                         ;; NonBindingPairSplit: pair width at indent exceeds
-                         (pair-exceeds-at-indent?
-                          exc-name
-                          exc-value
-                          indent-col
-                          max-length
-                          config)))]
+                        (pair-exceeds-at-indent?
+                         exc-name
+                         exc-value
+                         indent-col
+                         max-length
+                         config))]
        (if split-pair?
          ;; Pair's first line (key + value head) exceeds at indent,
          ;; split onto separate lines regardless of other children.
