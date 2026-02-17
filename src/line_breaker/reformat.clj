@@ -479,9 +479,10 @@
 
 (defn- generate-pair-break-edits
   "Generate edits to break a pair-grouped form so each pair is on its
-  own line. Also collapses multi-line values so they get properly
-  re-broken at their new indent position by subsequent fix-source
-  passes. Returns edits or nil."
+  own line. When breaking will make the form multi-line, backtracks to
+  break siblings in the parent form. If the parent break moves this
+  form, omits internal edits so the next iteration re-breaks correctly.
+  Returns edits or nil."
   [node config]
   (let [rule (rules/get-effective-rule node config)
         children (node/named-children node)
@@ -490,12 +491,18 @@
         breakable-children (drop base-keep-count children)]
     (when (seq breakable-children)
       (let [last-kept (nth children (dec base-keep-count))
-            break-edits (fix/generate-paired-edits
-                         last-kept
-                         breakable-children
-                         indent-col)]
-        (when (seq break-edits)
-          break-edits)))))
+            parent-result
+            (fix/generate-parent-break-edits node config)]
+        (if (:moves-child? parent-result)
+          (:edits parent-result)
+          (let [break-edits (fix/generate-paired-edits
+                             last-kept
+                             breakable-children
+                             indent-col)
+                parent-edits (:edits parent-result)]
+            (when (seq break-edits)
+              (cond-> break-edits
+                parent-edits (into parent-edits)))))))))
 
 (defn apply-pair-breaking
   "Force pair-grouped forms to break so each pair is on its own line.

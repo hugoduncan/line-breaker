@@ -522,6 +522,76 @@
   (let [pw (effective-pair-width exc-name exc-value config)]
     (> (+ indent-col pw) max-length)))
 
+(defn generate-parent-break-edits
+  "When breaking a child will make it multi-line, check whether the
+  parent has siblings sharing a line with the child. If so, generate
+  break edits to separate them. Only applies to parents without indent
+  rules (plain function calls, data structures) — forms with indent
+  rules (let, defn, etc.) use forced breaks for body separation.
+  Also collapses repositioned pair-grouped siblings whose internal
+  indent would be stale at the new column.
+  Returns a map {:edits [...] :moves-child? bool}, or nil."
+  [child-node config]
+  (when-let [parent (node/node-parent child-node)]
+    (let [rule (rules/get-effective-rule parent config)]
+      (when (and (rules/breakable-node? parent)
+                 (not (rules/uses-pair-grouping? parent config))
+                 (nil? rule)
+                 (has-consecutive-children-on-line? parent))
+        (let [children (node/named-children parent)
+              base-keep-count
+              (rules/elements-to-keep-on-first-line rule)
+              indent-col (indent-column parent rule)
+              breakable-children
+              (drop base-keep-count children)]
+          (when (seq breakable-children)
+            (let [last-kept (nth children (dec base-keep-count))
+                  all-pairs
+                  (cons
+                   [last-kept (first breakable-children)]
+                   (partition 2 1 breakable-children))
+                  sharing-line?
+                  (fn [[prev-child next-child]]
+                    (let [[_ prev-end]
+                          (node/node-line-range prev-child)
+                          next-start
+                          (node-start-line next-child)]
+                      (= prev-end next-start)))
+                  pairs-to-break
+                  (filterv sharing-line? all-pairs)
+                  break-edits
+                  (into
+                   []
+                   (keep
+                    (fn [[prev-child next-child]]
+                      (make-break-edit
+                       prev-child next-child indent-col)))
+                   pairs-to-break)
+                  moved-pair-children
+                  (into
+                   []
+                   (comp
+                    (map second)
+                    (filter
+                     (fn [child]
+                       (and
+                        (rules/uses-pair-grouping?
+                         child config)
+                        (not=
+                         (form-start-column child)
+                         indent-col)))))
+                   pairs-to-break)
+                  collapse-edits
+                  (collapse-repositioned-children
+                   moved-pair-children)
+                  moves-child?
+                  (not=
+                   (form-start-column child-node)
+                   indent-col)]
+              (when (seq break-edits)
+                {:edits (into break-edits collapse-edits)
+                 :moves-child? moves-child?}))))))))
+
 (defn break-form
   "Generate edits to break a form across multiple lines.
 
@@ -541,6 +611,12 @@
 
   When breaking repositions children that are already multi-line, also
   collapses them so the next iteration re-breaks at the correct indent.
+
+  When breaking will make a form multi-line, backtracks to the parent:
+  if the parent is a plain function call with siblings sharing a line,
+  generates break edits for the parent too. If the parent break moves
+  the form to a different column, the form's own edits are omitted so
+  the next iteration re-breaks at the correct indent.
 
   Comments on the same line as the preceding element stay attached.
   Comments include their trailing newline, so no extra newline is added after.
@@ -574,22 +650,31 @@
           breakable-children indent-col)
          (when (seq breakable-children)
            (let [last-kept (nth children (dec base-keep-count))
-                 edits
-                 (if (rules/uses-pair-grouping? node config)
-                   (generate-paired-edits
-                    last-kept
-                    breakable-children
-                    indent-col)
-                   (generate-sequential-edits
-                    last-kept
-                    breakable-children
-                    indent-col))]
-             (when (seq edits)
-               (let [collapse-edits
-                     (collapse-repositioned-children
-                      breakable-children)]
-                 {:edits
-                  (into edits collapse-edits)})))))))))
+                 parent-result
+                 (generate-parent-break-edits node config)]
+             (if (:moves-child? parent-result)
+               ;; Parent will move this form — omit internal edits
+               ;; (they'd use stale indent). Next iteration re-breaks.
+               {:edits (:edits parent-result)}
+               (let [edits
+                     (if (rules/uses-pair-grouping? node config)
+                       (generate-paired-edits
+                        last-kept
+                        breakable-children
+                        indent-col)
+                       (generate-sequential-edits
+                        last-kept
+                        breakable-children
+                        indent-col))]
+                 (when (seq edits)
+                   (let [collapse-edits
+                         (collapse-repositioned-children
+                          breakable-children)
+                         parent-edits (:edits parent-result)]
+                     {:edits
+                      (cond-> (into edits collapse-edits)
+                        parent-edits
+                        (into parent-edits))})))))))))))
 
 ;;; Line length checking
 
@@ -780,128 +865,22 @@
         (when (not= new-source source)
           new-source)))))
 
-;;; Multiline child breaking
-
-(defn- has-multiline-child?
-  "Returns true if any named child of node spans multiple lines."
-  [node]
-  (some
-   (fn [child]
-     (let [[start-line end-line] (node/node-line-range child)]
-       (and start-line end-line (not= start-line end-line))))
-   (node/named-children node)))
-
-(defn- needs-multiline-child-breaking?
-  "Returns true if node is breakable, not pair-grouped, has a multi-line
-  child, and has consecutive named children sharing a line.
-  Pair-grouped forms (maps, binding vectors, cond, etc.) are excluded
-  because pair-breaking already handles their layout."
-  [node config]
-  (and
-   (rules/breakable-node? node)
-   (not (rules/uses-pair-grouping? node config))
-   (has-consecutive-children-on-line? node)
-   (has-multiline-child? node)))
-
-(defn- generate-multiline-child-break-edits
-  "Generate edits to separate children sharing lines in a form with
-  multi-line children. Inserts breaks between children that share a
-  line. Also collapses repositioned pair-grouped children (maps,
-  binding vectors) whose internal indentation would be stale at
-  their new column position."
-  [node config]
-  (let [rule (rules/get-effective-rule node config)
-        children (node/named-children node)
-        base-keep-count (rules/elements-to-keep-on-first-line rule)
-        indent-col (indent-column node rule)
-        breakable-children (drop base-keep-count children)]
-    (when (seq breakable-children)
-      (let [last-kept (nth children (dec base-keep-count))
-            all-pairs (cons
-                       [last-kept (first breakable-children)]
-                       (partition 2 1 breakable-children))
-            sharing-line?
-            (fn [[prev-child next-child]]
-              (let [[_ prev-end] (node/node-line-range prev-child)
-                    next-start (node-start-line next-child)]
-                (= prev-end next-start)))
-            pairs-to-break (filterv sharing-line? all-pairs)
-            break-edits
-            (into
-             []
-             (keep
-              (fn [[prev-child next-child]]
-                (make-break-edit prev-child next-child indent-col)))
-             pairs-to-break)
-            ;; Collapse pair-grouped children moving to a new column.
-            ;; Only pair-grouped forms have stale pair indentation
-            ;; after repositioning; other forms are re-indented by
-            ;; forced-breaks or fix-source on the next iteration.
-            moved-pair-children
-            (into
-             []
-             (comp
-              (map second)
-              (filter
-               (fn [child]
-                 (and (rules/uses-pair-grouping? child config)
-                      (not= (form-start-column child) indent-col)))))
-             pairs-to-break)
-            collapse-edits
-            (collapse-repositioned-children moved-pair-children)]
-        (when (seq break-edits)
-          (into break-edits collapse-edits))))))
-
-(defn- find-multiline-child-forms
-  "Walk tree pre-order to find forms needing multiline-child breaking.
-  Does not recurse into found forms — their children may be collapsed,
-  so inner forms are deferred to the next iteration."
-  [root config]
-  (let [results (transient [])]
-    (letfn
-     [(walk
-        [node]
-        (when node
-          (if (needs-multiline-child-breaking? node config)
-            (conj! results node)
-            (doseq [child (node/named-children node)]
-              (walk child)))))]
-      (walk root))
-    (persistent! results)))
-
-(defn- try-break-multiline-children
-  "Find and break forms with multi-line children sharing lines.
-  Returns the new source if any changes were made, nil otherwise."
-  [source tree config]
-  (let [root (node/root-node tree)
-        forms (find-multiline-child-forms root config)]
-    (when (seq forms)
-      (let [edits
-            (into
-             []
-             (mapcat
-              (fn [form]
-                (generate-multiline-child-break-edits form config)))
-             forms)]
-        (when (and (seq edits) (edits-change-source? source edits))
-          (let [new-source (apply-edits source edits)]
-            (when (not= new-source source)
-              new-source)))))))
-
 (defn fix-source
-  "Fix line length violations and multiline-child sharing in source code.
+  "Fix line length violations in source code.
 
   Takes a source string and config map with :line-length. Iteratively breaks
-  forms until all lines fit or only unbreakable atoms remain. Also separates
-  children sharing lines with multi-line siblings. Returns the fixed source
-  string. Forms preceded by #_:line-breaker/ignore are not modified.
+  forms until all lines fit or only unbreakable atoms remain. Returns the
+  fixed source string. Forms preceded by #_:line-breaker/ignore are not
+  modified.
+
+  When breaking a form makes it multi-line, break-form backtracks to the
+  parent to separate siblings sharing lines with the newly multi-line child.
 
   The algorithm uses breadth-first breaking:
   1. Find lines exceeding max-length
   2. Collect ignored byte ranges (re-collected each pass as positions shift)
   3. Break the outermost form on every long line in a single pass
-  4. Separate children sharing lines with multi-line siblings
-  5. Re-parse and repeat until stable
+  4. Re-parse and repeat until stable
 
   This ensures sibling forms at the same depth are all broken before
   descending into sub-forms."
@@ -915,18 +894,13 @@
               tree (parser/parse-source source)
               ignored-ranges
               (check/find-ignored-byte-ranges tree)
-              line-source
-              (when (seq long-lines)
-                (try-break-on-lines
-                 source tree long-lines ignored-ranges config))
-              ;; Check for multiline-child sharing after line fixes
-              source' (or line-source source)
-              tree' (if line-source
-                      (parser/parse-source source')
-                      tree)
-              child-source
-              (try-break-multiline-children source' tree' config)
-              new-source (or child-source source')]
+              new-source
+              (if (seq long-lines)
+                (or (try-break-on-lines
+                     source tree long-lines
+                     ignored-ranges config)
+                    source)
+                source)]
           (if (not= new-source source)
             (recur new-source (inc iteration))
             source))))))

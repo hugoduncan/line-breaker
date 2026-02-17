@@ -843,4 +843,16 @@
            (re-find #"(?m)^  :bbb 2$" result)
            (str "second pair at col 2,"
                 " got:\n"
+                result)))))
+    (testing "given a nested call with map arg in let binding"
+      (testing "separates sibling args from map"
+        (let [input (str "(let [r (f {:a 1 :b 2"
+                         " :c 3} \"x\" \"y\")])")
+              result (reformat/reformat-source
+                      input
+                      {:line-length 30})]
+          (is
+           (not (re-find #"\}.*\"" result))
+           (str "no args on } line,"
+                " got:\n"
                 result)))))))
