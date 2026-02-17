@@ -382,6 +382,25 @@
   (let [pw (effective-pair-width exc-name exc-value config)]
     (> (+ indent-col pw) max-length)))
 
+(defn- collapse-moved-pair-children
+  "Collapse pair-grouped children whose column will change after breaking.
+  Filters pairs-to-break for pair-grouped second elements that will move
+  to indent-col, then collapses them so they re-indent correctly."
+  [pairs-to-break indent-col config]
+  (let [moved-pair-children
+        (into
+         []
+         (comp
+          (map second)
+          (filter
+           (fn [child]
+             (and
+              (rules/uses-pair-grouping? child config)
+              (not= (form-start-column child) indent-col)))))
+         pairs-to-break)]
+    (collapse-repositioned-children
+     moved-pair-children indent-col)))
+
 (defn generate-parent-break-edits
   "When breaking a child will make it multi-line, check whether the
   parent has siblings sharing a line with the child. If so, generate
@@ -427,23 +446,9 @@
                       (make-break-edit
                        prev-child next-child indent-col)))
                    pairs-to-break)
-                  moved-pair-children
-                  (into
-                   []
-                   (comp
-                    (map second)
-                    (filter
-                     (fn [child]
-                       (and
-                        (rules/uses-pair-grouping?
-                         child config)
-                        (not=
-                         (form-start-column child)
-                         indent-col)))))
-                   pairs-to-break)
                   collapse-edits
-                  (collapse-repositioned-children
-                   moved-pair-children indent-col)
+                  (collapse-moved-pair-children
+                   pairs-to-break indent-col config)
                   moves-child?
                   (not=
                    (form-start-column child-node)
