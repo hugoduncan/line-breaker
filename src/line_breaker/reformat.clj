@@ -380,7 +380,8 @@
 (defn apply-forced-breaks
   "Insert forced line breaks at structurally significant positions.
   Uses fix-source with a forced-break form-breaker.
-  When check-position? is false, skips the at-line-start? guard."
+  When check-position? is false, skips the at-line-start? guard.
+  Not used by the reformat pipeline; exposed for unit testing."
   ([source config]
    (apply-forced-breaks source config true))
   ([source config check-position?]
@@ -476,7 +477,8 @@
 
 (defn apply-pair-breaking
   "Force pair-grouped forms to break so each pair is on its own line.
-  Uses fix-source with a pair-break form-breaker."
+  Uses fix-source with a pair-break form-breaker.
+  Not used by the reformat pipeline; exposed for unit testing."
   [source config]
   (fix/fix-source source config :form-breakers [pair-break-form]))
 
