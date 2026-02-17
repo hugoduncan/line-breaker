@@ -538,13 +538,16 @@
   "Reformat source by collapsing then applying a single-pass pipeline.
   Runs forced breaks (position-checked), middle steps (pair breaking,
   fix-source), then forced breaks (unchecked). If the unchecked pass
-  changed anything, re-runs middle steps once."
+  changed anything, re-runs middle steps and forced breaks again, since
+  fix-source may collapse forms that need forced breaks."
   [source config]
   (let [collapsed (collapse-top-level-forms source)
         s1 (apply-forced-breaks collapsed config)
         s2 (run-middle-steps s1 config)
         s3 (apply-forced-breaks s2 config false)
         result (if (not= s3 s2)
-                 (run-middle-steps s3 config)
+                 (-> s3
+                     (run-middle-steps config)
+                     (apply-forced-breaks config false))
                  s3)]
     result))

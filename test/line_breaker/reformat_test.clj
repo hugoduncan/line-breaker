@@ -439,7 +439,28 @@
           "(let [x 1]\n"
           "  ;; check x\n"
           "  (when-not x (throw (ex-info \"err\" {}))))")
-         {:line-length 80}))))))
+         {:line-length 80}))))
+    (testing "preserves forced breaks after pipeline re-run"
+      ;; fix-source collapses when-not forms that fit within
+      ;; line length. The final forced-breaks pass must
+      ;; re-expand them.
+      (let [build-src (slurp "build.clj")
+            input
+            (subs
+             build-src
+             (.indexOf
+              build-src "(defn native-image"))
+            result
+            (reformat/reformat-source
+             input {:line-length 80})]
+        (is
+         (not
+          (re-find
+           #"\(when-not \S+ \(throw"
+           result))
+         (str
+          "when-not body on same line:\n"
+          result))))))
 
 (deftest apply-pair-breaking-test
   ;; Verify that apply-pair-breaking forces pair-grouped forms onto
