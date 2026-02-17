@@ -67,6 +67,11 @@ Fix line length violations:
 bb line-length fix
 ```
 
+Reformat files (structure-aware):
+```bash
+bb line-length reformat
+```
+
 Import clj-kondo configs from dependencies:
 ```bash
 bb import-kondo-config

@@ -60,8 +60,9 @@
          (println "Usage: bb line-length <command> [files...]")
          (println)
          (println "Commands:")
-         (println "  check   Check files for line length violations")
-         (println "  fix     Fix files by reformatting long lines")
+         (println "  check      Check files for line length violations")
+         (println "  fix        Fix files by reformatting long lines")
+         (println "  reformat   Reformat files (structure-aware)")
          (println)
          (println "Arguments:")
          (println "  files   Files or directories to process")
@@ -70,7 +71,8 @@
          (println "Examples:")
          (println "  bb line-length check")
          (println "  bb line-length check src")
-         (println "  bb line-length fix src/foo.clj"))
+         (println "  bb line-length fix src/foo.clj")
+         (println "  bb line-length reformat src"))
 
        (= cmd "check")
        (apply shell "clojure" "-J--enable-native-access=ALL-UNNAMED"
@@ -79,6 +81,10 @@
        (= cmd "fix")
        (apply shell "clojure" "-J--enable-native-access=ALL-UNNAMED"
               "-M" "-m" "line-breaker.main" "--fix" files)
+
+       (= cmd "reformat")
+       (apply shell "clojure" "-J--enable-native-access=ALL-UNNAMED"
+              "-M" "-m" "line-breaker.main" "--reformat" files)
 
        :else
        (do
